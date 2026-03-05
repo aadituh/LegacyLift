@@ -4,3 +4,166 @@
     padding: 0;
     box-sizing: border-box;
 }
+
+body {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #000;
+    background-color: #fff;
+    line-height: 1.6;
+}
+
+/* Navigation */
+nav {
+    border-bottom: 2px solid #000;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+nav .site-title {
+    font-size: 1.25rem;
+    font-weight: bold;
+    text-decoration: none;
+    color: #000;
+}
+
+nav ul {
+    list-style: none;
+    display: flex;
+    gap: 2rem;
+}
+
+nav ul li a {
+    text-decoration: none;
+    color: #000;
+    font-size: 0.95rem;
+}
+
+nav ul li a:hover {
+    text-decoration: underline;
+}
+
+nav ul li a.active {
+    text-decoration: underline;
+    font-weight: bold;
+}
+
+/* Main Content */
+main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+}
+
+/* Hero / Landing */
+.hero {
+    text-align: center;
+    padding: 4rem 0;
+    border-bottom: 1px solid #000;
+    margin-bottom: 2rem;
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.hero p {
+    font-size: 1.1rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Section */
+section {
+    margin-bottom: 3rem;
+}
+
+section h2 {
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #000;
+    padding-bottom: 0.5rem;
+}
+
+section p {
+    margin-bottom: 1rem;
+}
+
+.presentation-embed {
+    width: 100%;
+    border: 1px solid #000;
+    margin-top: 1rem;
+}
+
+.presentation-embed iframe {
+    width: 100%;
+    height: 500px;
+    border: none;
+    display: block;
+}
+
+/* Team Bios */
+.team-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+.team-member {
+    display: flex;
+    gap: 1.5rem;
+    border: 1px solid #000;
+    padding: 1.5rem;
+}
+
+.team-member img {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border: 1px solid #000;
+}
+
+.team-member .bio h3 {
+    margin-bottom: 0.5rem;
+}
+
+.team-member .bio p {
+    font-size: 0.95rem;
+}
+
+.contact-info {
+    list-style: none;
+    font-size: 0.9rem;
+}
+
+.contact-info li {
+    margin-bottom: 0.25rem;
+}
+
+.contact-info a {
+    text-decoration: underline;
+}
+
+footer {
+    border-top: 2px solid #000;
+    text-align: center;
+    padding: 1.5rem 2rem;
+    font-size: 0.85rem;
+}
+
+
+a {
+    color: #000;
+}
+
+/* Utility */
+.placeholder-note {
+    font-style: italic;
+    border: 1px dashed #000;
+    padding: 1rem;
+    text-align: center;
+    margin-top: 1rem;
+}
