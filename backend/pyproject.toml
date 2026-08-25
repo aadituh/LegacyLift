@@ -1,0 +1,17 @@
+[project]
+name = "legacylift"
+version = "0.1.0"
+description = "LegacyLift backend — COBOL to Python conversion service"
+readme = "README.md"
+authors = [
+    { name = "Aaditya Ghimire", email = "aadityanepali@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
