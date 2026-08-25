@@ -30,7 +30,7 @@ desktop.ini
 *.pem
 *.key
 
-# Dependencies & build output (for the backend work coming)
+# Dependencies & build output (for the backend workspace)
 node_modules/
 dist/
 build/
