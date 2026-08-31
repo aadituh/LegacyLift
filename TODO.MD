@@ -2,12 +2,15 @@
 
 ## Home / Landing Page
 
-- [ ] Add a home/landing page (may be blank for now)
+-[ ] Add a banner graphic or image
+-[ ] Add a portal or menu for easy navigation
 
-## Presentations Page
+## Media Page
 
-- [ ] Add a presentations page or section
-- [ ] Embed an iframe referencing the team's Working Draft Feasibility Presentation
+- [ ] Add the current design document with interactive elements
+- [ ] Add a project milestones section
+- [ ] Update the slide deck 
+- [ ] Add hyperlinks to WordPress and Github
 
 ## Team Bio Page
 
@@ -19,5 +22,6 @@
 
 ## Layout & Presentation
 
+- [ ] Apply a consistent CSS theming or style guide
 - [ ] Update the layout to be more presentable
 - [ ] Ensure all materials are readable, presentable, and professional
