@@ -1,29 +1,22 @@
-import re
-from typing import Dict, List
+# ML-Driven Legacy Code Modernization (Mockup)
 
-def parse_cobol(file_path: str) -> Dict:
-    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-        content = f.read().upper()
+## Files
+- `src/cobol_parser.py`: Preprocessing & feature extraction from COBOL.
+- `src/models.py`: Embeddings + KMeans clustering (unsupervised pattern detection).
+- `src/refactorer.py`: Rule-based baseline + ML-augmented OOP skeleton generation.
+- `notebooks/`: Exploration, pattern detection, and full demo.
 
-    data = {
-        'program_id': re.search(r'PROGRAM-ID\.\s*(\w+)', content),
-        'data_items': re.findall(r'0[1-9]\s+\w+.*PIC\s+[\w()V]+', content),
-        'paragraphs': re.findall(r'(\w+)-?\w*\.\s*(.*?)(?=\w+-?\w*\.|STOP RUN)', content, re.DOTALL)
-    }
-    
-    # Extract potential class fields from DATA DIVISION
-    fields = []
-    for item in data['data_items']:
-        match = re.search(r'(\w+)\s+PIC\s+(.+)', item)
-        if match:
-            fields.append({'name': match.group(1), 'pic': match.group(2)})
-    
-    # Paragraphs as potential methods
-    methods = [p[0] for p in data['paragraphs'] if p[0] not in ['MAIN-LOGIC', 'STOP']]
-    
-    return {
-        'program_name': data['program_id'].group(1) if data['program_id'] else 'UNKNOWN',
-        'potential_attributes': fields,
-        'potential_methods': methods,
-        'raw_paragraphs': data['paragraphs']
-    }
+## How to Run
+1. `pip install -r requirements.txt`
+2. `jupyter notebook`
+3. Open `notebooks/03_refactoring_demo.ipynb`
+
+## Mock ML Pipeline
+1. Parse COBOL (DATA/PROCEDURE divisions).
+2. Embed paragraphs → Cluster into conceptual classes (unsupervised).
+3. Generate Python OOP (attributes from data items, methods from clustered procedures).
+4. Compare with manual reference OOP version.
+
+Limitations (for report): Small synthetic data, heuristic parsing, template-based generation. Real version would fine-tune CodeT5 or use GNNs on program graphs.
+
+This demonstrates the full proposed pipeline in a runnable, visual form suitable for the course project.
