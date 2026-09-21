@@ -8,8 +8,13 @@
 
 ## How to Run
 1. `pip install -r requirements.txt`
-2. `jupyter notebook`
-3. Open `notebooks/03_refactoring_demo.ipynb`
+2. **Notebook:** `jupyter notebook` → open `notebooks/03_refactoring_demo.ipynb`
+3. **Script frontend (same pipeline as the notebook):**
+   ```bash
+   python run_refactoring_demo.py
+   # optional:
+   python run_refactoring_demo.py --cobol data/simple_account.cbl --save output/generated_account.py
+   ```
 
 ## Mock ML Pipeline
 1. Parse COBOL (DATA/PROCEDURE divisions).
