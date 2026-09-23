@@ -10,7 +10,7 @@ def create_app() -> FastAPI:
     @fastapi_app.get("/")
     def hello() -> dict[str, str]:
         """Return a basic liveness greeting."""
-        return {"message": "Hello from LegacyLift"}
+        return {"message": "Hello from LegacyLift."}
 
     return fastapi_app
 
