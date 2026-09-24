@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Legacy Lift Prototype</title>
+  <style>
+    body { font-family: Georgia, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    button, input { margin: 0.35rem 0.35rem 0.35rem 0; padding: 0.5rem 0.75rem; }
+    pre { background: #f4f4f4; padding: 1rem; overflow: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>LegacyLift prototype</h1>
+  <p>Upload COBOL, view analysis, then convert to a Python class.</p>
+  <input id="file" type="file" accept=".cbl,.cob,.txt">
+  <button type="button" id="sample">Load Sample</button>
+  <button type="button" id="analyze">View Analysis</button>
+  <button type="button" id="convert">Start Translation</button>
+  <p id="status">No file loaded yet.</p>
+  <h2>Results</h2>
+  <pre id="out">Waiting…</pre>
+  <script>
+    const statusEl = document.getElementById("status");
+    const outEl = document.getElementById("out");
+    const fileEl = document.getElementById("file");
+    function currentFile() {
+      return fileEl.files[0];
+    }
+    async function api(url, options) {
+      const response = await fetch(url, options);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+      return data;
+    }
+    document.getElementById("sample").onclick = async () => {
+      try {
+        const sample = await api("/api/sample");
+        const blob = new Blob([sample.source], { type: "text/plain" });
+        const file = new File([blob], sample.name);
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileEl.files = dt.files;
+        statusEl.textContent = "Sample loaded. Click View Analysis or Start Translation.";
+        outEl.textContent = sample.source;
+      } catch (err) {
+        statusEl.textContent = err.message;
+      }
+    };
+    document.getElementById("analyze").onclick = async () => {
+      const file = currentFile();
+      if (!file) { statusEl.textContent = "Choose a file first."; return; }
+      const body = new FormData();
+      body.append("file", file);
+      try {
+        const data = await api("/api/analyze", { method: "POST", body });
+        statusEl.textContent = "Analysis done.";
+        outEl.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        statusEl.textContent = err.message;
+      }
+    };
+    document.getElementById("convert").onclick = async () => {
+      const file = currentFile();
+      if (!file) { statusEl.textContent = "Choose a file first."; return; }
+      const body = new FormData();
+      body.append("file", file);
+      try {
+        statusEl.textContent = "Converting… first run can be slow.";
+        const data = await api("/api/convert", { method: "POST", body });
+        statusEl.textContent = "Translation done.";
+        outEl.textContent = data.python || JSON.stringify(data, null, 2);
+      } catch (err) {
+        statusEl.textContent = err.message;
+      }
+    };
+  </script>
+</body>
+</html>
