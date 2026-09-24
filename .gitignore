@@ -42,3 +42,4 @@ venv/
 # Logs
 *.log
 npm-debug.log*
+backend/prototype/*
