@@ -7,12 +7,13 @@
     body { font-family: Georgia, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
     button, input { margin: 0.35rem 0.35rem 0.35rem 0; padding: 0.5rem 0.75rem; }
     pre { background: #f4f4f4; padding: 1rem; overflow: auto; white-space: pre-wrap; }
+    #status.error { color: #b00020; font-weight: 600; }
   </style>
 </head>
 <body>
   <h1>LegacyLift prototype</h1>
   <p>Upload COBOL, view analysis, then convert to a Python class.</p>
-  <input id="file" type="file" accept=".cbl,.cob,.txt">
+  <input id="file" type="file" accept=".cbl,.cob">
   <button type="button" id="sample">Load Sample</button>
   <button type="button" id="analyze">View Analysis</button>
   <button type="button" id="convert">Start Translation</button>
@@ -23,8 +24,16 @@
     const statusEl = document.getElementById("status");
     const outEl = document.getElementById("out");
     const fileEl = document.getElementById("file");
+    const COBOL_ERROR = "That is not a COBOL file. Choose a .cbl or .cob file.";
     function currentFile() {
       return fileEl.files[0];
+    }
+    function isCobolFile(file) {
+      return /\.(cbl|cob)$/i.test(file.name);
+    }
+    function setStatus(message, isError) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle("error", Boolean(isError));
     }
     async function api(url, options) {
       const response = await fetch(url, options);
@@ -40,37 +49,48 @@
         const dt = new DataTransfer();
         dt.items.add(file);
         fileEl.files = dt.files;
-        statusEl.textContent = "Sample loaded. Click View Analysis or Start Translation.";
+        setStatus("Sample loaded. Click View Analysis or Start Translation.");
         outEl.textContent = sample.source;
       } catch (err) {
-        statusEl.textContent = err.message;
+        setStatus(err.message, true);
       }
+    };
+    fileEl.onchange = () => {
+      const file = currentFile();
+      if (!file) return;
+      if (!isCobolFile(file)) {
+        setStatus(COBOL_ERROR, true);
+        return;
+      }
+      setStatus(file.name + " loaded. Click View Analysis or Start Translation.");
     };
     document.getElementById("analyze").onclick = async () => {
       const file = currentFile();
-      if (!file) { statusEl.textContent = "Choose a file first."; return; }
+      if (!file) { setStatus("Choose a file first.", true); return; }
+      if (!isCobolFile(file)) { setStatus(COBOL_ERROR, true); return; }
       const body = new FormData();
       body.append("file", file);
       try {
         const data = await api("/api/analyze", { method: "POST", body });
-        statusEl.textContent = "Analysis done.";
+        setStatus("Analysis done.");
         outEl.textContent = JSON.stringify(data, null, 2);
       } catch (err) {
-        statusEl.textContent = err.message;
+        setStatus(err.message, true);
       }
     };
     document.getElementById("convert").onclick = async () => {
       const file = currentFile();
-      if (!file) { statusEl.textContent = "Choose a file first."; return; }
+      if (!file) { setStatus("Choose a file first.", true); return; }
+      if (!isCobolFile(file)) { setStatus(COBOL_ERROR, true); return; }
       const body = new FormData();
       body.append("file", file);
       try {
-        statusEl.textContent = "Converting… first run can be slow.";
+        setStatus("Converting… first run can be slow.");
         const data = await api("/api/convert", { method: "POST", body });
-        statusEl.textContent = "Translation done.";
+        setStatus("Translation done.");
         outEl.textContent = data.python || JSON.stringify(data, null, 2);
       } catch (err) {
-        statusEl.textContent = err.message;
+        setStatus(err.message, true);
       }
     };
   </script>
