@@ -4,27 +4,38 @@
   <meta charset="UTF-8">
   <title>Legacy Lift Prototype</title>
   <style>
-    body { font-family: Georgia, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    body { font-family: Georgia, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
     button, input { margin: 0.35rem 0.35rem 0.35rem 0; padding: 0.5rem 0.75rem; }
     pre { background: #f4f4f4; padding: 1rem; overflow: auto; white-space: pre-wrap; }
     #status.error { color: #b00020; font-weight: 600; }
+    .tabs { margin-top: 0.75rem; }
+    .tabs button.active { font-weight: 700; text-decoration: underline; }
   </style>
 </head>
 <body>
   <h1>LegacyLift prototype</h1>
-  <p>Upload COBOL, view analysis, then convert to a Python class.</p>
+  <p>Upload COBOL, view analysis, then convert to functionally equivalent Python (notebook pipeline).</p>
   <input id="file" type="file" accept=".cbl,.cob">
   <button type="button" id="sample">Load Sample</button>
   <button type="button" id="analyze">View Analysis</button>
   <button type="button" id="convert">Start Translation</button>
   <p id="status">No file loaded yet.</p>
-  <h2>Results</h2>
+  <div class="tabs">
+    <button type="button" id="tab-out" class="active">Results</button>
+    <button type="button" id="tab-console">Console Log</button>
+  </div>
+  <h2 id="panel-title">Results</h2>
   <pre id="out">Waiting…</pre>
+  <pre id="console" hidden>No conversion log yet.</pre>
   <script>
     const statusEl = document.getElementById("status");
     const outEl = document.getElementById("out");
+    const consoleEl = document.getElementById("console");
+    const titleEl = document.getElementById("panel-title");
     const fileEl = document.getElementById("file");
     const COBOL_ERROR = "That is not a COBOL file. Choose a .cbl or .cob file.";
+    let lastConsole = "No conversion log yet.";
+
     function currentFile() {
       return fileEl.files[0];
     }
@@ -35,12 +46,31 @@
       statusEl.textContent = message;
       statusEl.classList.toggle("error", Boolean(isError));
     }
+    function showResults() {
+      outEl.hidden = false;
+      consoleEl.hidden = true;
+      titleEl.textContent = "Results";
+      document.getElementById("tab-out").classList.add("active");
+      document.getElementById("tab-console").classList.remove("active");
+    }
+    function showConsole() {
+      outEl.hidden = true;
+      consoleEl.hidden = false;
+      consoleEl.textContent = lastConsole;
+      titleEl.textContent = "Console Log";
+      document.getElementById("tab-console").classList.add("active");
+      document.getElementById("tab-out").classList.remove("active");
+    }
     async function api(url, options) {
       const response = await fetch(url, options);
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       return data;
     }
+
+    document.getElementById("tab-out").onclick = showResults;
+    document.getElementById("tab-console").onclick = showConsole;
+
     document.getElementById("sample").onclick = async () => {
       try {
         const sample = await api("/api/sample");
@@ -51,6 +81,7 @@
         fileEl.files = dt.files;
         setStatus("Sample loaded. Click View Analysis or Start Translation.");
         outEl.textContent = sample.source;
+        showResults();
       } catch (err) {
         setStatus(err.message, true);
       }
@@ -73,7 +104,9 @@
       try {
         const data = await api("/api/analyze", { method: "POST", body });
         setStatus("Analysis done.");
+        lastConsole = "Analysis complete for " + (data.filename || file.name);
         outEl.textContent = JSON.stringify(data, null, 2);
+        showResults();
       } catch (err) {
         setStatus(err.message, true);
       }
@@ -85,10 +118,13 @@
       const body = new FormData();
       body.append("file", file);
       try {
-        setStatus("Converting… first run can be slow.");
+        setStatus("Converting…");
         const data = await api("/api/convert", { method: "POST", body });
         setStatus("Translation done.");
+        lastConsole = data.console_log || JSON.stringify(data, null, 2);
         outEl.textContent = data.python || JSON.stringify(data, null, 2);
+        consoleEl.textContent = lastConsole;
+        showResults();
       } catch (err) {
         setStatus(err.message, true);
       }

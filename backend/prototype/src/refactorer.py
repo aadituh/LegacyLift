@@ -1,142 +1,168 @@
-from src.cobol_parser import parse_cobol
-from src.models import CodeEmbedder, cluster_procedural_patterns
-from typing import Dict, List, Tuple
-import re
+"""
+ML-augmented COBOL → Python OOP refactorer (notebook Cell 4 logic).
+
+Pipeline:
+  1. Parse COBOL structure
+  2. Cluster procedural paragraphs (unsupervised TF-IDF / KMeans)
+  3. Emit one Python method per COBOL paragraph with translated statements
+  4. Wire a ``run()`` entry point from the main paragraph
+"""
+
+from __future__ import annotations
+
 from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
+
+from src.cobol_parser import parse_cobol, parse_cobol_source
+from src.models import cluster_procedural_patterns
+from src.translator import (
+    CobolTranslator,
+    clean_identifier,
+    default_value_for_pic,
+    map_pic_to_type,
+)
+
 
 class OOPRefactorer:
-    def __init__(self):
-        self.embedder = CodeEmbedder()
+    """Generate functionally oriented Python OOP from a COBOL program."""
 
-    def _clean_name(self, name: str) -> str:
-        """Convert COBOL paragraph names to valid Python method names."""
-        name = re.sub(r'[^a-zA-Z0-9_]', '_', name.lower())
-        name = re.sub(r'_+', '_', name).strip('_')
-        return name or 'unknown_method'
+    def __init__(self, use_ml_clustering: bool = True):
+        self.use_ml_clustering = use_ml_clustering
+        self._embedder = None  # lazy; notebooks import CodeEmbedder separately
 
-    def _map_pic_to_type(self, pic: str) -> str:
-        pic = pic.upper()
-        if any(x in pic for x in ['S9', 'V9', '9V']):
-            return "Decimal"
-        elif '9' in pic:
-            return "int"
-        elif 'X' in pic:
-            return "str"
-        return "Any"
+    @property
+    def embedder(self):
+        """Lazy CodeEmbedder for notebook / analysis parity (not required for convert)."""
+        if self._embedder is None:
+            from src.models import CodeEmbedder
 
-    def _translate_paragraph_to_code(self, para_name: str, para_body: str) -> List[str]:
-        """Translate individual COBOL paragraph into Python statements."""
-        lines = []
-        body_upper = para_body.upper()
+            self._embedder = CodeEmbedder()
+        return self._embedder
 
-        if any(word in body_upper for word in ["ADD", "DEPOSIT"]):
-            lines.append("        self.balance += self.amount")
-            lines.append('        print(f"Deposit processed for account {self.number}. New balance: {self.balance}")')
-        elif any(word in body_upper for word in ["SUBTRACT", "WITHDRAWAL"]):
-            lines.append("        if self.amount <= self.balance:")
-            lines.append("            self.balance -= self.amount")
-            lines.append('            print(f"Withdrawal processed for account {self.number}. New balance: {self.balance}")')
-            lines.append("        else:")
-            lines.append('            print(f"Insufficient funds in account {self.number}.")')
-        elif "DISPLAY" in body_upper and ("BALANCE" in body_upper or "REPORT" in body_upper):
-            lines.append('        print(f"Account Balance Report: {self.balance}")')
-        elif "DISPLAY" in body_upper:
-            lines.append('        print("COBOL DISPLAY statement executed")')
+    def _class_name(self, program_name: str) -> str:
+        return clean_identifier(program_name).title().replace("_", "") + "Class"
+
+    def _cluster_paragraphs(
+        self, paragraphs: List[Tuple[str, str]]
+    ) -> Dict[int, List[Tuple[str, str]]]:
+        names = [n for n, _ in paragraphs]
+        texts = [b if b.strip() else n for n, b in paragraphs]
+        if self.use_ml_clustering and len(texts) >= 2:
+            labels = cluster_procedural_patterns(
+                texts, n_clusters=min(4, len(texts))
+            )
         else:
-            lines.append("        # TODO: Translate remaining COBOL logic here")
-            lines.append("        pass")
+            labels = list(range(len(texts)))
+        groups: Dict[int, List[Tuple[str, str]]] = defaultdict(list)
+        for label, name, body in zip(labels, names, [b for _, b in paragraphs]):
+            groups[int(label)].append((name, body))
+        return groups
 
-        return lines
+    def _find_main_paragraph(self, paragraphs: List[Tuple[str, str]]) -> Optional[str]:
+        for name, _ in paragraphs:
+            upper = name.upper()
+            if upper.startswith("MAIN") or upper.endswith("-MAIN") or upper == "MAIN":
+                return name
+        return paragraphs[0][0] if paragraphs else None
 
-    def refactor(self, cobol_file: str) -> str:
-        parsed = parse_cobol(cobol_file)
-        
-        class_name = self._clean_name(parsed['program_name']).title() + "Class"
-        
-        # Build attributes
-        attributes = []
-        for item in parsed['potential_attributes']:
-            py_type = self._map_pic_to_type(item.get('pic', ''))
-            attr_name = self._clean_name(item['name'])
-            attributes.append(
-                f"        self.{attr_name}: {py_type} = None  # from PIC {item.get('pic', 'Unknown')}"
+    def refactor_parsed(self, parsed: dict) -> str:
+        """Generate Python source from an already-parsed COBOL dict."""
+        fields = parsed.get("potential_attributes") or []
+        paragraphs = parsed.get("raw_paragraphs") or []
+        program_name = parsed.get("program_name") or "UNKNOWN"
+        class_name = self._class_name(program_name)
+
+        field_names = [item["name"] for item in fields]
+        translator = CobolTranslator(field_names)
+        clusters = self._cluster_paragraphs(paragraphs) if paragraphs else {}
+
+        # Attribute declarations
+        attr_lines: List[str] = []
+        init_assigns: List[str] = []
+        for item in fields:
+            py_name = clean_identifier(item["name"])
+            py_type = map_pic_to_type(item.get("pic", ""))
+            default = default_value_for_pic(item.get("pic", ""))
+            attr_lines.append(
+                f"        self.{py_name}: {py_type} = {default}  # from PIC {item.get('pic', 'Unknown')}"
             )
 
-        # Cluster paragraphs using embeddings (unsupervised ML)
-        paragraph_texts = [body for _, body in parsed['raw_paragraphs']]
-        paragraph_names = [name for name, _ in parsed['raw_paragraphs']]
+        # Cluster summary comment for ML notebook parity
+        cluster_comment_lines = [
+            "    # === Procedural patterns grouped via unsupervised clustering ===",
+        ]
+        for cluster_id, group in sorted(clusters.items()):
+            members = ", ".join(n for n, _ in group)
+            cluster_comment_lines.append(
+                f"    # Cluster {cluster_id}: {members}"
+            )
+        cluster_comment_lines.append("")
 
-        if len(paragraph_texts) >= 2:
-            clusters = cluster_procedural_patterns(paragraph_texts, n_clusters=min(4, len(paragraph_texts)))
-        else:
-            clusters = [0] * len(paragraph_texts)
-
-        # Group by cluster
-        groups: Dict[int, List[Tuple[str, str]]] = defaultdict(list)
-        for i, cluster_id in enumerate(clusters):
-            if i < len(paragraph_names):
-                groups[cluster_id].append((paragraph_names[i], paragraph_texts[i]))
-
-        # Build code
-        code_lines = [
+        code_lines: List[str] = [
             "from decimal import Decimal",
             "from typing import Any",
             "",
             f"class {class_name}:",
             '    """',
-            f'    Modern OOP version of COBOL program: {parsed["program_name"]}',
-            '    Generated by ML-Driven Legacy Code Modernization framework',
+            f"    Modern OOP version of COBOL program: {program_name}",
+            "    Generated by ML-Driven Legacy Code Modernization framework",
             '    """',
             "",
-            "    def __init__(self, account_number: int = 0, owner: str = ''):",
-            "        # Data Division → Class Attributes",
-            *attributes,
-            "        self.number = account_number",
-            "        self.owner = owner",
-            "        self.amount: Decimal = Decimal('0.00')",
-            "        self.balance: Decimal = Decimal('0.00')",
-            "",
-            "    # === Business Logic Methods (Procedural Patterns Grouped via Clustering) ===",
-            ""
+            "    def __init__(self):",
+            "        # Data Division -> Class Attributes",
         ]
+        if attr_lines:
+            code_lines.extend(attr_lines)
+        else:
+            code_lines.append("        pass")
+        code_lines.append("")
+        code_lines.extend(cluster_comment_lines)
+        code_lines.append(
+            "    # === Business Logic Methods (one per COBOL paragraph) ==="
+        )
+        code_lines.append("")
 
-        # Add one method per cluster with meaningful logic
-        for cluster_id, group in groups.items():
-            # Try to pick a good method name from the paragraphs in the group
-            method_name = "main_logic" if cluster_id == 0 and any("main" in n.lower() for n, _ in group) else \
-                          self._clean_name(group[0][0]) if group else f"group_{cluster_id}"
-            
-            code_lines.append(f"    def {method_name}(self):")
-            code_lines.append(f'        """')
-            code_lines.append(f'        Implements clustered logic from COBOL paragraphs: {", ".join([n for n,_ in group])}')
-            code_lines.append(f'        """')
-            
-            for name, body in group:
-                code_lines.append(f"        # From paragraph: {name}")
-                code_lines.extend(self._translate_paragraph_to_code(name, body))
-                code_lines.append("")
-            
+        method_names: List[str] = []
+        for name, body in paragraphs:
+            method = clean_identifier(name)
+            method_names.append(method)
+            code_lines.append(f"    def {method}(self):")
+            code_lines.append(f'        """COBOL paragraph: {name}"""')
+            code_lines.extend(translator.translate_paragraph(body))
             code_lines.append("")
 
-        # Add convenient run() method
-        code_lines.extend([
-            "    def run(self):",
-            '        """Simulates the main COBOL execution flow (MAIN-LOGIC)."""',
-            "        print('=== Starting COBOL Modernized Program ===')",
-            "        print(f'Processing account: {self.number} - Owner: {self.owner}')",
-            "",
-            "        # Example transaction flow",
-            "        self.amount = Decimal('150.00')",
-            "        self.deposit() if hasattr(self, 'deposit') else self.group_0() if hasattr(self, 'group_0') else None",
-            "",
-            "        self.amount = Decimal('75.50')",
-            "        self.withdraw() if hasattr(self, 'withdraw') else None",
-            "",
-            "        self.generate_report() if hasattr(self, 'generate_report') else None",
-            "",
-            "        print('=== Program completed successfully ===')",
-            ""
-        ])
+        main_para = self._find_main_paragraph(paragraphs)
+        main_method = clean_identifier(main_para) if main_para else None
 
-        code_lines.append("    # Business logic preserved and modernized from original COBOL")
+        code_lines.extend(
+            [
+                "    def run(self):",
+                '        """Entry point - mirrors COBOL PROCEDURE DIVISION main flow."""',
+                "        print('=== Starting modernized COBOL program ===')",
+                f"        print(f'Program: {program_name}')",
+            ]
+        )
+        if main_method and main_method in method_names:
+            code_lines.append(f"        self.{main_method}()")
+        elif method_names:
+            code_lines.append(f"        self.{method_names[0]}()")
+        else:
+            code_lines.append("        pass")
+        code_lines.extend(
+            [
+                "        print('=== Program completed successfully ===')",
+                "",
+                "    # Business logic preserved and modernized from original COBOL",
+            ]
+        )
         return "\n".join(code_lines)
+
+    def refactor(self, cobol_file: str) -> str:
+        """Refactor a COBOL file path into Python OOP source (notebook API)."""
+        parsed = parse_cobol(cobol_file)
+        return self.refactor_parsed(parsed)
+
+    def refactor_source(self, source: str) -> str:
+        """Refactor COBOL source text into Python OOP source (web / API)."""
+        parsed = parse_cobol_source(source)
+        return self.refactor_parsed(parsed)
