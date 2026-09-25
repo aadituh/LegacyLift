@@ -61,6 +61,11 @@
       statusEl.textContent = message;
       statusEl.classList.toggle("error", Boolean(isError));
     }
+    const API_ORIGIN = location.port === "8000" ? "" : "http://127.0.0.1:8000";
+    function showError(err) {
+      setStatus(err.message, true);
+      outEl.textContent = err.message;
+    }
     function showResults() {
       outEl.hidden = false;
       consoleEl.hidden = true;
@@ -77,9 +82,21 @@
       document.getElementById("tab-out").classList.remove("active");
     }
     async function api(url, options) {
-      const response = await fetch(url, options);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+      const response = await fetch(API_ORIGIN + url, { cache: "no-store", ...options });
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        const snippet = text.replace(/\s+/g, " ").trim().slice(0, 180);
+        throw new Error(snippet
+          ? "The server did not return JSON. " + snippet
+          : "The server returned an empty response.");
+      }
+      if (!response.ok) {
+        const detail = data && data.detail;
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(data));
+      }
       return data;
     }
 
@@ -98,7 +115,7 @@
         outEl.textContent = sample.source;
         showResults();
       } catch (err) {
-        setStatus(err.message, true);
+        showError(err);
       }
     };
     fileEl.onchange = () => {
@@ -123,7 +140,7 @@
         outEl.textContent = formatAnalysis(data);
         showResults();
       } catch (err) {
-        setStatus(err.message, true);
+        showError(err);
       }
     };
     document.getElementById("convert").onclick = async () => {
@@ -142,7 +159,7 @@
         consoleEl.textContent = lastConsole;
         showResults();
       } catch (err) {
-        setStatus(err.message, true);
+        showError(err);
       }
     };
     document.getElementById("download").onclick = () => {
