@@ -14,7 +14,7 @@ if str(PROTOTYPE_ROOT) not in sys.path:
 
 from src.pipeline import analyze_source, convert_source  # noqa: E402
 
-UI_PATH = Path(__file__).resolve().parent / "static" / "index.html"
+UI_PATH = Path(__file__).resolve().parents[3] / "frontend" / "index.html"
 SAMPLE_COBOL = PROTOTYPE_ROOT / "data" / "simple_account.cbl"
 
 

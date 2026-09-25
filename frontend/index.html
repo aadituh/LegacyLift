@@ -19,6 +19,7 @@
   <button type="button" id="sample">Load Sample</button>
   <button type="button" id="analyze">View Analysis</button>
   <button type="button" id="convert">Start Translation</button>
+  <button type="button" id="download">Download Python</button>
   <p id="status">No file loaded yet.</p>
   <div class="tabs">
     <button type="button" id="tab-out" class="active">Results</button>
@@ -35,6 +36,7 @@
     const fileEl = document.getElementById("file");
     const COBOL_ERROR = "That is not a COBOL file. Choose a .cbl or .cob file.";
     let lastConsole = "No conversion log yet.";
+    let lastPython = "";
 
     function currentFile() {
       return fileEl.files[0];
@@ -42,6 +44,19 @@
     function isCobolFile(file) {
       return /\.(cbl|cob)$/i.test(file.name);
     }
+    function formatAnalysis(data) {
+  const fields = (data.attributes || [])
+    .map((item) => "- " + item.name + " (" + item.pic + ")")
+    .join("\n") || "- none";
+  const paragraphs = (data.paragraphs || [])
+    .map((item) => "- " + item.name)
+    .join("\n") || "- none";
+  return (
+    "Program: " + (data.program_name || "UNKNOWN") + "\n\n" +
+    "Fields:\n" + fields + "\n\n" +
+    "Paragraphs:\n" + paragraphs
+  );
+}
     function setStatus(message, isError) {
       statusEl.textContent = message;
       statusEl.classList.toggle("error", Boolean(isError));
@@ -105,7 +120,7 @@
         const data = await api("/api/analyze", { method: "POST", body });
         setStatus("Analysis done.");
         lastConsole = "Analysis complete for " + (data.filename || file.name);
-        outEl.textContent = JSON.stringify(data, null, 2);
+        outEl.textContent = formatAnalysis(data);
         showResults();
       } catch (err) {
         setStatus(err.message, true);
@@ -120,6 +135,7 @@
       try {
         setStatus("Converting…");
         const data = await api("/api/convert", { method: "POST", body });
+        lastPython = data.python || "";
         setStatus("Translation done.");
         lastConsole = data.console_log || JSON.stringify(data, null, 2);
         outEl.textContent = data.python || JSON.stringify(data, null, 2);
@@ -129,6 +145,20 @@
         setStatus(err.message, true);
       }
     };
+    document.getElementById("download").onclick = () => {
+  if (!lastPython) {
+    setStatus("Convert a file first.", true);
+    return;
+  }
+  const name = ((currentFile() && currentFile().name) || "converted.cbl")
+    .replace(/\.(cbl|cob)$/i, "") + ".py";
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([lastPython], { type: "text/plain" }));
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  setStatus("Downloaded " + name + ".");
+};
   </script>
 </body>
 </html>
