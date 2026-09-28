@@ -58,6 +58,7 @@
   <ul id="history-list"></ul>
   <button type="button" id="clear-history">Clear History</button>
 </div>
+  <script src="converter.js"></script>
   <script>
     /*
     Conversion UI (frontend/index.html), served by FastAPI at http://127.0.0.1:8000
@@ -79,7 +80,9 @@
       History list/replace is by filename (same name overwrites that row)
       Clear History re-saves the translation still on screen
 
-    API_ORIGIN is "" when this page is on port 8000; otherwise it calls 127.0.0.1:8000
+    Load Sample uses an embedded copy of simple_account.cbl so it never depends
+    on /api/sample (avoids "Failed to fetch" when the page is opened via file://
+    or Live Server while uvicorn is down). Start still needs the API on :8000.
     */
     const statusEl = document.getElementById("status");
     const outEl = document.getElementById("out");
@@ -93,6 +96,39 @@
     const cobolPane = document.getElementById("cobol-pane");
     const pythonPane = document.getElementById("python-pane");
     const COBOL_ERROR = "That is not a COBOL file. Choose a .cbl or .cob file.";
+    // Embedded sample (backend/prototype/data/simple_account.cbl) — Load Sample works offline.
+    const EMBEDDED_SAMPLE = {
+      name: "simple_account.cbl",
+      source:
+        "IDENTIFICATION DIVISION.\n" +
+        "PROGRAM-ID. ACCOUNT-PROC.\n" +
+        "\n" +
+        "DATA DIVISION.\n" +
+        "WORKING-STORAGE SECTION.\n" +
+        "01 ACCOUNT-RECORD.\n" +
+        "   05 ACCOUNT-NUMBER     PIC 9(10).\n" +
+        "   05 ACCOUNT-BALANCE    PIC S9(10)V99.\n" +
+        "   05 ACCOUNT-OWNER      PIC X(50).\n" +
+        "   05 TRANSACTION-AMOUNT PIC S9(8)V99.\n" +
+        "\n" +
+        "PROCEDURE DIVISION.\n" +
+        "MAIN-LOGIC.\n" +
+        "    PERFORM PROCESS-DEPOSIT.\n" +
+        "    PERFORM PROCESS-WITHDRAWAL.\n" +
+        "    PERFORM GENERATE-REPORT.\n" +
+        "    STOP RUN.\n" +
+        "\n" +
+        "PROCESS-DEPOSIT.\n" +
+        "    ADD TRANSACTION-AMOUNT TO ACCOUNT-BALANCE.\n" +
+        '    DISPLAY "Deposit processed for account " ACCOUNT-NUMBER.\n' +
+        "\n" +
+        "PROCESS-WITHDRAWAL.\n" +
+        "    SUBTRACT TRANSACTION-AMOUNT FROM ACCOUNT-BALANCE.\n" +
+        '    DISPLAY "Withdrawal processed for account " ACCOUNT-NUMBER.\n' +
+        "\n" +
+        "GENERATE-REPORT.\n" +
+        '    DISPLAY "Account Balance Report: " ACCOUNT-BALANCE.\n'
+    };
     let lastConsole = "No conversion log yet.";
     let lastAnalysis = "";
     let lastPython = "";
@@ -201,10 +237,67 @@
       statusEl.textContent = message;
       statusEl.classList.toggle("error", Boolean(isError));
     }
-    const API_ORIGIN = location.port === "8000" ? "" : "http://127.0.0.1:8000";
+    // Prefer same-origin (uvicorn on :8000), then common local API hosts.
+    function apiCandidates() {
+      const list = [];
+      if (location.protocol.startsWith("http") && location.port === "8000") {
+        list.push("");
+      }
+      list.push("http://127.0.0.1:8000", "http://localhost:8000");
+      return list.filter((v, i, a) => a.indexOf(v) === i);
+    }
+    let API_ORIGIN = apiCandidates()[0];
     function showError(err) {
-      setStatus(err.message, true);
-      outEl.textContent = err.message;
+      const message = err && err.message ? err.message : String(err);
+      setStatus(message, true);
+      lastConsole = message;
+      if (!consoleEl.hidden) {
+        consoleEl.textContent = lastConsole;
+      }
+    }
+    function applyConversionResult(file, key, data, analysisText) {
+      lastPython = data.python || "";
+      lastTranslatedKey = key;
+      outEl.textContent = analysisText || "Waiting...";
+      lastConsole = data.console_log || JSON.stringify(data, null, 2);
+      lastAnalysis = outEl.textContent;
+      saveHistoryEntry(file.name, lastCobol, lastPython, lastConsole, lastAnalysis);
+      cobolEl.textContent = lastCobol || "(no COBOL loaded)";
+      pythonEl.textContent = lastPython || JSON.stringify(data, null, 2);
+      consoleEl.textContent = lastConsole;
+      setCompareMode("split");
+      showCompare();
+    }
+    function convertWithFallback(file, key) {
+      // Browser fallback mirrors prototype parse/translate when API is down.
+      if (!window.LegacyLiftConverter) {
+        throw new Error("Local converter failed to load (converter.js missing).");
+      }
+      const local = window.LegacyLiftConverter.convertLocal(lastCobol, file.name);
+      applyConversionResult(file, key, local, local.analysis_text);
+      setStatus(
+        "Translation done in-browser (API offline). Open http://127.0.0.1:8000/ with the backend for full ML clustering."
+      );
+      return local;
+    }
+    function loadSampleIntoInput(sample) {
+      const blob = new Blob([sample.source], { type: "text/plain" });
+      const file = new File([blob], sample.name, { type: "text/plain" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileEl.files = dt.files;
+      const saved = findHistory(sample.name, sample.source);
+      if (saved) {
+        restoreHistory(saved);
+        return;
+      }
+      lastCobol = sample.source;
+      clearTranslation();
+      cobolEl.textContent = sample.source;
+      pythonEl.textContent = "Waiting...";
+      setStatus("Sample loaded. Click Start to begin conversion.");
+      outEl.textContent = "Waiting...";
+      showResults();
     }
     function setTab(activeId) {
       document.getElementById("tab-out").classList.toggle("active", activeId === "tab-out");
@@ -261,22 +354,40 @@
       renderHistory();
     }
     async function api(url, options) {
-      const response = await fetch(API_ORIGIN + url, { cache: "no-store", ...options });
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (err) {
-        const snippet = text.replace(/\s+/g, " ").trim().slice(0, 180);
-        throw new Error(snippet
-          ? "The server did not return JSON. " + snippet
-          : "The server returned an empty response.");
+      const origins = [API_ORIGIN].concat(apiCandidates());
+      const tried = [];
+      let lastErr = null;
+      for (let i = 0; i < origins.length; i++) {
+        const origin = origins[i];
+        if (tried.indexOf(origin) !== -1) continue;
+        tried.push(origin);
+        try {
+          const response = await fetch(origin + url, { cache: "no-store", ...options });
+          const text = await response.text();
+          let data;
+          try {
+            data = JSON.parse(text);
+          } catch (err) {
+            const snippet = text.replace(/\s+/g, " ").trim().slice(0, 180);
+            throw new Error(snippet
+              ? "The server did not return JSON. " + snippet
+              : "The server returned an empty response.");
+          }
+          if (!response.ok) {
+            const detail = data && data.detail;
+            throw new Error(typeof detail === "string" ? detail : JSON.stringify(data));
+          }
+          API_ORIGIN = origin;
+          return data;
+        } catch (err) {
+          lastErr = err;
+        }
       }
-      if (!response.ok) {
-        const detail = data && data.detail;
-        throw new Error(typeof detail === "string" ? detail : JSON.stringify(data));
-      }
-      return data;
+      const msg = lastErr && lastErr.message ? lastErr.message : "network error";
+      const err = new Error(msg);
+      err.isNetwork = /fetch|network|Failed|Load failed|NetworkError/i.test(msg) ||
+        msg === "Failed to fetch";
+      throw err;
     }
     document.getElementById("tab-out").onclick = showResults;
     document.getElementById("tab-compare").onclick = showCompare;
@@ -299,26 +410,16 @@
     document.getElementById("view-cobol").onclick = () => setCompareMode("cobol"); 
     document.getElementById("view-python").onclick = () => setCompareMode("python"); 
     document.getElementById("sample").onclick = async () => {
+      // Prefer embedded sample so Load Sample never dies with "Failed to fetch".
+      // If the API is up, refresh from /api/sample (keeps UI in sync with disk).
       try {
         const sample = await api("/api/sample");
-        const blob = new Blob([sample.source], { type: "text/plain" });
-        const file = new File([blob], sample.name);
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        fileEl.files = dt.files;
-        // Same filename + text in history: reopen. Else reset Analysis to Waiting...
-        const saved = findHistory(sample.name, sample.source)
-        if (saved) {
-          restoreHistory(saved);
-          return;
-        }
-        lastCobol = sample.source;
-        clearTranslation();
-        setStatus("Sample loaded. Click Start to begin conversion.");
-        outEl.textContent = "Waiting...";
-        showResults();
+        loadSampleIntoInput(sample);
       } catch (err) {
-        showError(err);
+        loadSampleIntoInput(EMBEDDED_SAMPLE);
+        setStatus(
+          "Sample loaded from built-in copy. Click Start (API needed for conversion)."
+        );
       }
     };
     fileEl.onchange = () => {
@@ -387,23 +488,24 @@
       try {
         setStatus("Converting...");
         const data = await api("/api/convert", { method: "POST", body });
-        lastPython = data.python || "";
-        lastTranslatedKey = key;
-        const analysisBody = new FormData();
-        analysisBody.append("file", file);
-        const analysis = await api("/api/analyze", { method: "POST", body: analysisBody });
-        outEl.textContent = formatAnalysis(analysis);
-        lastConsole = data.console_log || JSON.stringify(data, null, 2);
-        lastAnalysis = outEl.textContent;
-        saveHistoryEntry(file.name, lastCobol, lastPython, lastConsole, lastAnalysis);
-        cobolEl.textContent = lastCobol || "(no COBOL loaded)";
-        pythonEl.textContent = lastPython || JSON.stringify(data, null, 2);
-        consoleEl.textContent = lastConsole;
+        let analysisText = "";
+        try {
+          const analysisBody = new FormData();
+          analysisBody.append("file", file);
+          const analysis = await api("/api/analyze", { method: "POST", body: analysisBody });
+          analysisText = formatAnalysis(analysis);
+        } catch (analyzeErr) {
+          // Convert succeeded; analyze optional — synthesize from convert payload if present.
+          if (data.analysis) analysisText = formatAnalysis(data.analysis);
+        }
+        applyConversionResult(file, key, data, analysisText);
         setStatus("Translation done. Click Translation or Analysis to view output.");
-        setCompareMode("split");
-        showCompare();
       } catch (err) {
-        showError(err);
+        try {
+          convertWithFallback(file, key);
+        } catch (localErr) {
+          showError(localErr);
+        }
       }
     };
     document.getElementById("download").onclick = () => {

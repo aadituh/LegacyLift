@@ -9,13 +9,23 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
+# Windows consoles often use cp1252; pipeline logs may include Unicode.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 PROTOTYPE_ROOT = Path(__file__).resolve().parents[2] / "prototype"
 if str(PROTOTYPE_ROOT) not in sys.path:
     sys.path.insert(0, str(PROTOTYPE_ROOT))
 
 from src.pipeline import analyze_source, convert_source  # noqa: E402
 
-UI_PATH = Path(__file__).resolve().parents[3] / "frontend" / "index.html"
+FRONTEND_ROOT = Path(__file__).resolve().parents[3] / "frontend"
+UI_PATH = FRONTEND_ROOT / "index.html"
+CONVERTER_JS = FRONTEND_ROOT / "converter.js"
 SAMPLE_COBOL = PROTOTYPE_ROOT / "data" / "simple_account.cbl"
 
 
@@ -40,6 +50,16 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail="Demo UI is missing")
         return FileResponse(UI_PATH, headers={"Cache-Control": "no-store"})
 
+    @fastapi_app.get("/converter.js")
+    def converter_script() -> FileResponse:
+        if not CONVERTER_JS.exists():
+            raise HTTPException(status_code=500, detail="converter.js is missing")
+        return FileResponse(
+            CONVERTER_JS,
+            media_type="application/javascript; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
+        )
+
     @fastapi_app.get("/health")
     def health() -> dict[str, str]:
         return {"message": "Hello from Legacy Lift."}
@@ -59,7 +79,7 @@ def create_app() -> FastAPI:
         if not source.strip():
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
         filename = file.filename or "upload.cbl"
-        print(f"\n=== /api/analyze ← {filename} ===")
+        print(f"\n=== /api/analyze <- {filename} ===")
         return analyze_source(source, filename=filename)
 
     @fastapi_app.post("/api/convert")
@@ -68,7 +88,7 @@ def create_app() -> FastAPI:
         if not source.strip():
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
         filename = file.filename or "upload.cbl"
-        print(f"\n=== /api/convert ← {filename} ===")
+        print(f"\n=== /api/convert <- {filename} ===")
         return convert_source(source, filename=filename)
 
     return fastapi_app

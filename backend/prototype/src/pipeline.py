@@ -98,7 +98,7 @@ def convert_source(
         filename, analysis, python, console_log
     """
     _configure_logging()
-    logger.info("Converting COBOL → Python (%s)", filename)
+    logger.info("Converting COBOL -> Python (%s)", filename)
     analysis = analyze_source(source, filename=filename)
     refactorer = OOPRefactorer(use_ml_clustering=use_ml_clustering)
     python_code = refactorer.refactor_source(source)
