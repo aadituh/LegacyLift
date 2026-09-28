@@ -7,7 +7,6 @@
     body { font-family: Georgia, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
     button, input { margin: 0.35rem 0.35rem 0.35rem 0; padding: 0.5rem 0.75rem; }
     pre { background: #f4f4f4; padding: 1rem; overflow: auto; white-space: pre-wrap; }
-    #status.error { color: #b00020; font-weight: 600; }
     .tabs { margin-top: 0.75rem; }
     .tabs button.active { font-weight: 700; text-decoration: underline; }
     .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -17,11 +16,15 @@
     #cobol-pane[hidden], #python-pane[hidden], #history[hidden] { display: none; }
     #history-list { list-style: none; padding: 0; margin: 0.5rem 0; }
     #history-list button { display: block; width: 100%; text-align: left; }
+    #status.error { color: #b00020; font-weight: 600; }
+    #status.busy { font-weight: 700; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
   </style>
 </head>
 <body>
   <h1>Legacy Lift Prototype</h1>
-  <p>Upload COBOL, then convert to view Analysis and Translation (to equivalently functional Python).</p>
+  <p>Upload COBOL, then convert to view Analysis and Translation.</p>
+  <p>This conversion uses paragraph clustering and rules. It currently does not use Gemini.</p>
   <input id="file" type="file" accept=".cbl,.cob">
   <button type="button" id="sample">Load Sample</button>
   <button type="button" id="convert">Start</button>
@@ -54,7 +57,7 @@
 </div>
 <pre id="console" hidden>No conversion log yet.</pre>
 <div id="history" hidden>
-  <p>Past conversions. Click on selected file to reopen it.</p>
+  <p>Past conversions in this browser only. Click a file to reopen it.</p>
   <ul id="history-list"></ul>
   <button type="button" id="clear-history">Clear History</button>
 </div>
@@ -236,6 +239,7 @@
     function setStatus(message, isError) {
       statusEl.textContent = message;
       statusEl.classList.toggle("error", Boolean(isError));
+      statusEl.classList.toggle("busy", message.indexOf("Converting...") === 0);
     }
     // Prefer same-origin (uvicorn on :8000), then common local API hosts.
     function apiCandidates() {
@@ -485,6 +489,8 @@
       }
       const body = new FormData();
       body.append("file", file);
+      const convertBtn = document.getElementById("convert");
+      convertBtn.disabled = true;
       try {
         setStatus("Converting...");
         const data = await api("/api/convert", { method: "POST", body });
@@ -506,6 +512,8 @@
         } catch (localErr) {
           showError(localErr);
         }
+      } finally {
+        convertBtn.disabled = false;
       }
     };
     document.getElementById("download").onclick = () => {
