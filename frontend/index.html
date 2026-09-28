@@ -60,41 +60,41 @@
     <div class="tabs">
       <button type="button" id="view-split" class="active">Split View</button>
       <button type="button" id="view-cobol">COBOL Only</button>
-      <button type="button" id="view-python">Python Only</button>
-    </div>
-    <div id="split" class="split">
-      <div id="cobol-pane">
-        <h3>Original COBOL</h3>
-        <pre id="cobol">Waiting…</pre>
-      </div>
-      <div id="python-pane">
-        <h3>Generated Python</h3>
-        <pre id="python">Waiting…</pre>
-      </div>
-    </div>
+    <button type="button" id="view-python">Python Only</button>
   </div>
-
-  <pre id="console" hidden>No conversion log yet.</pre>
-
-  <div id="history" hidden>
-    <p>Past conversions in this browser only. Click a file to reopen it.</p>
-    <ul id="history-list"></ul>
-    <button type="button" id="clear-history">Clear History</button>
+  <div id="split" class="split">
+   <div id="cobol-pane">
+    <h3>Original COBOL</h3>
+    <pre id="cobol">Waiting…</pre>
   </div>
-
-  <div id="ai-disclosure" hidden>
-    <div class="box">
-      <p>This tool uses AI/ML (paragraph clustering plus translation rules). Generated Python can be wrong or incomplete. Please review before relying on it.</p>
-      <p>
-        <label>
-          <input type="checkbox" id="ai-disclosure-hide">
-          Don't show this again.
-        </label>
-      </p>
-      <button type="button" id="ai-disclosure-continue">Continue</button>
-      <button type="button" id="ai-disclosure-cancel">Cancel</button>
-    </div>
+  <div id="python-pane">
+    <h3>Generated Python</h3>
+    <pre id="python">Waiting…</pre>
   </div>
+ </div>
+</div>
+
+<pre id="console" hidden>No conversion log yet.</pre>
+
+<div id="history" hidden>
+  <p>Past conversions in this browser only. Click a file to reopen it.</p>
+  <ul id="history-list"></ul>
+  <button type="button" id="clear-history">Clear History</button>
+</div>
+
+<div id="ai-disclosure" hidden>
+  <div class="box">
+    <p>This tool uses AI/ML (paragraph clustering plus translation rules). Generated Python can be wrong or incomplete. Please review before relying on it.</p>
+    <p>
+      <label>
+        <input type="checkbox" id="ai-disclosure-hide">
+        Don't show this again.
+      </label>
+    </p>
+    <button type="button" id="ai-disclosure-continue">Continue</button>
+    <button type="button" id="ai-disclosure-cancel">Cancel</button>
+  </div>
+</div>
 
   <script src="converter.js"></script>
   <script>
@@ -137,7 +137,7 @@
     const HISTORY_KEY = "legacylift-history";
     const DISCLOSE_KEY = "legacylift-ai-disclosure-hide";
     const historyEl = document.getElementById("history");
-    const historyListEl = document.getElementById("history-list");
+    const historyListEl= document.getElementById("history-list");
 
     // Embedded sample (backend/prototype/data/simple_account.cbl) — Load Sample works offline.
     const EMBEDDED_SAMPLE = {
@@ -285,16 +285,45 @@
 
     // Turns /api/analyze JSON into readable program / fields / paragraphs text.
     function formatAnalysis(data) {
-      const fields = (data.attributes || [])
-        .map((item) => "- " + item.name + " (" + item.pic + ")")
+      const fields = data.attributes || [];
+      const paragraphs = data.paragraphs || [];
+      const clusters = data.clusters || [];
+      const methods = data.methods || [];
+      const clusterByName = {};
+      clusters.forEach((item) => {
+        if (item && item.paragraph != null) {
+          clusterByName[String(item.paragraph).toUpperCase()] = item.cluster;
+        }
+      });
+      const fieldLines = fields
+        .map((item) => "- " + item.name + " (" + (item.pic || "?") + ")")
         .join("\n") || "- none";
-      const paragraphs = (data.paragraphs || [])
-        .map((item) => "- " + item.name)
+      const paraLines = paragraphs
+        .map((item) => {
+          const name = item.name || String(item);
+          const cluster = clusterByName[String(name).toUpperCase()];
+          const extra = cluster === undefined ? "" : " [cluster " + cluster + "]";
+          return "- " + name + extra;
+        })
         .join("\n") || "- none";
+      const methodLines = methods.length
+        ? methods.map((item) => "- " + (item.name || item)).join("\n")
+        : "- none";
+      let clusterLines = "- none (need at least 2 paragraphs, or API clustering)";
+      if (clusters.length) {
+        clusterLines = clusters
+          .map((item) => "- " + item.paragraph + " -> cluster " + item.cluster)
+          .join("\n")
+      }
       return (
-        "Program: " + (data.program_name || "UNKNOWN") + "\n\n" +
-        "Fields:\n" + fields + "\n\n" +
-        "Paragraphs:\n" + paragraphs
+        "File: " + (data.filename || "unknown") + "\n" +
+        "Program: " + (data.program_name || "UNKNOWN") + "\n" +
+        "Counts: " + fields.length + " fields, " + paragraphs.length +
+          " paragraphs, " + methods.length + " methods\n\n" +
+        "Fields:\n" + fieldLines + "\n\n" +
+        "Paragraphs:\n" + paraLines + "\n\n" +
+        "Methods:\n" + methodLines + "\n\n" +
+        "Clusters (unsupervised grouping of paragraphs):\n" + clusterLines
       );
     }
     
@@ -385,7 +414,7 @@
       document.getElementById("view-python").classList.toggle("active", mode === "python");
       cobolPane.hidden = mode === "python";
       pythonPane.hidden = mode === "cobol";
-      splitEl.classList.toggle("single", mode !== "split");
+      splitEl.classList.toggle("single", mode != "split");
     }
 
     function showResults() {
@@ -480,7 +509,7 @@
       // Clear list
       if (lastPython && lastCobol && file) {
         saveHistoryEntry(file.name, lastCobol, lastPython, lastConsole, lastAnalysis);
-        setStatus("Older history cleared. This translation is still listed.");
+        setStatus("Older history cleared. This translation is still listed.")
       } else {
         renderHistory();
         setStatus("History cleared.");
@@ -528,7 +557,7 @@
         setStatus(file.name + " loaded. Click Start.");
         showResults();
       });
-    };
+    }
 
     async function runStart() {
       const file = currentFile();
@@ -616,7 +645,7 @@
       }
       hideAiDisclosure();
       await runStart();
-    };
+    }
 
     document.getElementById("ai-disclosure-cancel").onclick = () => {
       hideAiDisclosure();
@@ -628,15 +657,15 @@
         setStatus("Convert a file first.", true);
         return;
       }
-      const name = ((currentFile() && currentFile().name) || "converted.cbl")
-        .replace(/\.(cbl|cob)$/i, "") + ".py";
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(new Blob([lastPython], { type: "text/plain" }));
-      link.download = name;
-      link.click();
-      URL.revokeObjectURL(link.href);
-      setStatus("Downloaded " + name + ".");
-    };
+    const name = ((currentFile() && currentFile().name) || "converted.cbl")
+      .replace(/\.(cbl|cob)$/i, "") + ".py";
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([lastPython], { type: "text/plain" }));
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setStatus("Downloaded " + name + ".");
+  };
   </script>
 </body>
 </html>
