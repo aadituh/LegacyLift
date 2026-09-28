@@ -44,7 +44,7 @@
   <input id="file" type="file" accept=".cbl,.cob">
   <button type="button" id="sample">Load Sample</button>
   <button type="button" id="convert">Start</button>
-  <button type="button" id="download">Download Python</button>
+  <button type="button" id="download">Download ZIP</button>
   <p id="status">No file loaded yet.</p>
 
   <div class="tabs">
@@ -103,7 +103,8 @@
     Buttons
       Load Sample / file picker - COBOL into the file input
       Start - POST /api/convert, then POST /api/analyze; fills Analysis + Translation
-      Download Python - saves lastPython as a .py file
+        and downloads the generated .py inside a .zip
+      Download ZIP - saves lastPython as a .py file inside a .zip
 
     Tabs
       Analysis - program, fields, paragraphs (Waiting... until Start is clicked)
@@ -327,6 +328,92 @@
       );
     }
     
+    const CRC32_TABLE = (() => {
+      const table = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let crc = n;
+        for (let k = 0; k < 8; k++) {
+          crc = (crc & 1) ? (0xedb88320 ^ (crc >>> 1)) : (crc >>> 1);
+        }
+        table[n] = crc >>> 0;
+      }
+      return table;
+    })();
+
+    function crc32(bytes) {
+      let crc = 0xffffffff;
+      for (let i = 0; i < bytes.length; i++) {
+        crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+      }
+      return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    function writeUint32(view, offset, value) {
+      view.setUint32(offset, value >>> 0, true);
+    }
+
+    function writeUint16(view, offset, value) {
+      view.setUint16(offset, value & 0xffff, true);
+    }
+
+    // One stored (uncompressed) .py entry. Browsers save this as a real .zip.
+    function zipStore(filename, text) {
+      const encoder = new TextEncoder();
+      const nameBytes = encoder.encode(filename);
+      const data = encoder.encode(text);
+      const crc = crc32(data);
+      const localSize = 30 + nameBytes.length + data.length;
+      const centralSize = 46 + nameBytes.length;
+      const out = new Uint8Array(localSize + centralSize + 22);
+      const view = new DataView(out.buffer);
+      writeUint32(view, 0, 0x04034b50);
+      writeUint16(view, 4, 20);
+      writeUint16(view, 6, 0x0800);
+      writeUint16(view, 8, 0);
+      writeUint32(view, 14, crc);
+      writeUint32(view, 18, data.length);
+      writeUint32(view, 22, data.length);
+      writeUint16(view, 26, nameBytes.length);
+      out.set(nameBytes, 30);
+      out.set(data, 30 + nameBytes.length);
+      const central = localSize;
+      writeUint32(view, central, 0x02014b50);
+      writeUint16(view, central + 4, 20);
+      writeUint16(view, central + 6, 20);
+      writeUint16(view, central + 8, 0x0800);
+      writeUint32(view, central + 16, crc);
+      writeUint32(view, central + 20, data.length);
+      writeUint32(view, central + 24, data.length);
+      writeUint16(view, central + 28, nameBytes.length);
+      out.set(nameBytes, central + 46);
+      const end = central + centralSize;
+      writeUint32(view, end, 0x06054b50);
+      writeUint16(view, end + 8, 1);
+      writeUint16(view, end + 10, 1);
+      writeUint32(view, end + 12, centralSize);
+      writeUint32(view, end + 16, localSize);
+      return new Blob([out], { type: "application/zip" });
+    }
+
+    function pythonDownloadNames() {
+      const stem = ((currentFile() && currentFile().name) || "converted.cbl")
+        .replace(/\.(cbl|cob)$/i, "");
+      return { pyName: stem + ".py", zipName: stem + ".zip" };
+    }
+
+    function deliverPythonZip() {
+      if (!lastPython) return "";
+      const names = pythonDownloadNames();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(zipStore(names.pyName, lastPython));
+      link.download = names.zipName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+      return names.zipName;
+    }
+
     function setStatus(message, isError) {
       statusEl.textContent = message;
       statusEl.classList.toggle("error", Boolean(isError));
@@ -366,6 +453,7 @@
       consoleEl.textContent = lastConsole;
       setCompareMode("split");
       showCompare();
+      deliverPythonZip();
     }
 
     function convertWithFallback(file, key) {
@@ -376,7 +464,8 @@
       const local = window.LegacyLiftConverter.convertLocal(lastCobol, file.name);
       applyConversionResult(file, key, local, local.analysis_text);
       setStatus(
-        "Translation done in-browser (API offline). Open http://127.0.0.1:8000/ with the backend for full ML clustering."
+        "Translation done in-browser (API offline). Downloaded " + pythonDownloadNames().zipName +
+        ". Open http://127.0.0.1:8000/ with the backend for full ML clustering."
       );
       return local;
     }
@@ -569,7 +658,8 @@
       const savedSameFile = findHistory(file.name, lastCobol);
       if (savedSameFile) {
         restoreHistory(savedSameFile);
-        setStatus("This file is already translated.");
+        const zipName = deliverPythonZip();
+        setStatus("This file is already translated. Downloaded " + zipName + ".");
         return;
       }
       // Same COBOL under different name: reuse Python/analysis, save a new history row.
@@ -584,7 +674,8 @@
         pythonEl.textContent = lastPython;
         consoleEl.textContent = lastConsole;
         saveHistoryEntry(file.name, lastCobol, lastPython, lastConsole, lastAnalysis);
-        setStatus("Same COBOL as " + saveSameText.name + ". Reused that translation.");
+        const zipName = deliverPythonZip();
+        setStatus("Same COBOL as " + saveSameText.name + ". Reused that translation. Downloaded " + zipName + ".");
         setCompareMode("split");
         showCompare();
         return;
@@ -594,7 +685,8 @@
         if (!findHistory(file.name, lastCobol)) {
           saveHistoryEntry(file.name, lastCobol, lastPython, lastConsole, lastAnalysis);
         }
-        setStatus("This file is already converted. View Translation");
+        const zipName = deliverPythonZip();
+        setStatus("This file is already converted. Downloaded " + zipName + ".");
         showCompare();
         return;
       }
@@ -616,7 +708,7 @@
           if (data.analysis) analysisText = formatAnalysis(data.analysis);
         }
         applyConversionResult(file, key, data, analysisText);
-        setStatus("Translation done. Click Translation or Analysis to view output.");
+        setStatus("Translation done. Downloaded " + pythonDownloadNames().zipName + ".");
       } catch (err) {
         try {
           convertWithFallback(file, key);
@@ -653,19 +745,13 @@
     };
 
     document.getElementById("download").onclick = () => {
-      if (!lastPython) {
+      const zipName = deliverPythonZip();
+      if (!zipName) {
         setStatus("Convert a file first.", true);
         return;
       }
-    const name = ((currentFile() && currentFile().name) || "converted.cbl")
-      .replace(/\.(cbl|cob)$/i, "") + ".py";
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([lastPython], { type: "text/plain" }));
-    link.download = name;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    setStatus("Downloaded " + name + ".");
-  };
+      setStatus("Downloaded " + zipName + ".");
+    };
   </script>
 </body>
 </html>

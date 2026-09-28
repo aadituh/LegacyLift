@@ -14,6 +14,8 @@ Last, they download the Python and an audit report.
 
 ---
 
+
+
 ## Frontend — `frontend/`
 
 - [ ] Projects page: create and open a project
@@ -25,7 +27,22 @@ Last, they download the Python and an audit report.
 - [ ] Download the Python as a zip
 - [ ] Show clear errors (for example, when a non-COBOL file is uploaded)
 
+
+
+## Frontend — `frontend/`
+
+- [ ] Projects page: create and open a project
+- [ ] sssa
+- [ ] saas
+- [ ] saassa
+- [ ] saas
+- [ ] 
+
+
+
 ## Backend
+
+
 
 ### Conversion engine — `backend/prototype/src/`
 
@@ -36,12 +53,16 @@ Last, they download the Python and an audit report.
 - [ ] Translator: use `Decimal` with the PIC scale and `ROUNDED`; leave `# TODO` for anything unsupported
 - [ ] Gemini + RAG: translate at least one program and show it next to the rule-based version
 
+
+
 ### API — `backend/src/legacylift/`
 
 - [ ] Endpoints: create a project, upload files, analyze, convert, verify, run history
 - [ ] Reject non-COBOL uploads with a 400 error
 - [ ] Verify endpoint: run the COBOL (GnuCOBOL) and the Python on the same input and compare the outputs
 - [ ] Load settings (database URL, Gemini key) from `.env`, never committed
+
+
 
 ## Database — PostgreSQL
 
@@ -50,7 +71,11 @@ Last, they download the Python and an audit report.
 - [ ] Save every analyze / convert / verify run (this is the audit log)
 - [ ] Later: pgvector tables for RAG (rag_knowledge_base, embeddings)
 
+
+
 ## QA
+
+
 
 ### Demo COBOL system — `backend/prototype/data/`
 
@@ -59,17 +84,23 @@ Last, they download the Python and an audit report.
 - [ ] Create 2–3 input sets (normal, overdraft, closed account) with the expected output from GnuCOBOL
 - [ ] Replace or delete `display-test.cbl` (it's a saved HTML page, not COBOL)
 
+
+
 ### Tests — `backend/tests/`
 
 - [ ] Write the test plan (test IDs that the demo will run)
 - [ ] pytest: parser tests, API tests, COBOL-vs-Python equivalence tests
 - [ ] Before Demo 2: the full demo works from a fresh clone and Verify passes on every input set
 
+
+
 ## Infrastructure — repo root
 
 - [ ] `docker-compose.yml`: UI, API, Postgres and a GnuCOBOL runner
 - [ ] One command to start the whole demo: `docker compose up`
 - [ ] Update `README.md` with how to run it
+
+
 
 ## Presentation & website — `docs/`
 
@@ -78,6 +109,9 @@ Last, they download the Python and an audit report.
 - [ ] Final demo scenario slide
 - [ ] Update `docs/presentations.html` with the new deck
 
+
+
 ## Cut for now
 
 - Notebooks 02/03 (KMeans clustering), Fortran, JCL, GCP deployment, login, React rewrite
+
