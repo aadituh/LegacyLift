@@ -14,24 +14,26 @@
     .split.single { grid-template-columns: 1fr; }
     .split h3 { margin: 0 0 0.5rem; font-size: 1rem; }
     .split[hidden], #out[hidden], #console[hidden], #compare[hidden],
-    #cobol-pane[hidden], #python-pane[hidden] { display: none; }
+    #cobol-pane[hidden], #python-pane[hidden], #history[hidden] { display: none; }
+    #history-list { list-style: none; padding: 0; margin: 0.5rem 0; }
+    #history-list button { display: block; width: 100%; text-align: left; }
   </style>
 </head>
 <body>
   <h1>Legacy Lift Prototype</h1>
-  <p>Upload COBOL, view analysis, then convert to functionally equivalent Python (notebook pipeline).</p>
+  <p>Upload COBOL, then convert to view Analysis and Translation (to equivalently functional Python).</p>
   <input id="file" type="file" accept=".cbl,.cob">
   <button type="button" id="sample">Load Sample</button>
-  <button type="button" id="analyze">View Analysis</button>
-  <button type="button" id="convert">Start Translation</button>
+  <button type="button" id="convert">Start</button>
   <button type="button" id="download">Download Python</button>
   <p id="status">No file loaded yet.</p>
   <div class="tabs">
-    <button type="button" id="tab-out" class="active">Results</button>
-    <button type="button" id="tab-compare">Translation Comparison</button>
+    <button type="button" id="tab-out" class="active">Analysis</button>
+    <button type="button" id="tab-compare">Translation</button>
     <button type="button" id="tab-console">Console Log</button>
+    <button type="button" id="tab-history">History</button>
   </div>
-  <h2 id="panel-title">Results</h2>
+  <h2 id="panel-title">Analysis</h2>
 <pre id="out">Waiting…</pre>
 <div id="compare" hidden>
   <div class="tabs">
@@ -51,28 +53,33 @@
 </div>
 </div>
 <pre id="console" hidden>No conversion log yet.</pre>
+<div id="history" hidden>
+  <p>Past conversions. Click on selected file to reopen it.</p>
+  <ul id="history-list"></ul>
+  <button type="button" id="clear-history">Clear History</button>
+</div>
   <script>
     /*
-    Conversion UI (frontend/index.html), served by FastAPI at http://127.0.0.1:800
+    Conversion UI (frontend/index.html), served by FastAPI at http://127.0.0.1:8000
     Buttons
       Load Sample / file picker - COBOL into the file input
-      View Analysis - POST /api/analyze, Results tab (program, fields, paragraphs)
-      Start Translation - POST /api/convert, then Translation Comparison
+      Start - POST /api/convert, then POST /api/analyze; fills Analysis + Translation
       Download Python - saves lastPython as a .py file
 
     Tabs
-      Results - analysis (or sample COBOL before convert)
-      Translation Comparison - last COBOL vs generated Python
+      Analysis - program, fields, paragraphs (Waiting... until Start is clicked)
+      Translation - last COBOL vs generated Python
         Split view / COBOL only / Python Only
-      Cobsole Log - last analyze/convert log from the API
+      Console Log - last analyze/convert log from the API
+      History - past conversions in browser (localStorage)
 
-    Same-source skip (this browser tab only, currently no history feature)
+    Same-source skip (this browser tab only)
       lastCobol / lastPython / lastTranslatedKey remember the last convert
-      Same COBOL text again = do not call /api/convert; tell user to open Translation Comparison
-      Different COBOL text = clearTranslation(), then convert again
-      Since there is currently no history feature A to B to A still converts
+      Skip conversion if the COBOL text already has a history row
+      History list/replace is by filename (same name overwrites that row)
+      Clear History re-saves the translation still on screen
 
-    API_ORIGIN is "" when this page is on port 8000; otherwise it calls 127.0.0.1:800
+    API_ORIGIN is "" when this page is on port 8000; otherwise it calls 127.0.0.1:8000
     */
     const statusEl = document.getElementById("status");
     const outEl = document.getElementById("out");
@@ -87,23 +94,94 @@
     const pythonPane = document.getElementById("python-pane");
     const COBOL_ERROR = "That is not a COBOL file. Choose a .cbl or .cob file.";
     let lastConsole = "No conversion log yet.";
+    let lastAnalysis = "";
     let lastPython = "";
     let lastCobol = "";
     let lastTranslatedKey = "";
+    const historyEl = document.getElementById("history");
+    const historyListEl= document.getElementById("history-list");
+    const HISTORY_KEY = "legacylift-history";
     function currentFile() {
       return fileEl.files[0];
     }
     function isCobolFile(file) {
       return /\.(cbl|cob)$/i.test(file.name);
     }
-    // Name + source text. Start Translation uses this to detect already converted.
+    // Name + source text. Start uses this to detect already converted file.
     function fileKey(file, source) {
       return (file && file.name ? file.name : "") + ":" + (source || "");
     }
-    // Clears the saved Python so next conversion is new, it does not clear lastCOBOL.
+    // Drops Python, analysis, and skip-key. Keep lastCobol so a new Start can run.
     function clearTranslation() {
+      lastAnalysis = "";
       lastPython = "";
       lastTranslatedKey = "";
+    }
+    function loadHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+      } catch (err) {
+        return [];
+      }
+    }
+    // One row per filename: same name replaces the old row. Newest first, with a cap of 20.
+    function saveHistoryEntry(name, cobol, python, consoleLog, analysis) {
+      const items = loadHistory().filter((item) => item.name !== name);
+      items.unshift({
+        name: name || "upload.cbl",
+        cobol: cobol,
+        python: python,
+        consoleLog: consoleLog || "",
+        analysis: analysis || "",
+        time: new Date().toLocaleString()
+      });
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 20)));
+      renderHistory();
+    }
+    // Same filename + text already in history: reopen it and do not convert again.
+    function findHistory(fileName, cobol) {
+      return loadHistory().find((item) => item.name === fileName && item.cobol === cobol);
+    }
+    // Same COBOL text, any filename (reuse translation, save under the new name).
+    function findHistoryByText(cobol) {
+      return loadHistory().find((item) => item.cobol === cobol);
+    }
+    // Puts that history row back into the file input, Analysis, and Translation.
+    function restoreHistory(item) {
+      lastCobol = item.cobol;
+      lastPython = item.python;
+      lastConsole = item.consoleLog || lastConsole;
+      lastTranslatedKey = fileKey({ name: item.name }, item.cobol);
+      const blob = new Blob([item.cobol], { type: "text/plain" });
+      const file = new File([blob], item.name);
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileEl.files = dt.files;
+      cobolEl.textContent = item.cobol;
+      pythonEl.textContent = item.python;
+      lastAnalysis = item.analysis || "";
+      outEl.textContent = lastAnalysis || "Waiting...";
+      consoleEl.textContent = lastConsole;
+      setStatus("Loaded " + item.name + " from history.");
+      setCompareMode("split");
+      showCompare();
+    }
+    function renderHistory() {
+      const items = loadHistory();
+      historyListEl.innerHTML = "";
+      if (!items.length) {
+        historyListEl.innerHTML = "<li>No conversions yet.</li>";
+        return;
+      }
+      items.forEach((item) => {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = item.name + " - " + item.time;
+        button.onclick = () => restoreHistory(item);
+        li.appendChild(button);
+        historyListEl.append(li);
+      });
     }
     // Turns /api/analyze JSON into readable program / fields / paragraphs text.
     function formatAnalysis(data) {
@@ -132,6 +210,7 @@
       document.getElementById("tab-out").classList.toggle("active", activeId === "tab-out");
       document.getElementById("tab-compare").classList.toggle("active", activeId === "tab-compare");
       document.getElementById("tab-console").classList.toggle("active", activeId === "tab-console");
+      document.getElementById("tab-history").classList.toggle("active", activeId === "tab-history");
     }
     function setCompareMode(mode) {
       document.getElementById("view-split").classList.toggle("active", mode === "split");
@@ -145,10 +224,11 @@
       outEl.hidden = false;
       compareEl.hidden = true;
       consoleEl.hidden = true;
-      titleEl.textContent = "Results";
+      historyEl.hidden = true;
+      titleEl.textContent = "Analysis";
       setTab("tab-out");
     }
-    // Needs lastPython. #compare is the panel #split is not hidden or view is blank
+    // Translation tab. Needs lastPython. Unhide #compare and #split or view stays blank.
     function showCompare() {
       if (!lastPython) {
         setStatus("Translate a file first.", true);
@@ -158,16 +238,27 @@
       compareEl.hidden = false;
       splitEl.hidden = false;
       consoleEl.hidden = true;
-      titleEl.textContent = "Translation Comparison";
+      historyEl.hidden = true;
+      titleEl.textContent = "Translation";
       setTab("tab-compare");
     }
     function showConsole() {
       outEl.hidden = true;
       compareEl.hidden = true;
       consoleEl.hidden = false;
+      historyEl.hidden = true;
       consoleEl.textContent = lastConsole;
       titleEl.textContent = "Console Log";
       setTab("tab-console");
+    }
+    function showHistory() {
+      outEl.hidden = true;
+      compareEl.hidden = true;
+      consoleEl.hidden = true;
+      historyEl.hidden = false;
+      titleEl.textContent = "History";
+      setTab("tab-history");
+      renderHistory();
     }
     async function api(url, options) {
       const response = await fetch(API_ORIGIN + url, { cache: "no-store", ...options });
@@ -190,6 +281,20 @@
     document.getElementById("tab-out").onclick = showResults;
     document.getElementById("tab-compare").onclick = showCompare;
     document.getElementById("tab-console").onclick = showConsole;
+    document.getElementById("tab-history").onclick = showHistory;
+    document.getElementById("clear-history").onclick = () => {
+      localStorage.removeItem(HISTORY_KEY);
+      const file = currentFile();
+      // Clear list
+      if (lastPython && lastCobol && file) {
+        saveHistoryEntry(file.name, lastCobol, lastPython, lastConsole, lastAnalysis);
+        setStatus("Older history cleared. This translation is still listed.")
+      } else {
+          renderHistory();
+          setStatus("History cleared.");
+        }
+    };
+    renderHistory();
     document.getElementById("view-split").onclick = () => setCompareMode("split");
     document.getElementById("view-cobol").onclick = () => setCompareMode("cobol"); 
     document.getElementById("view-python").onclick = () => setCompareMode("python"); 
@@ -201,15 +306,16 @@
         const dt = new DataTransfer();
         dt.items.add(file);
         fileEl.files = dt.files;
-        // Exact same sample text as last convert: keep Python, do not clear.
-        if (lastPython && lastCobol === sample.source) {
-          setStatus("This file is already translated. View Translation Comparison.");
-          return
+        // Same filename + text in history: reopen. Else reset Analysis to Waiting...
+        const saved = findHistory(sample.name, sample.source)
+        if (saved) {
+          restoreHistory(saved);
+          return;
         }
         lastCobol = sample.source;
         clearTranslation();
-        setStatus("Sample loaded. Click View Analysis or Start Translation.");
-        outEl.textContent = sample.source;
+        setStatus("Sample loaded. Click Start to begin conversion.");
+        outEl.textContent = "Waiting...";
         showResults();
       } catch (err) {
         showError(err);
@@ -223,42 +329,56 @@
         return;
       }
       file.text().then((text) => {
-        // Exact same COBOL text as last convert: keep Python, do not clear.
-        if (lastPython && text === lastCobol) {
-          setStatus("This file is already translated. View Translation Comparison.");
+        const saved = findHistory(file.name, text);
+        if (saved) {
+          restoreHistory(saved);
           return;
         }
         lastCobol = text;
         clearTranslation();
-        setStatus(file.name + " loaded. Click View Analysis or Start Translation.");
+        outEl.textContent = "Waiting...";
+        cobolEl.textContent = "Waiting...";
+        pythonEl.textContent = "Waiting...";
+        setStatus(file.name + " loaded. Click Start.");
+        showResults();
       });
     }
-    document.getElementById("analyze").onclick = async () => {
-      const file = currentFile();
-      if (!file) { setStatus("Choose a file first.", true); return; }
-      if (!isCobolFile(file)) { setStatus(COBOL_ERROR, true); return; }
-      const body = new FormData();
-      body.append("file", file);
-      try {
-        const data = await api("/api/analyze", { method: "POST", body });
-        lastView = "analysis";
-        setStatus("Analysis done.");
-        lastConsole = "Analysis complete for " + (data.filename || file.name);
-        outEl.textContent = formatAnalysis(data);
-        showResults();
-      } catch (err) {
-        showError(err);
-      }
-    };
     document.getElementById("convert").onclick = async () => {
       const file = currentFile();
       if (!file) { setStatus("Choose a file first.", true); return; }
       if (!isCobolFile(file)) { setStatus(COBOL_ERROR, true); return; }
       if (!lastCobol) lastCobol = await file.text();
       const key = fileKey(file, lastCobol);
-      // Same filename + source as last successful convert: skip /api/convert.
+      // Same filename + source as last successful convert: skip /api/convert and reopen row.
+      const savedSameFile = findHistory(file.name, lastCobol);
+      if (savedSameFile) {
+        restoreHistory(savedSameFile);
+        setStatus("This file is already translated.");
+        return;
+      }
+      // Same COBOL under different name: reuse Python/analysis, save a new history row.
+      const saveSameText = findHistoryByText(lastCobol);
+      if (saveSameText) {
+        lastPython = saveSameText.python;
+        lastAnalysis = saveSameText.analysis || "";
+        lastConsole = saveSameText.consoleLog || lastConsole;
+        lastTranslatedKey = key;
+        outEl.textContent = lastAnalysis || "Waiting...";
+        cobolEl.textContent = lastCobol;
+        pythonEl.textContent = lastPython;
+        consoleEl.textContent = lastConsole;
+        saveHistoryEntry(file.name, lastCobol, lastPython, lastConsole, lastAnalysis);
+        setStatus("Same COBOL as " + saveSameText.name + ". Reused that translation.");
+        setCompareMode("split");
+        showCompare();
+        return;
+      }
+      // Same file already converted in this tab (history is cleared): skip API, then re-save if missing.
       if (lastPython && lastTranslatedKey === key) {
-        setStatus("This file is already translated. View Translation Comparison.");
+        if (!findHistory(file.name, lastCobol)) {
+          saveHistoryEntry(file.name, lastCobol, lastPython, lastConsole, lastAnalysis);
+        }
+        setStatus("This file is already converted. View Translation");
         showCompare();
         return;
       }
@@ -269,11 +389,17 @@
         const data = await api("/api/convert", { method: "POST", body });
         lastPython = data.python || "";
         lastTranslatedKey = key;
-        setStatus("Translation done. Use Translation Comparison to view.");
+        const analysisBody = new FormData();
+        analysisBody.append("file", file);
+        const analysis = await api("/api/analyze", { method: "POST", body: analysisBody });
+        outEl.textContent = formatAnalysis(analysis);
         lastConsole = data.console_log || JSON.stringify(data, null, 2);
+        lastAnalysis = outEl.textContent;
+        saveHistoryEntry(file.name, lastCobol, lastPython, lastConsole, lastAnalysis);
         cobolEl.textContent = lastCobol || "(no COBOL loaded)";
         pythonEl.textContent = lastPython || JSON.stringify(data, null, 2);
         consoleEl.textContent = lastConsole;
+        setStatus("Translation done. Click Translation or Analysis to view output.");
         setCompareMode("split");
         showCompare();
       } catch (err) {
