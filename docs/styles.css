@@ -158,12 +158,3 @@ footer {
 a {
     color: #000;
 }
-
-/* Utility */
-.placeholder-note {
-    font-style: italic;
-    border: 1px dashed #000;
-    padding: 1rem;
-    text-align: center;
-    margin-top: 1rem;
-}

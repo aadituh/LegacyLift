@@ -1,97 +1,82 @@
-"""Application entry point: FastAPI app wired to the prototype conversion pipeline."""
+"""One file-upload route for the LegacyLift teaching demo."""
 
 from __future__ import annotations
 
-import sys
+import logging
+import os
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
 
-# Windows consoles often use cp1252; pipeline logs may include Unicode.
-for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        try:
-            _stream.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+from legacylift.converter import convert_source
 
-PROTOTYPE_ROOT = Path(__file__).resolve().parents[2] / "prototype"
-if str(PROTOTYPE_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROTOTYPE_ROOT))
+MAX_FILES = 5
+MAX_FILE_BYTES = 100_000
+logger = logging.getLogger("uvicorn.error")
 
-from src.pipeline import analyze_source, convert_source  # noqa: E402
 
-FRONTEND_ROOT = Path(__file__).resolve().parents[3] / "frontend"
-UI_PATH = FRONTEND_ROOT / "index.html"
-CONVERTER_JS = FRONTEND_ROOT / "converter.js"
-SAMPLE_COBOL = PROTOTYPE_ROOT / "data" / "simple_account.cbl"
+def invalid_upload(message: str) -> HTTPException:
+    """Use the same message in the server log and the API response."""
+    logger.warning("Rejected upload: %s", message)
+    return HTTPException(status_code=400, detail=message)
 
 
 def create_app() -> FastAPI:
-    fastapi_app = FastAPI(title="LegacyLift")
-    fastapi_app.add_middleware(
+    app = FastAPI(title="LegacyLift API")
+    origins = os.getenv(
+        "LEGACYLIFT_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    )
+    app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
+        allow_origins=[origin.strip() for origin in origins.split(",") if origin.strip()],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 
-    @fastapi_app.exception_handler(Exception)
-    async def unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
-        if isinstance(exc, HTTPException):
-            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
+    @app.get("/health")
+    def health() -> dict:
+        return {"status": "ok"}
 
-    @fastapi_app.get("/")
-    def demo_ui() -> FileResponse:
-        if not UI_PATH.exists():
-            raise HTTPException(status_code=500, detail="Demo UI is missing")
-        return FileResponse(UI_PATH, headers={"Cache-Control": "no-store"})
+    @app.post("/api/convert")
+    async def convert(files: list[UploadFile] = File(...)) -> dict:
+        if not 1 <= len(files) <= MAX_FILES:
+            raise invalid_upload("Choose 1 to 5 COBOL files.")
 
-    @fastapi_app.get("/converter.js")
-    def converter_script() -> FileResponse:
-        if not CONVERTER_JS.exists():
-            raise HTTPException(status_code=500, detail="converter.js is missing")
-        return FileResponse(
-            CONVERTER_JS,
-            media_type="application/javascript; charset=utf-8",
-            headers={"Cache-Control": "no-store"},
-        )
+        results = []
+        output_names = set()
+        logger.info("Received %d COBOL file(s)", len(files))
+        for file in files:
+            # Browsers send a name, but it may contain path separators.
+            name = Path((file.filename or "").replace("\\", "/")).name
+            if Path(name).suffix.lower() not in {".cbl", ".cob"}:
+                raise invalid_upload(f"{name or 'File'} must be .cbl or .cob.")
 
-    @fastapi_app.get("/health")
-    def health() -> dict[str, str]:
-        return {"message": "Hello from Legacy Lift."}
+            output_name = f"{Path(name).stem}.py"
+            if output_name.lower() in output_names:
+                raise invalid_upload("COBOL file names must be unique.")
+            output_names.add(output_name.lower())
 
-    @fastapi_app.get("/api/sample")
-    def sample() -> dict[str, str]:
-        if not SAMPLE_COBOL.exists():
-            raise HTTPException(status_code=500, detail="Sample COBOL file missing")
-        return {
-            "name": SAMPLE_COBOL.name,
-            "source": SAMPLE_COBOL.read_text(encoding="utf-8"),
-        }
+            raw = await file.read(MAX_FILE_BYTES + 1)
+            if len(raw) > MAX_FILE_BYTES:
+                raise invalid_upload(f"{name} is larger than 100 KB.")
+            try:
+                source = raw.decode("utf-8-sig")
+            except UnicodeDecodeError as error:
+                raise invalid_upload(f"{name} must be UTF-8 text.") from error
+            if not source.strip() or "\x00" in source:
+                raise invalid_upload(f"{name} is empty or binary.")
 
-    @fastapi_app.post("/api/analyze")
-    async def analyze(file: UploadFile = File(...)) -> dict:
-        source = (await file.read()).decode("utf-8", errors="replace")
-        if not source.strip():
-            raise HTTPException(status_code=400, detail="Uploaded file is empty")
-        filename = file.filename or "upload.cbl"
-        print(f"\n=== /api/analyze <- {filename} ===")
-        return analyze_source(source, filename=filename)
+            try:
+                converted = convert_source(source)
+            except ValueError as error:
+                raise invalid_upload(f"{name}: {error}") from error
+            results.append({"source_name": name, "python_name": output_name, **converted})
+            logger.info("Converted %s with %d review notes", name, len(converted["notes"]))
 
-    @fastapi_app.post("/api/convert")
-    async def convert(file: UploadFile = File(...)) -> dict:
-        source = (await file.read()).decode("utf-8", errors="replace")
-        if not source.strip():
-            raise HTTPException(status_code=400, detail="Uploaded file is empty")
-        filename = file.filename or "upload.cbl"
-        print(f"\n=== /api/convert <- {filename} ===")
-        return convert_source(source, filename=filename)
+        return {"files": results}
 
-    return fastapi_app
+    return app
 
 
 app = create_app()

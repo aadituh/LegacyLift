@@ -1,6 +1,6 @@
 [project]
 name = "legacylift"
-version = "0.1.0"
+version = "0.2.0"
 description = "LegacyLift backend — COBOL to Python conversion service"
 readme = "README.md"
 authors = [
@@ -10,10 +10,11 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",
     "python-multipart>=0.0.32",
-    "scikit-learn>=1.9.1",
-    "sentence-transformers>=6.1.0",
     "uvicorn[standard]>=0.52.4",
 ]
+
+[dependency-groups]
+dev = ["httpx>=0.28.1"]
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]

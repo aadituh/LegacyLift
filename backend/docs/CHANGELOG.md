@@ -1,5 +1,16 @@
 # Changelog — LegacyLift Backend
 
+Earlier entries describe the code as it existed at that time. Use the current
+[backend README](../README.md) for today's routes and commands.
+
+## Demo conversion — 2026-09-29
+
+- Added `POST /api/convert` for small UTF-8 COBOL uploads and `GET /health`.
+- Added rule-based Python drafts and review notes for unsupported lines.
+- Added API checks for conversion, review notes, and bad uploads.
+- Added request and rejection logs without recording source code.
+- Kept the research prototype separate from the running API.
+
 ## [v1] — 2026-08-25
 
 First backend scaffold: project skeleton, tooling, and a single liveness

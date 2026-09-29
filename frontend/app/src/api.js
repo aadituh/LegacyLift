@@ -1,38 +1,27 @@
-const API_CANDIDATES = ["http://127.0.0.1:8000", "http://localhost:8000"];
+// Vite proxies /api to port 8000 during local development.
+const apiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
 
-export async function postFile(path, file) {
-    const body = new FormData();
-    body.append("file", file);
-    let lastError = null;
+export const backendIsReady = import.meta.env.DEV || Boolean(apiUrl)
 
-    for (const origin of API_CANDIDATES) {
-        try {
-            const response = await fetch(origin + path, {
-                method: "POST",
-                body,
-                cache: "no-store",
-            });
-            const text = await response.text();
-            let data;
-            try {
-                data = JSON.parse(text);
-            }   catch {
-                const snippet = text.replace(/\s+/g, " ").trim().slice(0, 180);
-                throw new Error(
-                    snippet
-                    ? "The server did not return JSON. " + snippet
-                    : "The server returned an empty response.",
-                );
-            }
-            if (!response.ok) {
-                const detail = data && data.detail;
-                throw new Error(typeof detail === "string" ? detail : JSON.stringify(data));
-            }
-            return data;
-        } catch (err) {
-            lastError = err;
-        }
-    }
+export async function convertFiles(files) {
+  const form = new FormData()
+  for (const file of files) {
+    form.append('files', file)
+  }
 
-    throw lastError || new Error("Could not reach the API on port 8000.");
+  let response
+  try {
+    response = await fetch(`${apiUrl}/api/convert`, {
+      method: 'POST',
+      body: form,
+    })
+  } catch {
+    throw new Error('Cannot reach the backend. Check that it is running and the API URL is correct.')
+  }
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(typeof data.detail === 'string' ? data.detail : `Conversion failed (${response.status}).`)
+  }
+  return data.files
 }

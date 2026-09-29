@@ -1,103 +1,39 @@
-# LegacyLift — Backend
+# Backend
 
-FastAPI service for analyzing and converting legacy COBOL codebases to Python.
+The active backend is a small FastAPI service. It receives up to five UTF-8 `.cbl` or `.cob` files, converts a basic subset of COBOL, and sends Python drafts back in one response. It does not store uploads or require a database.
 
-**Status:** v1 scaffold. Structure and tooling are in place; feature modules
-are empty pending implementation. See [docs/CHANGELOG.md](docs/CHANGELOG.md).
+## Start and test
 
-## Requirements
+From this directory, on Windows PowerShell or macOS Terminal (the commands are the same):
 
-- [uv](https://docs.astral.sh/uv/) — manages the Python version, the
-  virtualenv, and dependencies
-- Python 3.12 (uv downloads it automatically; no manual install needed)
-
-## Quickstart
-
-```bash
-cd backend
-uv sync                                        # create .venv, install deps
-uv run uvicorn legacylift.main:app --reload    # http://127.0.0.1:8000
+```text
+uv sync --frozen
+uv run --frozen uvicorn legacylift.main:app --reload
 ```
 
-Verify it is up:
+Open <http://127.0.0.1:8000/docs> to inspect the API. `GET /health` returns `{"status":"ok"}`. The React app calls `POST /api/convert` with multipart form files under the field name `files`.
 
-```bash
-curl http://127.0.0.1:8000/
-# {"message":"Hello from LegacyLift"}
+To run the backend checks on either system:
+
+```text
+uv run --frozen python -m unittest discover -s tests -v
 ```
 
-Interactive API docs are served at http://127.0.0.1:8000/docs.
+## Where to change code
 
-## Layout
+| File | Responsibility |
+| --- | --- |
+| [`src/legacylift/main.py`](src/legacylift/main.py) | API route, CORS, upload validation, response, and request logs |
+| [`src/legacylift/converter.py`](src/legacylift/converter.py) | COBOL cleanup, supported statements, Python draft, and review notes |
+| [`tests/test_convert.py`](tests/test_convert.py) | Upload and generated-output checks |
+| [`pyproject.toml`](pyproject.toml) and [`uv.lock`](uv.lock) | Dependencies and locked versions |
 
-```
-backend/
-├── pyproject.toml          # project metadata and dependencies
-├── uv.lock                 # locked dependency versions (commit this)
-├── .python-version         # pins Python 3.12
-├── .env.example            # template for local environment config
-├── docs/
-│   └── CHANGELOG.md        # version history
-├── src/legacylift/
-│   ├── main.py             # app factory + router wiring
-│   ├── core/               # config, error handlers, shared deps
-│   ├── projects/           # feature: uploaded legacy codebase
-│   ├── analysis/           # feature: dependency graph
-│   ├── conversion/         # feature: COBOL -> Python
-│   └── ai/                 # shared infra: Gemini client, RAG
-└── tests/
-```
+The converter currently handles simple `01` and `77` text or whole-number fields, `DISPLAY`, `MOVE`, `ADD`, `SUBTRACT`, and `STOP RUN`. Unsupported procedure lines become `# TODO` comments in the generated file and entries in `notes`. See [the developer guide](../docs/developer.md) before adding a rule.
 
-Each feature package is intended to hold `router.py` (HTTP layer),
-`schemas.py` (request/response models), and `service.py` (business logic),
-keeping transport concerns out of the logic. `ai/` is shared infrastructure
-rather than a feature and exposes no routes of its own.
+## Configuration and logs
 
-## Adding a feature module
+Local CORS origins default to `http://localhost:5173,http://127.0.0.1:5173`. Set the `LEGACYLIFT_CORS_ORIGINS` environment variable to a comma-separated list for other frontend origins. The service reads the environment directly; it does not automatically load `.env` files. [`.env.example`](.env.example) shows the setting.
 
-Feature directories are currently empty. Before importing from one, add an
-`__init__.py` so it is a package:
+Uvicorn prints startup messages, upload counts, converted filenames with review-note counts, and rejection reasons to the terminal. Uploaded source and generated Python are not logged. Logs are for local debugging; generated files are returned to the browser rather than saved on the server.
 
-```bash
-touch src/legacylift/conversion/__init__.py
-```
-
-Then wire its router into the app factory in `src/legacylift/main.py`:
-
-```python
-from legacylift.conversion.router import router as conversion_router
-
-fastapi_app.include_router(conversion_router, prefix="/conversion")
-```
-
-## Common commands
-
-| Task | Command |
-|---|---|
-| Install / sync dependencies | `uv sync` |
-| Add a dependency | `uv add <package>` |
-| Add a dev-only dependency | `uv add --dev <package>` |
-| Run the dev server | `uv run uvicorn legacylift.main:app --reload` |
-| Run tests | `uv run pytest` (see note below) |
-| Run any command in the venv | `uv run <command>` |
-
-`uv run` executes inside the project virtualenv, so activating it manually is
-not necessary.
-
-**pytest is not yet a project dependency.** Add it before writing tests, or it
-will resolve to a system install (or fail entirely on a fresh clone):
-
-```bash
-uv add --dev pytest
-```
-
-## Configuration
-
-Copy the template and fill in real values:
-
-```bash
-cp .env.example .env
-```
-
-`.env` is gitignored and must never be committed. Configuration is intended to
-be loaded through `core/config.py` using pydantic-settings.
+[`prototype/`](prototype/) contains older research experiments. It is not imported by the API.
