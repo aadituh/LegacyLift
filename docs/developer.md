@@ -127,4 +127,4 @@ The following files are outside the skeletal app:
 | [`SYSTEM.png`](../SYSTEM.png) and [`Formal Design Presentation Final.pdf`](../Formal%20Design%20Presentation%20Final.pdf) | Course deliverables, not loaded by the app or course pages |
 | [`TODO.MD`](../TODO.MD) | Long-term roadmap that predates the smaller demo |
 
-The empty `site_dependencies.txt` file and the unused `.placeholder-note` CSS rule were removed. The previous standalone frontend and redundant backend parser are also removed from the active tree. Keep the research and course files only while the team still needs those historical materials; they are not required to run or publish the demo.
+The empty `site_dependencies.txt` file, the old `docs/.nojekyll` branch-publishing marker, and the unused `.placeholder-note` CSS rule were removed. The previous standalone frontend and redundant backend parser are also removed from the active tree. Keep the research and course files only while the team still needs those historical materials; they are not required to run or publish the demo.
