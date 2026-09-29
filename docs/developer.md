@@ -108,23 +108,9 @@ For conversion on Pages, set the repository Actions variable `VITE_API_URL` to t
 
 GitHub Pages cannot run FastAPI. The [root README](../README.md) has local run commands; the backend can be hosted separately when ready.
 
-## Notes for teammates
+## Codebase Standards
 
 - Keep `backend/uv.lock` and `frontend/app/package-lock.json` in Git so installs match across machines.
 - Keep virtual environments, `node_modules`, build output, caches, logs, and generated prototype output out of Git; the root [`.gitignore`](../.gitignore) covers them.
 - Put new active API behavior under `backend/src/legacylift/`. The research prototype is for experiments and does not change the web app.
 - If a rule cannot translate a COBOL line safely, return a clear review note and a `TODO` line in the draft.
-
-## Codebase audit
-
-Every function in `backend/src/legacylift/` and `frontend/app/src/` participates in the current upload, convert, review, or download path. Keep those files and the two lockfiles. The Pages workflow packages only the built React app and `docs/` course site; it does not package Python source or research files.
-
-The following files are outside the skeletal app:
-
-| Path | Why it is separate |
-| --- | --- |
-| [`backend/prototype/`](../backend/prototype/) | Older research code, notebooks, and data; nothing in the active API imports it |
-| [`SYSTEM.png`](../SYSTEM.png) and [`Formal Design Presentation Final.pdf`](../Formal%20Design%20Presentation%20Final.pdf) | Course deliverables, not loaded by the app or course pages |
-| [`TODO.MD`](../TODO.MD) | Long-term roadmap that predates the smaller demo |
-
-The empty `site_dependencies.txt` file, the old `docs/.nojekyll` branch-publishing marker, and the unused `.placeholder-note` CSS rule were removed. The previous standalone frontend and redundant backend parser are also removed from the active tree. Keep the research and course files only while the team still needs those historical materials; they are not required to run or publish the demo.
