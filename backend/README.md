@@ -27,7 +27,7 @@ Open <http://127.0.0.1:8000/docs> to try the API. Run the tests with `uv run --f
 
 Projects accept up to 10 UTF-8 `.cbl`, `.cob`, `.cpy`, or `.dat` files, each at most 100 KB. Conversion uses only `.cbl` and `.cob`; copybooks and data files are stored but not interpreted. The converter supports simple flat fields and `DISPLAY`, `MOVE`, `ADD`, `SUBTRACT`, and `STOP RUN`. Its output is a draft, even when there are no review notes.
 
-Projects and runs live in memory and disappear when the server restarts. The old `/api/convert` route remains stateless and accepts up to five `.cbl` or `.cob` files for the current frontend.
+Projects and runs live in memory and disappear when the server restarts. The React app uses both paths: file-picker **Convert files** calls `/api/convert`, and **Convert project** calls `/api/projects/{id}/convert` after create/upload. Both share `legacylift.converter`.
 
 ## Code layout
 

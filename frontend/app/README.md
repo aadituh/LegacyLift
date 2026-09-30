@@ -26,8 +26,8 @@ Open <http://127.0.0.1:5173>. Vite sends local `/api` requests to port 8000.
 
 | File | Responsibility |
 | --- | --- |
-| [`src/App.jsx`](src/App.jsx) | File selection, input/output state, sample, and download action |
-| [`src/api.js`](src/api.js) | Multipart request and API error message |
+| [`src/App.jsx`](src/App.jsx) | Health probe, file/project selection, batch + project convert, download |
+| [`src/api.js`](src/api.js) | `/health`, `/api/convert`, and `/api/projects/*` client |
 | [`src/App.css`](src/App.css) and [`src/index.css`](src/index.css) | App layout and shared styles |
 | [`vite.config.js`](vite.config.js) | React plugin and local API proxy |
 

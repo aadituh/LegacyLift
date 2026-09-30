@@ -1,14 +1,15 @@
 # Developer guide
 
-The [root README](../README.md) has local run commands. The React page currently calls the stateless `/api/convert` route. The separate [project API](../backend/README.md#project-routes) is ready for a future frontend view.
+The [root README](../README.md) has local run commands. The React app talks to FastAPI for both batch conversion and project conversion. Both paths use [`converter.py`](../backend/src/legacylift/converter.py).
 
 ## Current request path
 
-1. [`App.jsx`](../frontend/app/src/App.jsx) selects files and calls [`api.js`](../frontend/app/src/api.js).
-2. [`routers/legacy.py`](../backend/src/legacylift/routers/legacy.py) validates the upload and calls [`converter.py`](../backend/src/legacylift/converter.py) once per COBOL file.
-3. The API returns Python drafts and review notes. The browser displays them and downloads the selected `.py` file.
+1. On load, [`App.jsx`](../frontend/app/src/App.jsx) probes `/health` through [`api.js`](../frontend/app/src/api.js) and enables Convert only when the API is up.
+2. **Batch (file picker / Load sample):** `POST /api/convert` with multipart field `files` (1–5 `.cbl`/`.cob`). Handled by [`routers/legacy.py`](../backend/src/legacylift/routers/legacy.py).
+3. **Project:** `POST /api/projects` → `POST /api/projects/{id}/files` → `POST /api/projects/{id}/convert`. Handled by [`routers/projects.py`](../backend/src/legacylift/routers/projects.py) and [`services/projects.py`](../backend/src/legacylift/services/projects.py).
+4. Each COBOL program is converted by [`converter.py`](../backend/src/legacylift/converter.py). The API returns Python drafts and review notes; the browser displays them and downloads the selected `.py` file.
 
-The converter handles a small subset of COBOL. Unsupported lines become `TODO` comments and review notes; generated code requires review.
+Local Vite proxies `/api` and `/health` to port 8000. The converter handles a small subset of COBOL. Unsupported lines become `TODO` comments and review notes; generated code requires review.
 
 ## Where to edit
 
