@@ -62,7 +62,7 @@ Open <http://127.0.0.1:5173>. Click **Load sample**, **Convert files**, and **Do
 
 The [Pages workflow](.github/workflows/pages.yml) builds the React app for <https://aadituh.github.io/LegacyLift/> and includes the course website at <https://aadituh.github.io/LegacyLift/course/>. In GitHub, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**, then push this branch to `main` or run the workflow from the Actions tab. The workflow keeps generated files out of Git.
 
-GitHub Pages hosts only static files. Until the backend is deployed, the app shows its sample and upload interface but disables conversion. When the backend has a public HTTPS URL, add a repository **Actions variable** named `VITE_API_URL` with that API origin (for example, `https://api.example.com`, without `/api`), set `LEGACYLIFT_CORS_ORIGINS=https://aadituh.github.io` on the backend, and rerun the Pages workflow. See the [developer guide](docs/developer.md#configuration-and-hosting) for details.
+GitHub Pages hosts only static files; the FastAPI backend runs on Render. The Pages build uses `https://legacylift-api.onrender.com` by default. To use a different backend, set the repository **Actions variable** `VITE_API_URL` to its HTTPS origin (without `/api`) and rerun the Pages workflow. The backend already allows the LegacyLift Pages origin; use `LEGACYLIFT_CORS_ORIGINS` to add other frontend origins. See the [developer guide](docs/developer.md#configuration-and-hosting) for details.
 
 ## Check changes
 

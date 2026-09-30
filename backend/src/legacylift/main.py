@@ -12,12 +12,18 @@ from legacylift.services.projects import ProjectService
 
 def create_app() -> FastAPI:
     app = FastAPI(title="LegacyLift API")
-    origins = os.getenv(
-        "LEGACYLIFT_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
-    )
+    # Keep local Vite and the GitHub Pages frontend reachable by default.
+    default_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://aadituh.github.io",
+    ]
+    extra_origins = os.getenv("LEGACYLIFT_CORS_ORIGINS", "")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[origin.strip() for origin in origins.split(",") if origin.strip()],
+        allow_origins=default_origins + [
+            origin.strip() for origin in extra_origins.split(",") if origin.strip()
+        ],
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
     )

@@ -29,9 +29,9 @@ Open <http://127.0.0.1:8000/> for the API welcome response or <http://127.0.0.1:
 ## Try the project routes in Postman
 
 1. `POST /api/projects/demo` with no body. Copy the `id` in the response. Each request creates a new project.
-2. `GET /api/projects/{id}` to inspect `hello_team.cbl`, `account.cpy`, and `accounts.dat`.
+2. `GET /api/projects/{id}` to inspect `store_report.cbl`, `order.cpy`, and `orders.dat`.
 3. `POST /api/projects/{id}/analyze` with no body to see file counts.
-4. `POST /api/projects/{id}/convert` with no body to get `hello_team.py`.
+4. `POST /api/projects/{id}/convert` with no body to get `store_report.py`.
 5. `POST /api/projects/{id}/verify` with no body to see the explicit placeholder result.
 6. `GET /api/projects/{id}/runs` to see the three recorded runs.
 
@@ -39,10 +39,10 @@ To try uploading, use `POST /api/projects/{id}/files` with **Body → form-data*
 
 Projects accept up to 10 UTF-8 `.cbl`, `.cob`, `.cpy`, or `.dat` files, each at most 100 KB. Conversion uses only `.cbl` and `.cob`; copybooks and data files are stored but not interpreted. The converter supports simple flat fields and `DISPLAY`, `MOVE`, `ADD`, `SUBTRACT`, and `STOP RUN`. Its output is a draft, even when there are no review notes.
 
-Projects and runs live in memory and disappear when the server restarts. The React app uses both paths: file-picker **Convert files** calls `/api/convert`, and **Convert project** calls `/api/projects/{id}/convert` after create/upload. Both share `legacylift.converter`. The sample project lives in [`sample_data.py`](src/legacylift/sample_data.py); it is only created when the demo route is called.
+Projects and runs live in memory and disappear when the server restarts. The React app uses both paths: **Choose COBOL files** and **Load small sample** call `/api/convert`; **Load demo project** creates the larger sample through `/api/projects/demo`, then **Convert project** calls `/api/projects/{id}/convert`. Both share `legacylift.converter`. The sample project lives in [`sample_data.py`](src/legacylift/sample_data.py); it is only created when the demo route is called.
 
 ## Code layout
 
 `src/legacylift/main.py` assembles the app. `routers/` handles HTTP, `schemas/` defines JSON, `models/` holds internal data, `services/` handles the workflow, and `repositories/` stores projects in memory. `dependencies.py` supplies the service to routes. The older `prototype/` is separate from the running API.
 
-Set `LEGACYLIFT_CORS_ORIGINS` for other frontend origins; the default allows local Vite on port 5173. The service reads environment variables directly and does not load `.env` files automatically.
+Local Vite on port 5173 and the LegacyLift GitHub Pages origin are allowed by default. Set `LEGACYLIFT_CORS_ORIGINS` to add other frontend origins as a comma-separated list. The service reads environment variables directly and does not load `.env` files automatically.

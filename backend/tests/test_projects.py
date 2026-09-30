@@ -1,6 +1,8 @@
 """Check the first project-based API workflow."""
 
+import io
 import unittest
+from contextlib import redirect_stdout
 
 from fastapi.testclient import TestClient
 
@@ -90,7 +92,12 @@ class ProjectApiTests(unittest.TestCase):
         conversion = self.client.post(f"{demo_base}/convert")
         self.assertEqual(conversion.status_code, 200)
         self.assertEqual(conversion.json()["status"], "draft")
-        self.assertEqual(conversion.json()["files"][0]["python_name"], "hello_team.py")
+        self.assertEqual(conversion.json()["files"][0]["python_name"], "store_report.py")
+        self.assertIn("Amount due: $", conversion.json()["files"][0]["python"])
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exec(conversion.json()["files"][0]["python"], {"__name__": "__main__"})
+        self.assertIn("Amount due: $14", output.getvalue())
 
         verification = self.client.post(f"{demo_base}/verify")
         self.assertEqual(verification.status_code, 200)
@@ -106,6 +113,20 @@ class ProjectApiTests(unittest.TestCase):
         self.assertEqual(self.client.post(f"{self.base}/analyze").status_code, 400)
         self.assertEqual(self.client.post(f"{self.base}/verify").status_code, 400)
         self.assertEqual(self.client.get(f"{self.base}/runs").json()["runs"], [])
+
+    def test_pages_origin_can_call_the_api(self):
+        response = self.client.options(
+            "/api/projects/demo",
+            headers={
+                "Origin": "https://aadituh.github.io",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers["access-control-allow-origin"],
+            "https://aadituh.github.io",
+        )
 
 
 if __name__ == "__main__":

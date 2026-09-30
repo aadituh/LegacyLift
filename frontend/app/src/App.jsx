@@ -4,6 +4,7 @@ import {
   checkBackend,
   convertFiles,
   convertProject,
+  createDemoProject,
   createProject,
   uploadProjectFiles,
 } from './api'
@@ -58,9 +59,7 @@ export default function App() {
         setBackendReady(ok)
         setBackendChecked(true)
         if (!ok) {
-          setStatus(
-            'Backend not reachable on port 8000. Start it from backend/, then refresh this page.'
-          )
+          setStatus('Backend is not reachable. Check the API connection, then refresh this page.')
         } else {
           setStatus('Connected to LegacyLift API. Choose COBOL files or a project, then Convert.')
         }
@@ -109,6 +108,7 @@ export default function App() {
     }
 
     setFiles(chosen)
+    setProject(null)
     setResults([])
     setError('')
     setStatus(`${chosen.length} file(s) ready for batch conversion via /api/convert.`)
@@ -118,6 +118,7 @@ export default function App() {
   function loadSample() {
     const sample = new File([sampleCobol], 'hello_team.cbl', { type: 'text/plain' })
     setFiles([sample])
+    setProject(null)
     setResults([])
     setError('')
     setStatus('Sample loaded. Click Convert files to run the Python backend.')
@@ -126,15 +127,14 @@ export default function App() {
 
   async function handleConvert() {
     if (!backendReady) {
-      setError('Backend is offline. Start the FastAPI server, then try again.')
+      setError('Backend is offline. Check the API connection, then try again.')
       return
     }
 
     setIsConverting(true)
     setError('')
     try {
-      // Prefer explicit file-picker batch when the user selected files.
-      // Otherwise convert programs already uploaded to the open project.
+      // File-picker selections use the batch route. Open projects use their own route.
       if (files.length > 0) {
         const converted = await convertFiles(files)
         setResults(converted)
@@ -146,11 +146,6 @@ export default function App() {
         setStatus(
           `Converted project "${project.name}" (${conversion.files.length} program(s), status: ${conversion.status}).`
         )
-        // Align source panel with project programs so tabs match result indices.
-        const asFiles = projectPrograms.map(
-          (program) => new File([program.content], program.name, { type: 'text/plain' })
-        )
-        setFiles(asFiles)
         setSelectedFile(0)
         setSourceText(projectPrograms[0].content || '')
       } else {
@@ -164,6 +159,15 @@ export default function App() {
     }
   }
 
+  function openProject(nextProject) {
+    setProject(nextProject)
+    setProjectName(nextProject.name)
+    setFiles([])
+    setResults([])
+    setSelectedFile(0)
+    setSourceText(programFilesFromProject(nextProject)[0]?.content || '')
+  }
+
   async function handleCreateProject() {
     const name = projectName.trim()
     if (!name) {
@@ -171,16 +175,27 @@ export default function App() {
       return
     }
     if (!backendReady) {
-      setError('Backend is offline. Start the FastAPI server, then try again.')
+      setError('Backend is offline. Check the API connection, then try again.')
       return
     }
     setError('')
     try {
       const created = await createProject(name)
-      setProject(created)
+      openProject(created)
       setStatus(`Project "${created.name}" created. Upload .cbl/.cob files, then Convert.`)
     } catch (cause) {
-      setProject(null)
+      setError(cause.message)
+    }
+  }
+
+  async function handleLoadDemoProject() {
+    if (!backendReady) return
+    setError('')
+    try {
+      const demo = await createDemoProject()
+      openProject(demo)
+      setStatus(`Loaded "${demo.name}" with ${demo.files.length} sample files. Click Convert project.`)
+    } catch (cause) {
       setError(cause.message)
     }
   }
@@ -194,7 +209,7 @@ export default function App() {
     }
     if (!chosen.length) return
     if (!backendReady) {
-      setError('Backend is offline. Start the FastAPI server, then try again.')
+      setError('Backend is offline. Check the API connection, then try again.')
       return
     }
     setError('')
@@ -205,11 +220,13 @@ export default function App() {
         files: project.files.concat(uploaded.files),
       }
       setProject(next)
+      setFiles([])
+      setResults([])
       const programs = programFilesFromProject(next)
       setStatus(
         `Uploaded ${uploaded.files.length} file(s). ${programs.length} program(s) ready to convert.`
       )
-      if (programs.length && !files.length) {
+      if (programs.length) {
         setSourceText(programs[0].content || '')
         setSelectedFile(0)
       }
@@ -261,8 +278,8 @@ export default function App() {
           <p className="eyebrow">BACKEND-LINKED DEMO</p>
           <h1>Turn COBOL files into Python drafts.</h1>
           <p>
-            Select files for a batch convert, or create a project, upload programs, and convert
-            through the FastAPI COBOL translator.
+            Try the larger demo project, choose COBOL files for a quick conversion, or create your
+            own project and upload files.
           </p>
         </div>
 
@@ -293,9 +310,17 @@ export default function App() {
             className="button dark"
             type="button"
             onClick={handleCreateProject}
-            disabled={!backendReady}
+            disabled={!backendReady || isConverting}
           >
             Create project
+          </button>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={handleLoadDemoProject}
+            disabled={!backendReady || isConverting}
+          >
+            Load demo project
           </button>
         </div>
 
@@ -344,7 +369,7 @@ export default function App() {
             />
           </label>
           <button className="button secondary" type="button" onClick={loadSample} disabled={isConverting}>
-            Load sample
+            Load small sample
           </button>
           <button
             className="button dark"
@@ -415,7 +440,7 @@ export default function App() {
               <pre className="code">
                 {sourceTabs.length
                   ? sourceText
-                  : 'Choose files, load the sample, or upload programs to a project.'}
+                  : 'Choose files, load a sample, or upload programs to a project.'}
               </pre>
             </section>
           )}

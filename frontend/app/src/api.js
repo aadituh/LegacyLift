@@ -28,10 +28,7 @@ async function request(path, options = {}) {
   try {
     response = await fetch(endpoint(path), options)
   } catch {
-    throw new Error(
-      'Cannot reach the LegacyLift backend. Start it from backend/ with: ' +
-        'uv run --frozen uvicorn legacylift.main:app --reload'
-    )
+    throw new Error('Cannot reach the LegacyLift backend. Check the API connection and try again.')
   }
 
   const data = await response.json().catch(() => ({}))
@@ -73,6 +70,11 @@ export async function createProject(name) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   })
+}
+
+/** Ask the backend for a new project containing the longer COBOL example. */
+export async function createDemoProject() {
+  return request('/api/projects/demo', { method: 'POST' })
 }
 
 export async function uploadProjectFiles(projectId, files) {
