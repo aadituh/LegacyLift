@@ -21,6 +21,7 @@ export default function App() {
   const [results, setResults] = useState([])
   const [error, setError] = useState('')
   const [isConverting, setIsConverting] = useState(false)
+  const [viewMode, setViewMode] = useState("split")
 
   async function showFile(file, index) {
     setSelectedFile(index)
@@ -144,7 +145,32 @@ export default function App() {
 
         <p className="file-limit">Up to 5 UTF-8 files, 100 KB each. Supported extensions: .cbl and .cob.</p>
 
-        <div className="panels">
+        <div>
+          <button
+            className={viewMode === "split" ? "button dark" : "button secondary"}
+            type="button"
+            onClick={() => setViewMode("split")}
+          >
+            Both
+          </button>
+          <button
+            className={viewMode === "cobol" ? "button dark" : "button secondary"}
+            type="button"
+            onClick={() => setViewMode("cobol")}
+          >
+            COBOL only
+          </button>
+          <button
+            className={viewMode === "python" ? "button dark" : "button secondary"}
+            type="button"
+            onClick={() => setViewMode("python")}
+          >
+            Python only
+          </button>
+        </div>
+
+        <div className={viewMode === "split" ? "panels" : "panels single"}>
+          {(viewMode === "split" || viewMode === "cobol") && ( 
           <section className="panel" aria-labelledby="source-title">
             <div className="panel-heading">
               <span>INPUT</span>
@@ -166,7 +192,9 @@ export default function App() {
             )}
             <pre className="code">{files.length ? sourceText : 'Choose files or load the sample to begin.'}</pre>
           </section>
-
+        )}
+        
+        {(viewMode === "split" || viewMode === "python") && ( 
           <section className="panel" aria-labelledby="output-title">
             <div className="panel-heading">
               <span>OUTPUT</span>
@@ -182,6 +210,7 @@ export default function App() {
             )}
             <pre className="code">{currentResult?.python || 'Converted Python will appear here.'}</pre>
           </section>
+        )}
         </div>
 
         {currentResult?.notes.length > 0 && (

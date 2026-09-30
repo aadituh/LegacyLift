@@ -153,6 +153,10 @@
   gap: 16px;
 }
 
+.panels.single {
+  grid-template-columns: 1fr;
+}
+
 .panel {
   min-width: 0;
   overflow: hidden;
