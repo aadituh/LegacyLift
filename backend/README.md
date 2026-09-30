@@ -1,39 +1,36 @@
-# Backend
+# LegacyLift backend
 
-The active backend is a small FastAPI service. It receives up to five UTF-8 `.cbl` or `.cob` files, converts a basic subset of COBOL, and sends Python drafts back in one response. It does not store uploads or require a database.
+The FastAPI service has two paths: `/api/convert` serves the current React demo, and `/api/projects` is the new project-based API. Both use the same limited COBOL-to-Python converter.
 
-## Start and test
+## Run
 
-From this directory, on Windows PowerShell or macOS Terminal (the commands are the same):
+From `backend/`:
 
 ```text
 uv sync --frozen
 uv run --frozen uvicorn legacylift.main:app --reload
 ```
 
-Open <http://127.0.0.1:8000/docs> to inspect the API. `GET /health` returns `{"status":"ok"}`. The React app calls `POST /api/convert` with multipart form files under the field name `files`.
+Open <http://127.0.0.1:8000/docs> to try the API. Run the tests with `uv run --frozen python -m unittest discover -s tests -v`.
 
-To run the backend checks on either system:
+## Project routes
 
-```text
-uv run --frozen python -m unittest discover -s tests -v
-```
-
-## Where to change code
-
-| File | Responsibility |
+| Route | Current behavior |
 | --- | --- |
-| [`src/legacylift/main.py`](src/legacylift/main.py) | API route, CORS, upload validation, response, and request logs |
-| [`src/legacylift/converter.py`](src/legacylift/converter.py) | COBOL cleanup, supported statements, Python draft, and review notes |
-| [`tests/test_convert.py`](tests/test_convert.py) | Upload and generated-output checks |
-| [`pyproject.toml`](pyproject.toml) and [`uv.lock`](uv.lock) | Dependencies and locked versions |
+| `POST /api/projects` | Create a project with `{"name":"Demo"}`. |
+| `GET /api/projects/{id}` | Return its files and contents. |
+| `POST /api/projects/{id}/files` | Upload files under multipart field `files`. |
+| `POST /api/projects/{id}/convert` | Return Python drafts and `draft` or `review_required` status. |
+| `GET /api/projects/{id}/runs` | Return conversion run summaries. |
+| `POST /api/projects/{id}/analyze` | HTTP 501; analysis is not built. |
+| `POST /api/projects/{id}/verify` | HTTP 501; verification is not built. |
 
-The converter currently handles simple `01` and `77` text or whole-number fields, `DISPLAY`, `MOVE`, `ADD`, `SUBTRACT`, and `STOP RUN`. Unsupported procedure lines become `# TODO` comments in the generated file and entries in `notes`. See [the developer guide](../docs/developer.md) before adding a rule.
+Projects accept up to 10 UTF-8 `.cbl`, `.cob`, `.cpy`, or `.dat` files, each at most 100 KB. Conversion uses only `.cbl` and `.cob`; copybooks and data files are stored but not interpreted. The converter supports simple flat fields and `DISPLAY`, `MOVE`, `ADD`, `SUBTRACT`, and `STOP RUN`. Its output is a draft, even when there are no review notes.
 
-## Configuration and logs
+Projects and runs live in memory and disappear when the server restarts. The old `/api/convert` route remains stateless and accepts up to five `.cbl` or `.cob` files for the current frontend.
 
-Local CORS origins default to `http://localhost:5173,http://127.0.0.1:5173`. Set the `LEGACYLIFT_CORS_ORIGINS` environment variable to a comma-separated list for other frontend origins. The service reads the environment directly; it does not automatically load `.env` files. [`.env.example`](.env.example) shows the setting.
+## Code layout
 
-Uvicorn prints startup messages, upload counts, converted filenames with review-note counts, and rejection reasons to the terminal. Uploaded source and generated Python are not logged. Logs are for local debugging; generated files are returned to the browser rather than saved on the server.
+`src/legacylift/main.py` assembles the app. `routers/` handles HTTP, `schemas/` defines JSON, `models/` holds internal data, `services/` handles the workflow, and `repositories/` stores projects in memory. `dependencies.py` supplies the service to routes. The older `prototype/` is separate from the running API.
 
-[`prototype/`](prototype/) contains older research experiments. It is not imported by the API.
+Set `LEGACYLIFT_CORS_ORIGINS` for other frontend origins; the default allows local Vite on port 5173. The service reads environment variables directly and does not load `.env` files automatically.
