@@ -1,4 +1,4 @@
-# LegacyLift — CS410
+# LegacyLift
 
 A tool for analyzing and converting legacy COBOL codebases to Python, plus the
 team's course website.
@@ -52,8 +52,8 @@ Open <http://127.0.0.1:5173>. Click **Load sample**, **Convert files**, and **Do
 | Path | Purpose |
 | --- | --- |
 | [`frontend/app/`](frontend/app/) | React and Vite upload, preview, and download app |
-| [`backend/src/legacylift/`](backend/src/legacylift/) | Active FastAPI route and small rule-based converter |
-| [`backend/tests/`](backend/tests/) | API conversion checks |
+| [`backend/src/legacylift/`](backend/src/legacylift/) | FastAPI project routes, legacy demo route, and draft converter |
+| [`backend/tests/`](backend/tests/) | API workflow and conversion checks |
 | [`backend/prototype/`](backend/prototype/) | Earlier research scripts and notebooks; separate from the active app |
 | [`docs/`](docs/) | Static course website copied to `/course/` on Pages, plus the [developer guide](docs/developer.md) |
 | [`TODO.MD`](TODO.MD) | Longer-term team ideas; the running demo is intentionally smaller |

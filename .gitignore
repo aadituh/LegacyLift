@@ -57,6 +57,7 @@ build/
 # Local demo data and generated prototype files
 backend/data/
 backend/prototype/output/
+notes/
 
 # Logs
 *.log
