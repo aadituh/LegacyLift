@@ -13,9 +13,7 @@ from legacylift.services.projects import ProjectService
 def create_app() -> FastAPI:
     app = FastAPI(title="LegacyLift API")
     origins = os.getenv(
-        "LEGACYLIFT_CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,"
-        "http://localhost:4173,http://127.0.0.1:4173",
+        "LEGACYLIFT_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
     )
     app.add_middleware(
         CORSMiddleware,
