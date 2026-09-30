@@ -11,7 +11,7 @@ uv sync --frozen
 uv run --frozen uvicorn legacylift.main:app --reload
 ```
 
-Open <http://127.0.0.1:8000/docs> to try the API. Run the tests with `uv run --frozen python -m unittest discover -s tests -v`.
+Open <http://127.0.0.1:8000/> for the API welcome response or <http://127.0.0.1:8000/docs> to try the routes. Run the tests with `uv run --frozen python -m unittest discover -s tests -v`.
 
 ## Project routes
 

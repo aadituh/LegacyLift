@@ -27,6 +27,14 @@ def create_app() -> FastAPI:
     app.include_router(projects.router)
     app.include_router(legacy.router)
 
+    @app.get("/")
+    def home() -> dict[str, str]:
+        return {
+            "message": "LegacyLift API is running",
+            "health": "/health",
+            "docs": "/docs",
+        }
+
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
