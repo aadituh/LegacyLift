@@ -69,11 +69,42 @@ class ProjectApiTests(unittest.TestCase):
         self.assertEqual(result["files"][0]["status"], "review_required")
         self.assertEqual(len(result["files"][0]["notes"]), 1)
 
-    def test_unfinished_routes_are_explicit(self):
+    def test_demo_project_exercises_all_project_routes(self):
+        demo = self.client.post("/api/projects/demo")
+        self.assertEqual(demo.status_code, 201)
+        project = demo.json()
+        self.assertNotEqual(project["id"], self.project_id)
+        self.assertEqual(
+            [file["kind"] for file in project["files"]],
+            ["program", "copybook", "data"],
+        )
+        demo_base = f"/api/projects/{project['id']}"
+
+        analysis = self.client.post(f"{demo_base}/analyze")
+        self.assertEqual(analysis.status_code, 200)
+        self.assertEqual(analysis.json()["status"], "inventory_only")
+        self.assertEqual(analysis.json()["program_count"], 1)
+        self.assertEqual(analysis.json()["copybook_count"], 1)
+        self.assertEqual(analysis.json()["data_file_count"], 1)
+
+        conversion = self.client.post(f"{demo_base}/convert")
+        self.assertEqual(conversion.status_code, 200)
+        self.assertEqual(conversion.json()["status"], "draft")
+        self.assertEqual(conversion.json()["files"][0]["python_name"], "hello_team.py")
+
+        verification = self.client.post(f"{demo_base}/verify")
+        self.assertEqual(verification.status_code, 200)
+        self.assertEqual(verification.json()["status"], "not_verified")
+        self.assertIsNone(verification.json()["passed"])
+
+        runs = self.client.get(f"{demo_base}/runs").json()["runs"]
+        self.assertEqual([run["kind"] for run in runs], ["analyze", "convert", "verify"])
+
+    def test_routes_require_the_right_project_state(self):
         self.assertEqual(self.client.get("/api/projects/missing").status_code, 404)
         self.assertEqual(TestClient(create_app()).get(self.base).status_code, 404)
-        self.assertEqual(self.client.post(f"{self.base}/analyze").status_code, 501)
-        self.assertEqual(self.client.post(f"{self.base}/verify").status_code, 501)
+        self.assertEqual(self.client.post(f"{self.base}/analyze").status_code, 400)
+        self.assertEqual(self.client.post(f"{self.base}/verify").status_code, 400)
         self.assertEqual(self.client.get(f"{self.base}/runs").json()["runs"], [])
 
 

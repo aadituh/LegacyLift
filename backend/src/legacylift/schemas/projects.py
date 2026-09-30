@@ -42,6 +42,24 @@ class ConversionResponse(BaseModel):
     files: list[GeneratedFileResponse]
 
 
+class AnalysisResponse(BaseModel):
+    project_id: str
+    run_id: str
+    status: str
+    program_count: int
+    copybook_count: int
+    data_file_count: int
+    note: str
+
+
+class VerifyResponse(BaseModel):
+    project_id: str
+    run_id: str
+    status: str
+    passed: bool | None
+    note: str
+
+
 class RunResponse(BaseModel):
     id: str
     kind: str

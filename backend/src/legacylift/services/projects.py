@@ -8,6 +8,7 @@ from fastapi import UploadFile
 from legacylift.converter import convert_source
 from legacylift.models.project import Project, Run, SourceFile
 from legacylift.repositories.projects import ProjectRepository
+from legacylift.sample_data import DEMO_FILES
 
 MAX_PROJECT_FILES = 10
 MAX_FILE_BYTES = 100_000
@@ -23,6 +24,14 @@ class ProjectService:
         if not name:
             raise ValueError("Project name cannot be blank.")
         return self.repository.create(name)
+
+    def create_demo_project(self) -> Project:
+        project = self.create_project("LegacyLift demo")
+        project.files = [
+            SourceFile(id=str(uuid4()), name=name, kind=kind, content=content)
+            for name, kind, content in DEMO_FILES
+        ]
+        return project
 
     def get_project(self, project_id: str) -> Project | None:
         return self.repository.get(project_id)
@@ -92,3 +101,26 @@ class ProjectService:
         run = Run(id=str(uuid4()), kind="convert", status=status)
         project.runs.append(run)
         return run, results
+
+    def analyze(self, project: Project) -> tuple[Run, dict[str, int]]:
+        """Return a file inventory while dependency analysis is unfinished."""
+        if not project.files:
+            raise ValueError("Upload files before analyzing.")
+
+        counts = {
+            "program_count": sum(file.kind == "program" for file in project.files),
+            "copybook_count": sum(file.kind == "copybook" for file in project.files),
+            "data_file_count": sum(file.kind == "data" for file in project.files),
+        }
+        run = Run(id=str(uuid4()), kind="analyze", status="inventory_only")
+        project.runs.append(run)
+        return run, counts
+
+    def verify(self, project: Project) -> Run:
+        """Record a demo response without claiming the Python was verified."""
+        if not any(run.kind == "convert" for run in project.runs):
+            raise ValueError("Convert the project before requesting verification.")
+
+        run = Run(id=str(uuid4()), kind="verify", status="not_verified")
+        project.runs.append(run)
+        return run

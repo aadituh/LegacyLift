@@ -5,11 +5,13 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from legacylift.dependencies import ProjectServiceDep
 from legacylift.models.project import Project
 from legacylift.schemas.projects import (
+    AnalysisResponse,
     ConversionResponse,
     CreateProjectRequest,
     ProjectResponse,
     RunsResponse,
     UploadResponse,
+    VerifyResponse,
 )
 from legacylift.services.projects import ProjectService
 
@@ -31,6 +33,12 @@ def create_project(request: CreateProjectRequest, service: ProjectServiceDep) ->
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@router.post("/demo", response_model=ProjectResponse, status_code=201)
+def create_demo_project(service: ProjectServiceDep) -> Project:
+    """Create a new project with sample files for API exploration."""
+    return service.create_demo_project()
+
+
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(project_id: str, service: ProjectServiceDep) -> Project:
     return require_project(project_id, service)
@@ -48,10 +56,20 @@ async def upload_files(
     return {"project_id": project.id, "files": uploaded}
 
 
-@router.post("/{project_id}/analyze")
-def analyze(project_id: str, service: ProjectServiceDep) -> None:
-    require_project(project_id, service)
-    raise HTTPException(status_code=501, detail="Project analysis is not implemented yet.")
+@router.post("/{project_id}/analyze", response_model=AnalysisResponse)
+def analyze(project_id: str, service: ProjectServiceDep) -> dict:
+    project = require_project(project_id, service)
+    try:
+        run, counts = service.analyze(project)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return {
+        "project_id": project.id,
+        "run_id": run.id,
+        "status": run.status,
+        **counts,
+        "note": "File inventory only; dependency analysis is not implemented yet.",
+    }
 
 
 @router.post("/{project_id}/convert", response_model=ConversionResponse)
@@ -64,10 +82,20 @@ def convert(project_id: str, service: ProjectServiceDep) -> dict:
     return {"project_id": project.id, "run_id": run.id, "status": run.status, "files": generated}
 
 
-@router.post("/{project_id}/verify")
-def verify(project_id: str, service: ProjectServiceDep) -> None:
-    require_project(project_id, service)
-    raise HTTPException(status_code=501, detail="Verification is not implemented yet.")
+@router.post("/{project_id}/verify", response_model=VerifyResponse)
+def verify(project_id: str, service: ProjectServiceDep) -> dict:
+    project = require_project(project_id, service)
+    try:
+        run = service.verify(project)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return {
+        "project_id": project.id,
+        "run_id": run.id,
+        "status": run.status,
+        "passed": None,
+        "note": "Demo response only; COBOL and Python outputs were not compared.",
+    }
 
 
 @router.get("/{project_id}/runs", response_model=RunsResponse)
