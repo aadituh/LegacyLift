@@ -73,6 +73,10 @@
   gap: 10px;
 }
 
+.project-row {
+  margin-bottom: 18px;
+}
+
 .button {
   border: 1px solid transparent;
   border-radius: 9px;

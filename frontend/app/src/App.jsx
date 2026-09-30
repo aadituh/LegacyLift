@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { backendIsReady, convertFiles } from './api'
+import { backendIsReady, convertFiles, createProject } from './api'
 import './App.css'
 
 const sampleCobol = `IDENTIFICATION DIVISION.
@@ -22,6 +22,8 @@ export default function App() {
   const [error, setError] = useState('')
   const [isConverting, setIsConverting] = useState(false)
   const [viewMode, setViewMode] = useState("split")
+  const [projectName, setProjectName] = useState('')
+  const [project, setProject] = useState(null)
 
   async function showFile(file, index) {
     setSelectedFile(index)
@@ -81,6 +83,21 @@ export default function App() {
     }
   }
 
+  async function handleCreateProject() {
+    const name = projectName.trim()
+    if (!name) {
+      setError('Enter a project name.')
+      return
+    }
+    setError('')
+    try {
+      setProject(await createProject(name))
+    } catch (cause) {
+      setProject(null)
+      setError(cause.message)
+    }
+  }
+
   function downloadPython(result) {
     const file = new Blob([result.python], { type: 'text/x-python;charset=utf-8' })
     const url = URL.createObjectURL(file)
@@ -116,6 +133,24 @@ export default function App() {
           </p>
         )}
         {error && <p className="message error" role="alert">{error}</p>}
+
+        <div className="actions project-row">
+          <input
+            value={projectName}
+            onChange={(event) => setProjectName(event.target.value)}
+            placeholder="Project name"
+          />
+          <button
+            className="button dark"
+            type="button"
+            onClick={handleCreateProject}
+            disabled={!backendIsReady}
+          >
+            Create project
+          </button>
+        </div>
+
+        {project && <p className="file-limit">Project created: {project.name}</p>}
 
         <div className="actions">
           <label className="button primary" htmlFor="cobol-files">

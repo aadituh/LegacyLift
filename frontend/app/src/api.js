@@ -25,3 +25,22 @@ export async function convertFiles(files) {
   }
   return data.files
 }
+
+export async function createProject(name) {
+  let response
+  try {
+    response = await fetch(`${apiUrl}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+  } catch {
+    throw new Error('Cannot reach the backend. Check that it is running and the API URL is correct.')
+  }
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(typeof data.detail === 'string' ? data.detail : `Create project failed (${response.status}).`)
+  }
+  return data
+}
