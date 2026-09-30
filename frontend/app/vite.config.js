@@ -7,7 +7,15 @@ export default defineConfig({
   base: process.env.GITHUB_PAGES === 'true' ? '/LegacyLift/' : '/',
   server: {
     proxy: {
+      // Keep frontend and FastAPI in sync during local development.
       '/api': 'http://127.0.0.1:8000',
+      '/health': 'http://127.0.0.1:8000',
+    },
+  },
+  preview: {
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+      '/health': 'http://127.0.0.1:8000',
     },
   },
 })
