@@ -44,3 +44,26 @@ export async function createProject(name) {
   }
   return data
 }
+
+export async function uploadProjectFiles(projectId, files) {
+  const form = new FormData()
+  for (const file of files) {
+    form.append('files', file)
+  }
+
+  let response
+  try {
+    response = await fetch(`${apiUrl}/api/projects/${projectId}/files`, {
+      method: 'POST',
+      body: form,
+    })
+  } catch {
+    throw new Error('Cannot reach the backend. Check that it is running and the API URL is correct.')
+  }
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(typeof data.detail === 'string' ? data.detail : `Upload failed (${response.status}).`)
+  } 
+  return data
+}

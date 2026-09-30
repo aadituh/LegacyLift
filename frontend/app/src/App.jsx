@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { backendIsReady, convertFiles, createProject } from './api'
+import { backendIsReady, convertFiles, createProject, uploadProjectFiles } from './api'
 import './App.css'
 
 const sampleCobol = `IDENTIFICATION DIVISION.
@@ -98,6 +98,26 @@ export default function App() {
     }
   }
 
+  async function handleUpload(event) {
+    const chosen = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!project) {
+      setError('Create a project first.')
+      return
+    }
+    if (!chosen.length) return
+    setError('')
+    try {
+      const uploaded = await uploadProjectFiles(project.id, chosen)
+      setProject({
+        ...project,
+        files: project.files.concat(uploaded.files),
+      })
+    } catch (cause) {
+      setError(cause.message)
+    }
+  }
+
   function downloadPython(result) {
     const file = new Blob([result.python], { type: 'text/x-python;charset=utf-8' })
     const url = URL.createObjectURL(file)
@@ -150,7 +170,27 @@ export default function App() {
           </button>
         </div>
 
-        {project && <p className="file-limit">Project created: {project.name}</p>}
+        {project && (
+          <div className="project-row">
+            <p className="file-limit">Project created: {project.name}</p>
+            <label className="button secondary" htmlFor="project-files">
+              Upload project files
+              <input
+                id="project-files"
+                className="file-input"
+                type="file"
+                accept=".cbl,.cob,.cpy,.dat"
+                multiple
+                onChange={handleUpload}
+              />
+            </label>
+            <ul>
+              {project.files.map((file) => (
+                <li key={file.id}>{file.name}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="actions">
           <label className="button primary" htmlFor="cobol-files">
