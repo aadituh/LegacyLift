@@ -527,6 +527,10 @@ export default function App() {
                   </ul>
                 </section>
               )}
+              <p className="footnote">
+                Conversion runs on the Python backend (`legacylift.converter`). Supported: simple fields,
+                DISPLAY, MOVE, ADD, SUBTRACT, STOP RUN. Other lines are marked TODO in the draft.
+              </p>
             </>
           )}
 
