@@ -1,0 +1,40 @@
+name: Backend checks
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', '.github/workflows/backend.yml']
+  pull_request:
+    paths: ['backend/**', '.github/workflows/backend.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10
+
+      - name: Install locked dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: |
+          uv run --frozen ruff check src tests
+          uv run --frozen ruff format --check src tests
+
+      - name: Type check
+        run: uv run --frozen mypy
+
+      - name: Test
+        run: uv run --frozen pytest

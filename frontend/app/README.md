@@ -1,52 +1,43 @@
 # Frontend
 
-This React and Vite app lets a teammate choose COBOL files, inspect the source, convert them through the backend, read review notes, and download Python drafts.
+A React + Vite app for uploading COBOL files, converting them through the backend, reading review notes, and downloading the Python.
 
 ## Run
 
-Start the backend first using [its instructions](../../backend/README.md). Then, from this directory:
-
-Windows PowerShell:
-
-```powershell
-npm.cmd ci
-npm.cmd run dev
-```
-
-macOS Terminal:
+Start the [backend](../../backend/README.md) first. Then, from this folder:
 
 ```bash
-npm ci
-npm run dev
+npm ci          # Windows PowerShell: npm.cmd ci
+npm run dev     # Windows PowerShell: npm.cmd run dev
 ```
 
-Open <http://127.0.0.1:5173>. Vite sends local `/api` requests to port 8000.
+Open <http://127.0.0.1:5173>. Vite forwards `/api` and `/health` to the backend on port 8000.
+
+## What the screen does
+
+| Control | API call |
+| --- | --- |
+| Page load | `GET /health`; Convert stays disabled until the API answers |
+| **Choose COBOL files**, **Load small sample**, **Convert files** | `POST /api/convert` (up to 5 `.cbl`/`.cob` files, not saved) |
+| **Create project**, **Load demo project** | `POST /api/projects`, `POST /api/projects/demo` |
+| **Upload project files** | `POST /api/projects/{id}/files` (`.cbl`, `.cob`, `.cpy`, `.dat`) |
+| **Convert project** | `POST /api/projects/{id}/convert` |
+| **Both / COBOL only / Python only**, **Download .py** | No API call; these switch the view and save the file in the browser |
 
 ## Files
 
 | File | Responsibility |
 | --- | --- |
-| [`src/App.jsx`](src/App.jsx) | Health probe, file/project selection, batch + project convert, download |
-| [`src/api.js`](src/api.js) | `/health`, `/api/convert`, and `/api/projects/*` client |
-| [`src/App.css`](src/App.css) and [`src/index.css`](src/index.css) | App layout and shared styles |
-| [`vite.config.js`](vite.config.js) | React plugin and local API proxy |
-
-The browser checks file count, size, and extension for quick feedback. The backend checks again because browser checks can be bypassed. API errors appear above the controls. See [the developer guide](../../docs/developer.md) for the full request path.
+| [`src/App.jsx`](src/App.jsx) | The whole screen: state, buttons, panels, download |
+| [`src/api.js`](src/api.js) | Every backend call, and turns API errors into messages |
+| [`src/App.css`](src/App.css), [`src/index.css`](src/index.css) | Layout and shared styles |
+| [`vite.config.js`](vite.config.js) | React plugin, local API proxy, Pages base path |
 
 ## Check and build
 
-Windows PowerShell:
-
-```powershell
-npm.cmd run lint
-npm.cmd run build
-```
-
-macOS Terminal:
-
 ```bash
-npm run lint
-npm run build
+npm run lint    # Windows PowerShell: npm.cmd run lint
+npm run build   # Windows PowerShell: npm.cmd run build
 ```
 
-The [Pages workflow](../../.github/workflows/pages.yml) builds this app at `https://aadituh.github.io/LegacyLift/`. It sets Vite's base path to `/LegacyLift/` and copies the course website to `/course/`. For a static deployment with conversion, set the repository Actions variable `VITE_API_URL` to the backend's public HTTPS origin (for example, `https://api.example.com`, without `/api`). The app appends `/api/convert`. The backend must allow `https://aadituh.github.io` with `LEGACYLIFT_CORS_ORIGINS`. Without an API URL, the Pages app shows the interface and sample but disables conversion.
+The [Pages workflow](../../.github/workflows/pages.yml) publishes the build to <https://aadituh.github.io/LegacyLift/>. It points the app at the API through `VITE_API_URL`; see [hosting](../../docs/developer.md#configuration-and-hosting).

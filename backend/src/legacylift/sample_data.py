@@ -1,9 +1,16 @@
-"""Built-in files for the frontend and API demo project."""
+"""Built-in files for the demo project created by ``POST /api/projects/demo``.
+
+``DEMO_FILES`` holds ``(name, kind, content)`` tuples; the project service
+turns each into a ``SourceFile``. ``store_report.cbl`` uses only statements
+the converter supports, so its Python output runs with no review notes.
+"""
+
+from legacylift.models import FileKind
 
 DEMO_FILES = (
     (
         "store_report.cbl",
-        "program",
+        FileKind.PROGRAM,
         """IDENTIFICATION DIVISION.
 PROGRAM-ID. STORE-REPORT.
 DATA DIVISION.
@@ -32,6 +39,6 @@ DISPLAY "Thanks for your order!".
 STOP RUN.
 """,
     ),
-    ("order.cpy", "copybook", "01 ORDER-NUMBER PIC 9(4).\n"),
-    ("orders.dat", "data", "1042,Ada,Coffee\n"),
+    ("order.cpy", FileKind.COPYBOOK, "01 ORDER-NUMBER PIC 9(4).\n"),
+    ("orders.dat", FileKind.DATA, "1042,Ada,Coffee\n"),
 )
