@@ -7,6 +7,9 @@ import {
   createDemoProject,
   createProject,
   uploadProjectFiles,
+  getProject,
+  getRun,
+  getRuns,
 } from './api'
 import './App.css'
 
@@ -26,6 +29,8 @@ function programFilesFromProject(project) {
   if (!project?.files?.length) return []
   return project.files.filter((file) => file.kind === 'program')
 }
+
+const savedProjectKey = 'legacylift-project-id'
 
 export default function App() {
   const [files, setFiles] = useState([])
@@ -73,6 +78,38 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!backendReady) return
+    const id = sessionStorage.getItem(savedProjectKey)
+    if (!id) return
+    let cancelled = false
+    async function restore() {
+      try {
+        const saved = await getProject(id)
+        if (cancelled) return
+        openProject(saved)
+        const runs = await getRuns(id)
+        const convertRun = [...runs.runs].reverse().find((run) => run.kind === 'convert')
+        if (!convertRun) {
+          setStatus(`Opened "${saved.name}". Convert it to see the Python again.`)
+          return
+        }
+        const run = await getRun(id, convertRun.id)
+        if (cancelled) return
+        setResults(run.files || [])
+        setScreen('convert')
+        setStatus(`Opened "${saved.name}" with the saved translation.`)
+      } catch (cause) {
+        sessionStorage.removeItem(savedProjectKey)
+        if (!cancelled) setError(cause.message)
+      }
+    }
+    restore()
+    return () => {
+      cancelled = true
+    }
+  }, [backendReady])
+
   async function showFile(file, index) {
     setSelectedFile(index)
     try {
@@ -111,6 +148,7 @@ export default function App() {
 
     setFiles(chosen)
     setProject(null)
+    sessionStorage.removeItem(savedProjectKey)
     setResults([])
     setError('')
     setStatus(`${chosen.length} file(s) ready for batch conversion via /api/convert.`)
@@ -122,6 +160,7 @@ export default function App() {
     const sample = new File([sampleCobol], 'hello_team.cbl', { type: 'text/plain' })
     setFiles([sample])
     setProject(null)
+    sessionStorage.removeItem(savedProjectKey)
     setResults([])
     setError('')
     setStatus('Sample loaded. Click Convert files to run the Python backend.')
@@ -164,6 +203,7 @@ export default function App() {
   }
 
   function openProject(nextProject) {
+    sessionStorage.setItem(savedProjectKey, nextProject.id)
     setProject(nextProject)
     setProjectName(nextProject.name)
     setFiles([])

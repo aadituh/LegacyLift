@@ -97,3 +97,11 @@ export async function convertProject(projectId) {
 export async function getProject(projectId) {
   return request(`/api/projects/${projectId}`, { method: 'GET' })
 }
+
+export async function  getRuns(projectId) {
+  return request(`/api/projects/${projectId}/runs`, { method: 'GET' })
+}
+
+export async function getRun(projectId, runId) {
+  return request(`/api/projects/${projectId}/runs/${runId}`, { method: 'GET' })
+}
