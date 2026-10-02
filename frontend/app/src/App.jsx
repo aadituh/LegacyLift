@@ -136,13 +136,20 @@ export default function App() {
     const chosen = Array.from(event.target.files || [])
     event.target.value = ''
     if (!chosen.length) return
-
-    if (chosen.length > 5 || chosen.some((file) => file.size > 100_000)) {
-      rejectFiles('Choose up to 5 files, each up to 100 KB.')
+    if (chosen.length > 5) {
+      rejectFiles('Choose up to 5 files.')
       return
     }
-    if (chosen.some((file) => !/\.(cbl|cob)$/i.test(file.name))) {
-      rejectFiles('Choose only .cbl or .cob files.')
+    const tooBig = chosen.filter((file) => file.size > 100_000)
+    if (tooBig.length) {
+      const names = tooBig.map((file) => file.name).join(', ')
+      rejectFiles(`${names} must be 100 KB or less.`)
+      return
+    }
+    const wrongType = chosen.filter((file) => !/\.(cbl|cob)$/i.test(file.name))
+    if (wrongType.length) {
+      const names = wrongType.map((file) => file.name).join(', ')
+      rejectFiles(`${names} must be a .cbl or .cob file.`)
       return
     }
 
@@ -254,6 +261,16 @@ export default function App() {
     if (!chosen.length) return
     if (!backendReady) {
       setError('Backend is offline. Check the API connection, then try again.')
+      return
+    }
+    if (chosen.length > 10) {
+      setError('A project can take up to 10 files.')
+      return
+    } 
+    const tooBig = chosen.filter((file) => file.size > 100_000)
+    if (tooBig.length) {
+      const names = tooBig.map((file) => file.name).join(', ')
+      setError(`${names} must be 100 KB or less.`)
       return
     }
     setError('')

@@ -33,6 +33,9 @@ async function request(path, options = {}) {
 
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
+    if (response.status === 413) {
+      throw new Error(`That upload is too large. The API rejects a request over 1.2 MB.`)
+    }
     throw new Error(detailMessage(data, `Request failed (${response.status}).`))
   }
   return data
