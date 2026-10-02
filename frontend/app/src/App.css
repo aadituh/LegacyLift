@@ -310,3 +310,153 @@
     padding: 20px 17px 50px;
   }
 }
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.side-nav {
+  padding: 24px 16px;
+  background: #fff;
+  border-right: 1px solid #dce6dc;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.nav-button {
+  display: block;
+  width: 100%;
+  margin-bottom: 6px;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: transparent;
+  color: #2d6d43;
+  font-weight: 700;
+  text-align: left;
+}
+
+.nav-button.active {
+  background: #dff5c8;
+  color: #1f5b2c;
+}
+
+.shell-main {
+  min-width: 0;
+}
+
+.app-shell .site-header,
+.app-shell .workspace {
+  max-width: none;
+}
+
+.app-shell .code {
+  min-height: 60vh;
+  max-height: 70vh;
+}
+
+.export-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.export-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  border: 1px solid #dce6dc;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.export-row.selected {
+  border-color: #8fbf96;
+  background: #f3faee;
+}
+
+@media (max-width: 800px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.progress-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 30px 8px;
+}
+
+.status-ring-wrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  flex: none;
+}
+
+.status-ring {
+  width: 88px;
+  height: 88px;
+  transform: rotate(-90deg);
+}
+
+.status-ring-track,
+.status-ring-value {
+  fill: none;
+  stroke-width: 8;
+}
+
+.status-ring-track {
+  stroke: #dce6dc;
+}
+
+.status-ring-value {
+  stroke: #1f5b2c;
+  stroke-linecap: round;
+}
+
+.status-ring-count {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #1f5b2c;
+  font-weight: 700;
+}
+
+.progress-steps {
+  min-width: 0;
+}
+
+.progress-step {
+  margin: 0;
+  color: #8a988e;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.progress-step.done,
+.progress-step.current {
+  color: #1f5b2c;
+}
+
+.progress-step.current {
+  font-weight: 700;
+}
+
+.progress-note {
+  margin: 4px 0 0;
+  color: #698071;
+  font-size: 13px;
+}

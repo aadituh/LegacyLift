@@ -36,6 +36,8 @@ export default function App() {
   const [status, setStatus] = useState('')
   const [isConverting, setIsConverting] = useState(false)
   const [viewMode, setViewMode] = useState('split')
+  const [screen, setScreen] = useState('upload')
+  const [uploadMode, setUploadMode] = useState('project')
   const [projectName, setProjectName] = useState('')
   const [project, setProject] = useState(null)
   const [backendReady, setBackendReady] = useState(false)
@@ -112,6 +114,7 @@ export default function App() {
     setResults([])
     setError('')
     setStatus(`${chosen.length} file(s) ready for batch conversion via /api/convert.`)
+    setScreen('convert')
     showFile(chosen[0], 0)
   }
 
@@ -122,6 +125,7 @@ export default function App() {
     setResults([])
     setError('')
     setStatus('Sample loaded. Click Convert files to run the Python backend.')
+    setScreen('convert')
     showFile(sample, 0)
   }
 
@@ -258,171 +262,265 @@ export default function App() {
         onSelect: () => showProjectProgram(program, index),
       }))
 
+
+  const hasPrograms= files.length > 0 || projectPrograms.length > 0
+  const hasOnlyOtherFiles = Boolean(project?.files?.length) && projectPrograms.length === 0 && files.length === 0
+  const progressStep = results.length > 0 ? 2 : hasPrograms ? 1 : 0
+  const ringRadius = 32
+  const ringLength = 2 * Math.PI * ringRadius
+  const progressNote = 
+    progressStep === 0
+      ? hasOnlyOtherFiles
+        ? 'Upload a COBOL program before converting.'
+        : 'Add files before converting.'
+      : progressStep === 1
+        ? files.length > 0
+          ? 'Convert these files before verification.'
+          : 'Convert this project before verification.'
+        : 'Converted. Verification is not available yet.'
+  const progressSteps = [
+    { name: 'Upload', state: progressStep > 0 ? 'done' : 'current' },
+    {
+      name: 'Convert',
+      state: progressStep > 1 ? 'done' : progressStep === 1 ? 'current' : 'waiting',
+    },
+    { name: 'Verify', state: progressStep > 1 ? 'current' : 'locked'},
+  ]
+
   return (
-    <div className="page">
-      <header className="site-header">
-        <span className="logo">L</span>
-        <div>
+    <div className="page app-shell">
+      <aside className="side-nav">
+        <div className="nav-brand">
+          <span className="logo">L</span>
           <strong>LegacyLift</strong>
-          <span>COBOL to Python demo</span>
         </div>
-        {backendChecked && (
-          <span className={backendReady ? 'api-badge ok' : 'api-badge down'} role="status">
-            {backendReady ? 'API connected' : 'API offline'}
-          </span>
-        )}
-      </header>
+        <button
+          className={screen === 'upload' ? 'nav-button active' : "nav-button"}
+          type="button"
+          onClick={() => setScreen('upload')}
+        >
+          Upload
+        </button>
+        <button
+          className={screen === 'convert' ? 'nav-button active' : 'nav-button'}
+          type="button"
+          onClick={() => setScreen('convert')}
+        >
+          Convert
+        </button>
+        <button
+          className={screen === 'export' ? 'nav-button active' : 'nav-button'}
+          type="button"
+          onClick={() => setScreen('export')}
+        >
+          Export
+        </button>
+      </aside>
 
-      <main className="workspace">
-        <div className="intro">
-          <p className="eyebrow">BACKEND-LINKED DEMO</p>
-          <h1>Turn COBOL files into Python drafts.</h1>
-          <p>
-            Try the larger demo project, choose COBOL files for a quick conversion, or create your
-            own project and upload files.
-          </p>
-        </div>
+      <div className="shell-main">
+        <header className="site-header">
+          <strong>{project ? project.name : files.length ? 'Batch conversion' : 'No project yet'}</strong>
+          {backendChecked && (
+            <span className={backendReady ? 'api-badge ok' : 'api-badge down'} role="status">
+              {backendReady ? 'API connected' : 'API offline'}
+            </span>
+          )}
+        </header>
 
-        {!apiConfigured && (
-          <p className="message" role="status">
-            The frontend is ready. Set VITE_API_URL to your backend origin to enable conversion on
-            this host.
-          </p>
-        )}
-        {status && !error && (
-          <p className="message" role="status">
-            {status}
-          </p>
-        )}
-        {error && (
-          <p className="message error" role="alert">
-            {error}
-          </p>
-        )}
-
-        <div className="actions project-row">
-          <input
-            value={projectName}
-            onChange={(event) => setProjectName(event.target.value)}
-            placeholder="Project name"
-          />
-          <button
-            className="button dark"
-            type="button"
-            onClick={handleCreateProject}
-            disabled={!backendReady || isConverting}
-          >
-            Create project
-          </button>
-          <button
-            className="button secondary"
-            type="button"
-            onClick={handleLoadDemoProject}
-            disabled={!backendReady || isConverting}
-          >
-            Load demo project
-          </button>
-        </div>
-
-        {project && (
-          <div className="project-row">
-            <p className="file-limit">
-              Project: {project.name} ({projectPrograms.length} program
-              {projectPrograms.length === 1 ? '' : 's'}
-              {project.files.length !== projectPrograms.length
-                ? `, ${project.files.length - projectPrograms.length} other`
-                : ''}
-              )
-            </p>
-            <label className="button secondary" htmlFor="project-files">
-              Upload project files
-              <input
-                id="project-files"
-                className="file-input"
-                type="file"
-                accept=".cbl,.cob,.cpy,.dat"
-                multiple
-                onChange={handleUpload}
-              />
-            </label>
-            <ul>
-              {project.files.map((file) => (
-                <li key={file.id}>
-                  {file.name} <span className="file-kind">({file.kind})</span>
-                </li>
-              ))}
-            </ul>
+        <section className="progress-status" aria-label={`Progress ${progressStep} of 3. ${progressNote}`}>
+          <div className="status-ring-wrap">
+            <svg className="status-ring" viewBox="0 0 88 88" aria-hidden="true">
+              <circle className="status-ring-track" cx="44" cy="44" r={ringRadius} />
+              {progressStep > 0 && (
+                <circle
+                  className="status-ring-value"
+                  cx="44"
+                  cy="44"
+                  r={ringRadius}
+                  strokeDasharray={`${(progressStep / 3) * ringLength} ${ringLength}`}
+                />
+              )}
+            </svg>
+            <span className="status-ring-count">{progressStep}/3</span>
           </div>
-        )}
+          <div className="progress-steps">
+            {progressSteps.map((step) => (
+              <p key={step.name} className={`progress-step ${step.state}`}>
+                {step.state === 'done' ? '✓ ' : ''}
+                {step.name}
+                {step.state === 'locked' ? ' Locked' : ''}
+              </p>
+            ))}
+            <p className="progress-note">{progressNote}</p>
+          </div>
+        </section>
 
-        <div className="actions">
-          <label className="button primary" htmlFor="cobol-files">
-            Choose COBOL files
-            <input
-              id="cobol-files"
-              className="file-input"
-              type="file"
-              accept=".cbl,.cob"
-              multiple
-              disabled={isConverting}
-              onChange={chooseFiles}
-            />
-          </label>
-          <button className="button secondary" type="button" onClick={loadSample} disabled={isConverting}>
-            Load small sample
-          </button>
-          <button
-            className="button dark"
-            type="button"
-            onClick={handleConvert}
-            disabled={!canConvert}
-          >
-            {isConverting
-              ? 'Converting…'
-              : files.length
-                ? 'Convert files'
-                : projectPrograms.length
-                  ? 'Convert project'
-                  : 'Convert'}
-          </button>
-        </div>
+        <main className="workspace">
+          {!apiConfigured && (
+            <p className="message" role="status">
+              The frontend is ready. Set VITE_API_URL to your backend origin to enable conversion on
+              this host.
+            </p>
+          )}
+          {status && !error && (
+            <p className="message" role="status">
+              {status}
+            </p>
+          )}
+          {error && (
+            <p className="message error" role="alert">
+              {error}
+            </p>
+          )}
 
-        <p className="file-limit">
-          Batch: up to 5 UTF-8 .cbl/.cob files (100 KB each) via /api/convert. Projects: up to 10
-          files via /api/projects, then /convert.
-        </p>
-
-        <div>
-          <button
-            className={viewMode === 'split' ? 'button dark' : 'button secondary'}
-            type="button"
-            onClick={() => setViewMode('split')}
-          >
-            Both
-          </button>
-          <button
-            className={viewMode === 'cobol' ? 'button dark' : 'button secondary'}
-            type="button"
-            onClick={() => setViewMode('cobol')}
-          >
-            COBOL only
-          </button>
-          <button
-            className={viewMode === 'python' ? 'button dark' : 'button secondary'}
-            type="button"
-            onClick={() => setViewMode('python')}
-          >
-            Python only
-          </button>
-        </div>
-
-        <div className={viewMode === 'split' ? 'panels' : 'panels single'}>
-          {(viewMode === 'split' || viewMode === 'cobol') && (
-            <section className="panel" aria-labelledby="source-title">
-              <div className="panel-heading">
-                <span>INPUT</span>
-                <h2 id="source-title">COBOL files</h2>
+          {screen === 'upload' && (
+            <>
+              <div className="actions project-row">
+                <button
+                  className={uploadMode === 'project' ? 'button dark' : 'button secondary'}
+                  type="button"
+                  onClick={() => setUploadMode('project')}
+                >
+                  Project
+                </button>
+                <button
+                  className={uploadMode === 'batch' ? 'button dark' : 'button secondary'}
+                  type="button"
+                  onClick={() => setUploadMode('batch')}
+                >
+                  Batch files
+                </button>
               </div>
+
+              {uploadMode === 'project' && (
+                <>
+                  <div className="actions project-row">
+                    <input
+                      value={projectName}
+                      onChange={(event) => setProjectName(event.target.value)}
+                      placeholder="Project name"
+                    />
+                    <button
+                      className="button primary"
+                      type="button"
+                      onClick={handleCreateProject}
+                      disabled={!backendReady || isConverting}
+                    >
+                      Create project
+                    </button>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={handleLoadDemoProject}
+                      disabled={!backendReady || isConverting}
+                    >
+                      Load demo project
+                    </button>
+                  </div>
+
+                  {project && (
+                    <div className="project-row">
+                      <p className="file-limit">
+                        Project: {project.name} ({projectPrograms.length} program
+                        {projectPrograms.length === 1 ? '' : 's'}
+                        {project.files.length !== projectPrograms.length
+                          ? `, ${project.files.length - projectPrograms.length} other`
+                          : ''}
+                        )
+                      </p>
+                      <label className="button secondary" htmlFor="project-files">
+                        Upload project files
+                        <input
+                          id="project-files"
+                          className="file-input"
+                          type="file"
+                          accept=".cbl,.cob,.cpy,.dat"
+                          multiple
+                          onChange={handleUpload}
+                        />
+                      </label>
+                      <ul>
+                        {project.files.map((file) => (
+                          <li key={file.id}>
+                            {file.name} <span className="file-kind">({file.kind})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <p className="file-limit">Projects: up to 10 files via /api/projects, then /convert.</p>
+                </>
+              )}
+
+              {uploadMode === 'batch' && (
+                <>
+                  <p className="file-limit">
+                    These files are converted on their own and are not added to a project.
+                  </p>
+                  <div className="actions">
+                    <label className="button primary" htmlFor="cobol-files">
+                      Choose COBOL files
+                      <input
+                        id="cobol-files"
+                        className="file-input"
+                        type="file"
+                        accept=".cbl,.cob"
+                        multiple
+                        disabled={isConverting}
+                        onChange={chooseFiles}
+                      />
+                    </label>
+                    <button className="button secondary" type="button" onClick={loadSample} disabled={isConverting}>
+                      Load small sample
+                    </button>
+                  </div>
+                  <p className="file-limit">Batch: up to 5 UTF-8 .cbl/.cob files (100 KB each) via /api/convert.</p>
+                </>
+              )}
+            </>  
+          )}
+
+          {screen === 'convert' && (
+            <>
+              <div className="actions project-row">
+                <button
+                  className={viewMode === 'split' ? 'button dark' : 'button secondary'}
+                  type="button"
+                  onClick={() => setViewMode('split')}
+                >
+                  Both
+                </button>
+                <button
+                  className={viewMode === 'cobol' ? 'button dark' : 'button secondary'}
+                  type="button"
+                  onClick={() => setViewMode('cobol')}
+                >
+                  COBOL only
+                </button>
+                <button
+                  className={viewMode === 'python' ? 'button dark' : 'button secondary'}
+                  type = "button"
+                  onClick={() => setViewMode('python')}
+                >
+                  Python only
+                </button>
+                <button
+                  className="button dark"
+                  type="button"
+                  onClick={handleConvert}
+                  disabled={!canConvert}
+                >
+                  {isConverting
+                    ? 'Converting...'
+                    : files.length
+                      ? 'Convert files'
+                      : projectPrograms.length
+                        ? 'Convert project'
+                        : 'Convert'}
+                </button>
+              </div>
+
               {sourceTabs.length > 0 && (
                 <div className="file-tabs">
                   {sourceTabs.map((tab, index) => (
@@ -437,51 +535,81 @@ export default function App() {
                   ))}
                 </div>
               )}
-              <pre className="code">
-                {sourceTabs.length
-                  ? sourceText
-                  : 'Choose files, load a sample, or upload programs to a project.'}
-              </pre>
-            </section>
-          )}
+                    
+              <div className={viewMode === 'split' ? 'panels' : 'panels single'}>
+                {(viewMode === 'split' || viewMode === 'cobol') && (
+                  <section className="panel" aria-labelledby="source-title">
+                    <div className="panel-heading">
+                      <span>INPUT</span>
+                      <h2 id="source-title">COBOL files</h2>
+                    </div>
+                    <pre className="code">
+                      {sourceTabs.length
+                        ? sourceText
+                        : 'Choose files, load a sample, or upload programs to a project.'}
+                    </pre>
+                  </section>
+                )}
 
-          {(viewMode === 'split' || viewMode === 'python') && (
-            <section className="panel" aria-labelledby="output-title">
-              <div className="panel-heading">
-                <span>OUTPUT</span>
-                <h2 id="output-title">Python files</h2>
+                {(viewMode === 'split' || viewMode === 'python') && (
+                  <section className="panel" aria-labelledby="output-title">
+                    <div className="panel-heading">
+                      <span>OUTPUT</span>
+                      <h2 id="output-title">Python files</h2>
+                    </div>
+                    {currentResult && (
+                      <div className="output-toolbar">
+                        <span>
+                          {currentResult.python_name}
+                          {currentResult.status ? ` . ${currentResult.status}` : ''}
+                        </span>
+                      </div>
+                    )}
+                    <pre className="code">{currentResult?.python || 'Converted Python will appear here.'}</pre>
+                  </section>
+                )}
               </div>
-              {currentResult && (
-                <div className="output-toolbar">
-                  <span>
-                    {currentResult.python_name}
-                    {currentResult.status ? ` · ${currentResult.status}` : ''}
-                  </span>
-                  <button className="download" type="button" onClick={() => downloadPython(currentResult)}>
-                    Download .py
-                  </button>
-                </div>
-              )}
-              <pre className="code">{currentResult?.python || 'Converted Python will appear here.'}</pre>
-            </section>
-          )}
-        </div>
 
-        {currentResult?.notes?.length > 0 && (
-          <section className="review-notes">
-            <h2>Lines to review</h2>
-            <ul>
-              {currentResult.notes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          </section>
-        )}
-        <p className="footnote">
-          Conversion runs on the Python backend (`legacylift.converter`). Supported: simple fields,
-          DISPLAY, MOVE, ADD, SUBTRACT, STOP RUN. Other lines are marked TODO in the draft.
-        </p>
-      </main>
+              {currentResult?.notes?.length > 0 && (
+                <section className="review-notes">
+                  <h2>Lines to review</h2>
+                  <ul>
+                    {currentResult.notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              <p className="footnote">
+                Conversion runs on the Python backend (`legacylift.converter`). Supported: simple fields,
+                DISPLAY, MOVE, ADD, SUBTRACT, STOP RUN. Other lines are marked TODO in the draft.
+              </p>
+            </>
+          )}
+
+          {screen === 'export' && (
+            <>
+              {results.length === 0 ? (
+                <p className="file-limit">Convert a program first. The Python files will show up here.</p>
+              ) : (
+                <ul className="export-list">
+                  {results.map((result, index) => (
+                    <li
+                      key={result.python_name}
+                      className={index === selectedFile ? 'export-row selected' : 'export-row'}
+                    >
+                      <span>{result.python_name}</span>
+                      <button className="download" type="button" onClick={() => downloadPython(result)}>
+                        Download .py
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </main>
+      </div>
     </div>
   )
 }
