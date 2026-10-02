@@ -15,14 +15,17 @@ Open <http://127.0.0.1:5173>. Vite forwards `/api` and `/health` to the backend 
 
 ## What the screen does
 
-| Control | API call |
-| --- | --- |
-| Page load | `GET /health`; Convert stays disabled until the API answers |
-| **Choose COBOL files**, **Load small sample**, **Convert files** | `POST /api/convert` (up to 5 `.cbl`/`.cob` files, not saved) |
-| **Create project**, **Load demo project** | `POST /api/projects`, `POST /api/projects/demo` |
-| **Upload project files** | `POST /api/projects/{id}/files` (`.cbl`, `.cob`, `.cpy`, `.dat`) |
-| **Convert project** | `POST /api/projects/{id}/convert` |
-| **Both / COBOL only / Python only**, **Download .py** | No API call; these switch the view and save the file in the browser |
+The side menu has three screens: **Upload**, **Convert**, and **Export**. A progress ring shows how far you are.
+
+| Screen | Control | API call |
+| --- | --- | --- |
+| (page load) | | `GET /health`; Convert stays disabled until the API answers |
+| Upload → **Project** | **Create project**, **Load demo project** | `POST /api/projects`, `POST /api/projects/demo` |
+| Upload → **Project** | **Upload project files** | `POST /api/projects/{id}/files` (`.cbl`, `.cob`, `.cpy`, `.dat`) |
+| Upload → **Batch files** | **Choose COBOL files**, **Load small sample** | None yet; files stay in the browser |
+| Convert | **Convert files** (batch) or **Convert project** | `POST /api/convert` (up to 5 `.cbl`/`.cob` files, not saved) or `POST /api/projects/{id}/convert` |
+| Convert | **Both / COBOL only / Python only** | No API call; switches the view |
+| Export | **Download .py** | No API call; saves the file in the browser |
 
 ## Files
 

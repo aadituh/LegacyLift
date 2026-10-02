@@ -36,7 +36,7 @@ npm ci          # Windows PowerShell: npm.cmd ci
 npm run dev     # Windows PowerShell: npm.cmd run dev
 ```
 
-In the browser, click **Load demo project**, then **Convert project**, then **Download .py**. To call the API directly, use the interactive docs at <http://127.0.0.1:8000/docs>.
+In the browser: on **Upload**, click **Load demo project**; on **Convert**, click **Convert project**; on **Export**, click **Download .py**. To call the API directly, use the interactive docs at <http://127.0.0.1:8000/docs>.
 
 ## Repository map
 
