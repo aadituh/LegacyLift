@@ -32,6 +32,27 @@ function programFilesFromProject(project) {
 
 const savedProjectKey = 'legacylift-project-id'
 
+function runLabel(kind) {
+  if (kind === 'convert') return 'Convert'
+  if (kind === 'analyze') return 'Analyze'
+  if (kind === 'verify') return 'Verify'
+  return kind
+}
+
+function runStatusLabel(status) {
+  if (status === 'draft') return 'Draft'
+  if (status === 'review_required') return 'Review required'
+  if (status === 'inventory_only') return 'File count only'
+  if (status === 'not_verified') return 'Not compared'
+    return status
+}
+
+function runTime(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString()
+}
+
 export default function App() {
   const [files, setFiles] = useState([])
   const [sourceText, setSourceText] = useState('')
@@ -47,6 +68,7 @@ export default function App() {
   const [project, setProject] = useState(null)
   const [backendReady, setBackendReady] = useState(false)
   const [backendChecked, setBackendChecked] = useState(false)
+  const [runs, setRuns] = useState([])
 
   const projectPrograms = useMemo(() => programFilesFromProject(project), [project])
   const canConvert = backendReady && (files.length > 0 || projectPrograms.length > 0) && !isConverting
@@ -109,6 +131,23 @@ export default function App() {
       cancelled = true
     }
   }, [backendReady])
+
+  useEffect(() => {
+    if (screen !== 'export' || !project?.id || !backendReady) return
+    let cancelled = false
+    async function  loadRuns() {
+      try {
+        const data = await getRuns(project.id)
+        if (!cancelled) setRuns(data.runs || [])
+      } catch (cause) {
+        if (!cancelled) setError(cause.message)
+      }
+    }
+    loadRuns()
+    return () => {
+      cancelled = true
+    }
+}, [screen, project, backendReady])
 
   async function showFile(file, index) {
     setSelectedFile(index)
@@ -644,27 +683,49 @@ export default function App() {
             </>
           )}
 
-          {screen === 'export' && (
-            <>
-              {results.length === 0 ? (
-                <p className="file-limit">Convert a program first. The Python files will show up here.</p>
-              ) : (
-                <ul className="export-list">
-                  {results.map((result, index) => (
-                    <li
-                      key={result.python_name}
-                      className={index === selectedFile ? 'export-row selected' : 'export-row'}
-                    >
-                      <span>{result.python_name}</span>
-                      <button className="download" type="button" onClick={() => downloadPython(result)}>
-                        Download .py
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
+        {screen === 'export' && (
+          <>
+            <h2 className="history-title">Run history</h2>
+            {!project ? (
+              <p className="file-limit">
+                {files.length
+                  ? 'Batch conversion is not saved, so there is no run history.'
+                  : 'Open a project to see its runs.'}
+              </p>
+            ) : runs.length === 0 ? (
+              <p className="file-limit">No runs yet. Convert the project to add one.</p>
+            ) : (
+              <ul className="export-list">
+                {[...runs].reverse().map((run) => (
+                  <li key={run.id} className="export-row">
+                    <span>{runLabel(run.kind)}</span>
+                    <span className="run-status">{runStatusLabel(run.status)}</span>
+                    <span className="run-time">{runTime(run.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <h2 className="history-title">Downloads</h2>
+            {results.length === 0 ? (
+              <p className="file-limit">Convert a program first. The Python files will show up here.</p>
+            ) : (
+              <ul className="export-list">
+                {results.map((result, index) => (
+                  <li
+                    key={result.python_name}
+                    className={index === selectedFile ? 'export-row selected' : 'export-row'}
+                  >
+                    <span>{result.python_name}</span>
+                    <button className="download" type="button" onClick={() => downloadPython(result)}>
+                      Download .py
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+          )} 
         </main>
       </div>
     </div>

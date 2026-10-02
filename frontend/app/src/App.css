@@ -460,3 +460,18 @@
   color: #698071;
   font-size: 13px;
 }
+
+.history-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.history-title + .export-list {
+  margin-bottom: 28px;
+}
+
+.run-status,
+.run-time {
+  color: #698071;
+  font-size: 13px;
+}
