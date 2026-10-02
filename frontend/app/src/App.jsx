@@ -31,6 +31,24 @@ function programFilesFromProject(project) {
 }
 
 const savedProjectKey = 'legacylift-project-id'
+const savedBatchKey = 'legacylift-batch'
+const savedScreenKey = 'legacylift-screen'
+const savedUploadModeKey = 'legacylift-upload-mode'
+
+function clearSavedBatch() {
+  sessionStorage.removeItem(savedBatchKey)
+}
+
+async function rememberBatch(fileList, converted) {
+  const sources = []
+  for (const file of fileList) {
+    sources.push({ name: file.name, text: await file.text() })
+  }
+  sessionStorage.setItem(
+    savedBatchKey,
+    JSON.stringify({ sources, results: converted }),
+  )
+}
 
 function runLabel(kind) {
   if (kind === 'convert') return 'Convert'
@@ -62,8 +80,19 @@ export default function App() {
   const [status, setStatus] = useState('')
   const [isConverting, setIsConverting] = useState(false)
   const [viewMode, setViewMode] = useState('split')
-  const [screen, setScreen] = useState('upload')
-  const [uploadMode, setUploadMode] = useState('project')
+  
+  const [screen, setScreen] = useState(() => {
+    const saved = sessionStorage.getItem(savedScreenKey)
+    if (saved === 'upload' || saved === 'convert' || saved === 'export') return saved
+    return 'upload'
+  })
+
+  const [uploadMode, setUploadMode] = useState(() => {
+    const saved = sessionStorage.getItem(savedUploadModeKey)
+    if (saved === 'project' || saved === 'batch') return saved
+    return 'project'
+  })
+
   const [projectName, setProjectName] = useState('')
   const [project, setProject] = useState(null)
   const [backendReady, setBackendReady] = useState(false)
@@ -72,6 +101,14 @@ export default function App() {
 
   const projectPrograms = useMemo(() => programFilesFromProject(project), [project])
   const canConvert = backendReady && (files.length > 0 || projectPrograms.length > 0) && !isConverting
+
+  useEffect(() => {
+    sessionStorage.setItem(savedScreenKey, screen)
+  }, [screen])
+
+  useEffect(() => {
+    sessionStorage.setItem(savedUploadModeKey, uploadMode)
+  }, [uploadMode])
 
   useEffect(() => {
     let cancelled = false
@@ -101,9 +138,35 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!backendReady) return
-    const id = sessionStorage.getItem(savedProjectKey)
-    if (!id) return
+    const id= sessionStorage.getItem(savedProjectKey)
+
+    if (!id) {
+      const raw = sessionStorage.getItem(savedBatchKey)
+      if (raw) {
+        try {
+          const saved = JSON.parse(raw)
+          const restored = (saved.sources || []).map(
+            (source) => new File([source.text], source.name, { type: 'text/plain' }),
+          )
+          if (restored.length) {
+            setProject(null)
+            setFiles(restored)
+            setResults(saved.results || [])
+            setSelectedFile(0)
+            setSourceText(saved.sources[0]?.text || '')
+            setStatus(
+              saved.results?.length
+                ? 'Opened the batch conversion from this tab.'
+                : 'Opened the batch files from this tab. Click Convert files.',
+            )
+          }
+        } catch {
+          clearSavedBatch()
+        }
+      }
+    }
+    
+    if(!backendReady || !id) return
     let cancelled = false
     async function restore() {
       try {
@@ -119,8 +182,7 @@ export default function App() {
         const run = await getRun(id, convertRun.id)
         if (cancelled) return
         setResults(run.files || [])
-        setScreen('convert')
-        setStatus(`Opened "${saved.name}" with the saved translation.`)
+        setStatus(`Opened "${saved.name}" with the saved Python. `)
       } catch (cause) {
         sessionStorage.removeItem(savedProjectKey)
         if (!cancelled) setError(cause.message)
@@ -147,7 +209,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-}, [screen, project, backendReady])
+  }, [screen, project, backendReady])
 
   async function showFile(file, index) {
     setSelectedFile(index)
@@ -171,7 +233,7 @@ export default function App() {
     setError(message)
   }
 
-  function chooseFiles(event) {
+  async function chooseFiles(event) {
     const chosen = Array.from(event.target.files || [])
     event.target.value = ''
     if (!chosen.length) return
@@ -195,23 +257,25 @@ export default function App() {
     setFiles(chosen)
     setProject(null)
     sessionStorage.removeItem(savedProjectKey)
+    clearSavedBatch()
     setResults([])
     setError('')
     setStatus(`${chosen.length} file(s) ready for batch conversion via /api/convert.`)
-    setScreen('convert')
     showFile(chosen[0], 0)
+    await rememberBatch(chosen, [])
   }
 
-  function loadSample() {
+  async function loadSample() {
     const sample = new File([sampleCobol], 'hello_team.cbl', { type: 'text/plain' })
     setFiles([sample])
     setProject(null)
     sessionStorage.removeItem(savedProjectKey)
+    clearSavedBatch()
     setResults([])
     setError('')
     setStatus('Sample loaded. Click Convert files to run the Python backend.')
-    setScreen('convert')
     showFile(sample, 0)
+    await rememberBatch([sample], [])
   }
 
   async function handleConvert() {
@@ -227,6 +291,7 @@ export default function App() {
       if (files.length > 0) {
         const converted = await convertFiles(files)
         setResults(converted)
+        await rememberBatch(files, converted)
         setStatus(`Converted ${converted.length} file(s) through /api/convert.`)
         if (selectedFile >= converted.length) setSelectedFile(0)
       } else if (project && projectPrograms.length > 0) {
@@ -243,6 +308,8 @@ export default function App() {
     } catch (cause) {
       setResults([])
       setError(cause.message)
+      if (files.length > 0) await rememberBatch(files, [])
+      setError(cause.message)
     } finally {
       setIsConverting(false)
     }
@@ -250,6 +317,7 @@ export default function App() {
 
   function openProject(nextProject) {
     sessionStorage.setItem(savedProjectKey, nextProject.id)
+    clearSavedBatch()
     setProject(nextProject)
     setProjectName(nextProject.name)
     setFiles([])
