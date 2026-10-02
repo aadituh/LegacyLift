@@ -390,3 +390,73 @@
     grid-template-columns: 1fr;
   }
 }
+
+.progress-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 30px 8px;
+}
+
+.status-ring-wrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  flex: none;
+}
+
+.status-ring {
+  width: 88px;
+  height: 88px;
+  transform: rotate(-90deg);
+}
+
+.status-ring-track,
+.status-ring-value {
+  fill: none;
+  stroke-width: 8;
+}
+
+.status-ring-track {
+  stroke: #dce6dc;
+}
+
+.status-ring-value {
+  stroke: #1f5b2c;
+  stroke-linecap: round;
+}
+
+.status-ring-count {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #1f5b2c;
+  font-weight: 700;
+}
+
+.progress-steps {
+  min-width: 0;
+}
+
+.progress-step {
+  margin: 0;
+  color: #8a988e;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.progress-step.done,
+.progress-step.current {
+  color: #1f5b2c;
+}
+
+.progress-step.current {
+  font-weight: 700;
+}
+
+.progress-note {
+  margin: 4px 0 0;
+  color: #698071;
+  font-size: 13px;
+}

@@ -262,6 +262,31 @@ export default function App() {
         onSelect: () => showProjectProgram(program, index),
       }))
 
+
+  const hasPrograms= files.length > 0 || projectPrograms.length > 0
+  const hasOnlyOtherFiles = Boolean(project?.files?.length) && projectPrograms.length === 0 && files.length === 0
+  const progressStep = results.length > 0 ? 2 : hasPrograms ? 1 : 0
+  const ringRadius = 32
+  const ringLength = 2 * Math.PI * ringRadius
+  const progressNote = 
+    progressStep === 0
+      ? hasOnlyOtherFiles
+        ? 'Upload a COBOL program before converting.'
+        : 'Add files before converting.'
+      : progressStep === 1
+        ? files.length > 0
+          ? 'Convert these files before verification.'
+          : 'Convert this project before verification.'
+        : 'Converted. Verification is not available yet.'
+  const progressSteps = [
+    { name: 'Upload', state: progressStep > 0 ? 'done' : 'current' },
+    {
+      name: 'Convert',
+      state: progressStep > 1 ? 'done' : progressStep === 1 ? 'current' : 'waiting',
+    },
+    { name: 'Verify', state: progressStep > 1 ? 'current' : 'locked'},
+  ]
+
   return (
     <div className="page app-shell">
       <aside className="side-nav">
@@ -301,6 +326,34 @@ export default function App() {
             </span>
           )}
         </header>
+
+        <section className="progress-status" aria-label={`Progress ${progressStep} of 3. ${progressNote}`}>
+          <div className="status-ring-wrap">
+            <svg className="status-ring" viewBox="0 0 88 88" aria-hidden="true">
+              <circle className="status-ring-track" cx="44" cy="44" r={ringRadius} />
+              {progressStep > 0 && (
+                <circle
+                  className="status-ring-value"
+                  cx="44"
+                  cy="44"
+                  r={ringRadius}
+                  strokeDasharray={`${(progressStep / 3) * ringLength} ${ringLength}`}
+                />
+              )}
+            </svg>
+            <span className="status-ring-count">{progressStep}/3</span>
+          </div>
+          <div className="progress-steps">
+            {progressSteps.map((step) => (
+              <p key={step.name} className={`progress-step ${step.state}`}>
+                {step.state === 'done' ? '✓ ' : ''}
+                {step.name}
+                {step.state === 'locked' ? ' Locked' : ''}
+              </p>
+            ))}
+            <p className="progress-note">{progressNote}</p>
+          </div>
+        </section>
 
         <main className="workspace">
           {!apiConfigured && (
@@ -348,7 +401,7 @@ export default function App() {
                       placeholder="Project name"
                     />
                     <button
-                      className="button dark"
+                      className="button primary"
                       type="button"
                       onClick={handleCreateProject}
                       disabled={!backendReady || isConverting}
