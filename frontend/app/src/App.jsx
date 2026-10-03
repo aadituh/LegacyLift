@@ -51,6 +51,29 @@ async function rememberBatch(fileList, converted) {
   )
 }
 
+function readSavedBatch() {
+  if (sessionStorage.getItem(savedProjectKey)) return null
+  const raw = sessionStorage.getItem(savedBatchKey)
+  if (!raw) return null
+  try {
+    const saved = JSON.parse(raw)
+    const sources = saved.sources || []
+    if (!sources.length) return null
+    const results = saved.results || []
+    return {
+      files: sources.map((source) => new File([source.text], source.name, { type: 'text/plain' })),
+      results,
+      sourceText: sources[0]?.text || '',
+      status: results.length
+        ? 'Opened the batch conversion from this tab.'
+        : 'Opened the batch files from this tab. Click Convert files.',
+    }
+  } catch {
+    clearSavedBatch()
+    return null
+  }
+}
+
 function runLabel(kind) {
   if (kind === 'convert') return 'Convert'
   if (kind === 'analyze') return 'Analyze'
@@ -73,12 +96,13 @@ function runTime(value) {
 }
 
 export default function App() {
-  const [files, setFiles] = useState([])
-  const [sourceText, setSourceText] = useState('')
+  const [savedBatch] = useState(readSavedBatch)
+  const [files, setFiles] = useState(() => savedBatch?.files ?? [])
+  const [sourceText, setSourceText] = useState(() => savedBatch?.sourceText ?? '')
   const [selectedFile, setSelectedFile] = useState(0)
-  const [results, setResults] = useState([])
+  const [results, setResults] = useState(() => savedBatch?.results ?? [])
   const [error, setError] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(() => savedBatch?.status ?? '')
   const [isConverting, setIsConverting] = useState(false)
  
   const [viewMode, setViewMode] = useState(() => {
@@ -136,7 +160,7 @@ export default function App() {
         setBackendChecked(true)
         if (!ok) {
           setStatus('Backend is not reachable. Check the API connection, then refresh this page.')
-        } else {
+        } else if (!savedBatch) {
           setStatus('Connected to LegacyLift API. Choose COBOL files or a project, then Convert.')
         }
       }
@@ -145,36 +169,10 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [savedBatch])
 
   useEffect(() => {
-    const id= sessionStorage.getItem(savedProjectKey)
-
-    if (!id) {
-      const raw = sessionStorage.getItem(savedBatchKey)
-      if (raw) {
-        try {
-          const saved = JSON.parse(raw)
-          const restored = (saved.sources || []).map(
-            (source) => new File([source.text], source.name, { type: 'text/plain' }),
-          )
-          if (restored.length) {
-            setProject(null)
-            setFiles(restored)
-            setResults(saved.results || [])
-            setSelectedFile(0)
-            setSourceText(saved.sources[0]?.text || '')
-            setStatus(
-              saved.results?.length
-                ? 'Opened the batch conversion from this tab.'
-                : 'Opened the batch files from this tab. Click Convert files.',
-            )
-          }
-        } catch {
-          clearSavedBatch()
-        }
-      }
-    }
+    const id = sessionStorage.getItem(savedProjectKey)
     
     if(!backendReady || !id) return
     let cancelled = false
@@ -283,7 +281,11 @@ export default function App() {
     clearSavedBatch()
     setResults([])
     setError('')
-    setStatus('Sample loaded. Click Convert files to run the Python backend.')
+    setStatus(
+      backendReady
+        ? 'Sample loaded. Click Convert files to run the Python backend.'
+        : 'Sample loaded. Convert files not ready until the API is online.'
+    )
     showFile(sample, 0)
     await rememberBatch([sample], [])
   }
