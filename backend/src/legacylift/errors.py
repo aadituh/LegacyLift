@@ -1,8 +1,8 @@
 """Errors that the API returns as ``{"detail": message}`` with a 4xx status.
 
-Services raise these instead of ``HTTPException`` so they stay independent of
-FastAPI. ``main.py`` registers one handler that turns any of them into a
-response, like Spring's ``@ControllerAdvice``.
+Services raise these instead of FastAPI's ``HTTPException``, so they don't
+depend on the web framework. ``main.py`` registers one handler that turns any
+of them into a response with the class's ``status_code``.
 
 Example:
     >>> error = NotFoundError("Project not found.")

@@ -1,5 +1,8 @@
 """Settings, read from ``LEGACYLIFT_*`` environment variables or a ``.env`` file.
 
+``main.create_app`` reads them once at startup. Real environment variables
+override ``backend/.env``.
+
 Example:
     >>> settings = Settings(_env_file=None, cors_origins="https://a.example, ,https://b.example")
     >>> settings.cors_origins
@@ -43,12 +46,23 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def split_origins(cls, value: object) -> object:
-        """Accept ``"https://a.example,https://b.example"`` as well as a list."""
+        """Accept ``"https://a.example,https://b.example"`` as well as a list.
+
+        Args:
+            value: The raw setting.
+
+        Returns:
+            A list of origins without blanks, or ``value`` unchanged if it isn't text.
+        """
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
     @property
     def all_cors_origins(self) -> list[str]:
-        """The default origins followed by ``cors_origins``."""
+        """Every origin the API allows.
+
+        Returns:
+            ``DEFAULT_CORS_ORIGINS`` followed by ``cors_origins``.
+        """
         return [*DEFAULT_CORS_ORIGINS, *self.cors_origins]

@@ -4,17 +4,15 @@ LegacyLift analyzes legacy COBOL programs and converts them to Python for human 
 
 ## Status
 
-| Pipeline step (from the design) | Today |
+| Pipeline step | Today |
 | --- | --- |
-| Upload COBOL programs, copybooks, and data files | Working; saved as JSON files on the API's disk |
-| Keep translations after a page reload | Working; each convert run saves its Python |
-| Convert COBOL to Python | Working for a small subset; other lines become `TODO` review notes |
-| Dependency analysis (`COPY`, `CALL`, `PERFORM`) | Placeholder: counts files only |
-| Verify Python output against COBOL (GnuCOBOL) | Placeholder: returns `not_verified` |
-| PostgreSQL storage | Not started |
-| Gemini + RAG translation | Not started |
+| Upload programs, copybooks, and data files | Working; saved as JSON on the API's disk |
+| Convert COBOL to Python | Working for a small subset; other lines become `TODO` review notes. Each run is saved |
+| Dependency analysis (`COPY`, `CALL`, `PERFORM`) | Placeholder: counts files |
+| Verify against COBOL (GnuCOBOL) | Placeholder: `not_verified` |
+| PostgreSQL, Gemini + RAG | Not started |
 
-All generated Python is a draft. Review it before use.
+Generated Python is a draft; review it before use.
 
 ## Quick start
 
@@ -53,7 +51,7 @@ In the browser: on **Upload**, click **Load demo project**; on **Convert**, clic
 
 | Where | Commands |
 | --- | --- |
-| `backend/` | `uv run --frozen pytest`, `uv run --frozen ruff check src tests`, `uv run --frozen mypy` |
+| `backend/` | `uv run --frozen pytest`, `uv run --frozen ruff check src tests`, `uv run --frozen ruff format --check src tests`, `uv run --frozen mypy` |
 | `frontend/app/` | `npm run lint`, `npm run build` (Windows PowerShell: `npm.cmd`) |
 
 GitHub Actions runs the backend checks on every change under `backend/`.

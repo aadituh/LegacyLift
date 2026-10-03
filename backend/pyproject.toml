@@ -4,7 +4,7 @@ version = "0.2.0"
 description = "LegacyLift backend — COBOL to Python conversion service"
 readme = "README.md"
 authors = [
-    { name = "ODU 411W" }
+    { name = "ODU 411W LegacyLift Team" }
 ]
 requires-python = ">=3.12"
 dependencies = [

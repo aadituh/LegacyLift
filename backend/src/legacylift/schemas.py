@@ -1,7 +1,14 @@
 """Request and response bodies for the routes.
 
 Stored data lives in ``models.py``; these classes only shape what goes over
-HTTP. Several reuse the stored models directly.
+HTTP. A field typed ``RunSummary`` sends only the summary fields, even when it
+holds a full ``Run``, so lists stay small.
+
+Example:
+    >>> from legacylift.models import Run, RunKind, RunStatus
+    >>> run = Run(id="1", kind=RunKind.VERIFY, status=RunStatus.NOT_VERIFIED)
+    >>> "files" in RunsResponse(project_id="1", runs=[run]).model_dump()["runs"][0]
+    False
 """
 
 from datetime import datetime
@@ -42,6 +49,35 @@ class ProjectResponse(BaseModel):
     name: str
     created_at: datetime
     files: list[SourceFile]
+
+
+class ProjectSummary(FileCounts):
+    """One project in the project list: no file contents and no runs.
+
+    Has the ``FileCounts`` fields plus:
+
+    Attributes:
+        id: The project's ID.
+        name: The project name.
+        created_at: When it was created (UTC).
+        last_run: The most recent run without its files, or ``None`` if no
+            step has run yet.
+    """
+
+    id: str
+    name: str
+    created_at: datetime
+    last_run: RunSummary | None
+
+
+class ProjectListResponse(BaseModel):
+    """Response from ``GET /api/projects``.
+
+    Attributes:
+        projects: Every project, newest first.
+    """
+
+    projects: list[ProjectSummary]
 
 
 class UploadResponse(BaseModel):

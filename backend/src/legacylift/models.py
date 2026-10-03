@@ -1,33 +1,35 @@
 """The data the backend stores, as Pydantic models.
 
-A ``Project`` holds its files and its runs, and is saved to disk as one JSON
-file (see ``storage.py``). IDs and timestamps fill themselves in.
+A ``Project`` holds its files (``SourceFile``) and the steps run on it
+(``Run``), and is saved to disk as one JSON file by ``storage.py``. The
+converter's output for one program is a ``PythonDraft``; a convert run keeps
+one ``ConvertedProjectFile`` per program.
 
-The enums are ``StrEnum``, so each value is also a plain string: it compares
-equal to its text and is written to JSON as that text.
+IDs are short numbers as text: projects ``"1"``, ``"2"``, ... across the app
+(handed out by ``ProjectStore.next_id``), files and runs ``"1"``, ``"2"``, ...
+within their project (handed out by ``ProjectService``). Timestamps fill
+themselves in. The enums are ``StrEnum``, so each value is also its text.
 
 Example:
-    >>> project = Project(name="Payroll")
-    >>> project.files, project.runs
-    ([], [])
+    >>> project = Project(id="1", name="Payroll")
+    >>> project.files, project.runs, project.files_added
+    ([], [], 0)
     >>> RunStatus.DRAFT == "draft"
     True
 """
 
 from datetime import UTC, datetime
 from enum import StrEnum
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
 
-def new_id() -> str:
-    """Return a new random ID (a UUID as text)."""
-    return str(uuid4())
-
-
 def utc_now() -> datetime:
-    """Return the current time in UTC."""
+    """Return the current time in UTC, used for ``created_at``.
+
+    Returns:
+        A timezone-aware ``datetime``.
+    """
     return datetime.now(UTC)
 
 
@@ -60,13 +62,13 @@ class SourceFile(BaseModel):
     """One file stored in a project.
 
     Attributes:
-        id: Unique ID.
+        id: Number within its project, such as ``"1"``. Never reused.
         name: File name, such as ``PAY.cbl``.
         kind: Program, copybook, or data.
         content: The file's text.
     """
 
-    id: str = Field(default_factory=new_id)
+    id: str
     name: str
     kind: FileKind
     content: str
@@ -128,13 +130,13 @@ class RunSummary(BaseModel):
     """A record that one pipeline step ran on a project.
 
     Attributes:
-        id: Unique ID.
+        id: Number within its project, in run order: ``"1"``, ``"2"``, ...
         kind: Which step ran.
         status: Its outcome.
         created_at: When it ran (UTC).
     """
 
-    id: str = Field(default_factory=new_id)
+    id: str
     kind: RunKind
     status: RunStatus
     created_at: datetime = Field(default_factory=utc_now)
@@ -157,15 +159,18 @@ class Project(BaseModel):
     """A set of COBOL files and the history of steps run on them.
 
     Attributes:
-        id: Unique ID.
+        id: Number across the app, such as ``"1"``.
         name: Name given by the user.
         created_at: When the project was created (UTC).
         files: Stored files, in upload order.
         runs: Steps run so far, oldest first.
+        files_added: How many files were ever added, including deleted ones.
+            The next file's ID is this plus one. Saved, but not sent to clients.
     """
 
-    id: str = Field(default_factory=new_id)
+    id: str
     name: str
     created_at: datetime = Field(default_factory=utc_now)
     files: list[SourceFile] = []
     runs: list[Run] = []
+    files_added: int = 0

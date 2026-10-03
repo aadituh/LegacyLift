@@ -1,185 +1,139 @@
-"""The project-based API workflow."""
+"""The project routes, in the order a user calls them, plus their errors."""
 
 import pytest
 
-from helpers import make_client, run_python
+from helpers import HELLO, run_python
 
-HELLO = """IDENTIFICATION DIVISION.
-PROGRAM-ID. HELLO-TEAM.
-DATA DIVISION.
-WORKING-STORAGE SECTION.
-01 WS-NAME PIC X(20) VALUE "LegacyLift".
-PROCEDURE DIVISION.
-DISPLAY "Hello, " WS-NAME.
-STOP RUN.
-"""
+PAGES = "https://aadituh.github.io"
 
 
 @pytest.fixture
 def base(client) -> str:
-    """URL of a new, empty project."""
+    """URL of a new, empty project. It is the app's first, so its ID is "1"."""
     response = client.post("/api/projects", json={"name": "  Demo  "})
     assert response.status_code == 201
     return f"/api/projects/{response.json()['id']}"
 
 
-def test_create_upload_read_and_convert(client, base):
-    upload = client.post(
-        f"{base}/files",
-        files=[
-            ("files", ("hello.cbl", HELLO)),
-            ("files", ("ACCTDEF.cpy", "01 ACCOUNT-RECORD PIC X(10).")),
-            ("files", ("accounts.dat", "account 1")),
-        ],
-    )
-    assert upload.status_code == 200
-    assert [file["kind"] for file in upload.json()["files"]] == ["program", "copybook", "data"]
-
-    project = client.get(base).json()
-    assert project["name"] == "Demo"
-    assert len(project["files"]) == 3
-    assert project["files"][0]["content"] == HELLO
-
-    conversion = client.post(f"{base}/convert")
-    assert conversion.status_code == 200
-    result = conversion.json()
-    assert result["status"] == "draft"
-    assert [file["python_name"] for file in result["files"]] == ["hello.py"]
-    assert "print('Hello, '" in result["files"][0]["python"]
-    runs = client.get(f"{base}/runs").json()["runs"]
-    assert len(runs) == 1
-    assert runs[0]["id"] == result["run_id"]
-    assert (runs[0]["kind"], runs[0]["status"]) == ("convert", "draft")
-    assert "created_at" in runs[0]
-    assert "files" not in runs[0]  # the list stays small; fetch one run for its Python
+def upload(client, base, *files):
+    """POST (name, text) pairs to the project's files route."""
+    return client.post(f"{base}/files", files=[("files", file) for file in files])
 
 
-def test_saved_conversion_can_be_fetched_again(client, base):
-    client.post(f"{base}/files", files={"files": ("hello.cbl", HELLO)})
+def test_full_project_flow(client, base):
+    assert base == "/api/projects/1"
+    assert client.get(base).json()["name"] == "Demo"
+
+    # Upload three kinds of file plus a mistake, then remove the mistake.
+    files = [("hello.cbl", HELLO), ("A.cpy", "01 A PIC X."), ("a.dat", "1"), ("oops.dat", "x")]
+    added = upload(client, base, *files).json()["files"]
+    assert [(f["id"], f["kind"]) for f in added][::3] == [("1", "program"), ("4", "data")]
+    assert client.delete(f"{base}/files/4").status_code == 204
+    assert [f["name"] for f in client.get(base).json()["files"]] == ["hello.cbl", "A.cpy", "a.dat"]
+
+    # Analyze, convert, verify: runs "1", "2", "3".
+    counts = client.post(f"{base}/analyze").json()
+    assert counts["program_count"] == counts["copybook_count"] == counts["data_file_count"] == 1
     conversion = client.post(f"{base}/convert").json()
+    assert (conversion["run_id"], conversion["status"]) == ("2", "draft")
+    assert run_python(conversion["files"][0]["python"]) == "Hello, LegacyLift\nDemo count: 2\n"
+    assert client.post(f"{base}/verify").json()["status"] == "not_verified"
 
-    run = client.get(f"{base}/runs/{conversion['run_id']}")
-    assert run.status_code == 200
-    assert run.json()["kind"] == "convert"
-    assert run.json()["files"] == conversion["files"]
-    assert client.get(f"{base}/runs/missing").json() == {"detail": "Run not found."}
+    # Reopen: the run list is small; one run carries its Python.
+    runs = client.get(f"{base}/runs").json()["runs"]
+    assert [run["kind"] for run in runs] == ["analyze", "convert", "verify"]
+    assert "files" not in runs[1]
+    assert client.get(f"{base}/runs/2").json()["files"] == conversion["files"]
+
+    # The project list: counts and last run, no file contents.
+    [summary] = client.get("/api/projects").json()["projects"]
+    assert (summary["program_count"], summary["last_run"]["kind"]) == (1, "verify")
+    assert "files" not in summary and "files" not in summary["last_run"]
+
+    response = client.delete(base)
+    assert (response.status_code, response.content) == (204, b"")
+    assert client.get("/api/projects").json() == {"projects": []}
 
 
-def test_upload_validation_is_atomic_and_review_status_is_explicit(client, base):
-    bad = client.post(
-        f"{base}/files",
-        files=[
-            ("files", ("hello.cbl", HELLO)),
-            ("files", ("notes.txt", "not COBOL")),
-        ],
-    )
-    assert bad.status_code == 400
+def test_demo_project_converts_with_no_review_notes(client):
+    demo = client.post("/api/projects/demo").json()
+    assert [file["id"] for file in demo["files"]] == ["1", "2", "3"]
+    result = client.post(f"/api/projects/{demo['id']}/convert").json()
+    assert result["status"] == "draft"
+    assert "Amount due: $14" in run_python(result["files"][0]["python"])
+
+
+def test_projects_are_listed_newest_first(client):
+    assert client.get("/api/projects").json() == {"projects": []}
+    for name in ("Old", "New"):
+        client.post("/api/projects", json={"name": name})
+    projects = client.get("/api/projects").json()["projects"]
+    assert [(p["id"], p["name"], p["last_run"]) for p in projects] == [
+        ("2", "New", None),
+        ("1", "Old", None),
+    ]
+
+
+def test_failed_upload_adds_nothing_and_notes_mean_review(client, base):
+    assert upload(client, base, ("hello.cbl", HELLO), ("x.txt", "x")).status_code == 400
     assert client.get(base).json()["files"] == []
-    assert client.post(f"{base}/convert").status_code == 400
 
-    review_source = HELLO.replace("STOP RUN.", "PERFORM OTHER-STEP.\nSTOP RUN.")
-    good = client.post(f"{base}/files", files={"files": ("review.cbl", review_source)})
-    assert good.status_code == 200
+    source = HELLO.replace("STOP RUN.", "PERFORM OTHER-STEP.\nSTOP RUN.")
+    assert upload(client, base, ("review.cbl", source)).json()["files"][0]["id"] == "1"
     result = client.post(f"{base}/convert").json()
-    assert result["status"] == "review_required"
-    assert result["files"][0]["status"] == "review_required"
-    assert len(result["files"][0]["notes"]) == 1
+    assert result["status"] == result["files"][0]["status"] == "review_required"
+    assert result["files"][0]["notes"] == ["Line 11: PERFORM OTHER-STEP"]
 
 
 @pytest.mark.parametrize(
-    ("name", "detail"),
+    ("files", "detail"),
     [
-        ("REVIEW.CBL", "REVIEW.CBL is already in this project."),
-        ("review.cob", "COBOL program names must produce unique Python file names."),
+        ([("notes.txt", "x")], "notes.txt must be .cbl, .cob, .cpy, or .dat."),
+        ([("REVIEW.CBL", HELLO)], "REVIEW.CBL is already in this project."),
+        ([("review.cob", HELLO)], "COBOL program names must produce unique Python file names."),
+        ([(f"d{n}.dat", "1") for n in range(10)], "A project needs 1 to 10 files."),
+        ([("a" * 252 + ".dat", "1")], "File names must be at most 255 printable characters."),
     ],
 )
-def test_duplicate_names_are_rejected(client, base, name, detail):
-    assert client.post(f"{base}/files", files={"files": ("review.cbl", HELLO)}).status_code == 200
-    response = client.post(f"{base}/files", files={"files": (name, HELLO)})
-    assert response.status_code == 400
-    assert response.json() == {"detail": detail}
+def test_bad_upload_is_rejected(client, base, files, detail):
+    upload(client, base, ("review.cbl", HELLO))  # already in the project
+    response = upload(client, base, *files)
+    assert (response.status_code, response.json()) == (400, {"detail": detail})
 
 
-def test_project_file_limit(client, base):
-    files = [("files", (f"data{n}.dat", "1")) for n in range(11)]
-    response = client.post(f"{base}/files", files=files)
-    assert response.json() == {"detail": "A project needs 1 to 10 files."}
+@pytest.mark.parametrize(
+    ("method", "path", "status", "detail"),
+    [
+        ("GET", "/9", 404, "Project not found."),
+        ("DELETE", "/9", 404, "Project not found."),
+        ("POST", "/1/analyze", 400, "Upload files before analyzing."),
+        ("POST", "/1/convert", 400, "Upload a .cbl or .cob program before converting."),
+        ("POST", "/1/verify", 400, "Convert the project before requesting verification."),
+        ("GET", "/1/runs/9", 404, "Run not found."),
+        ("DELETE", "/1/files/9", 404, "File not found."),
+    ],
+)
+def test_errors_are_json_with_the_right_status(client, base, method, path, status, detail):
+    response = client.request(method, f"/api/projects{path}")
+    assert (response.status_code, response.json()) == (status, {"detail": detail})
 
 
-def test_blank_project_name_is_rejected(client):
-    response = client.post("/api/projects", json={"name": "   "})
-    assert response.status_code == 400
+def test_blank_name_is_rejected_and_the_browser_can_read_why(client):
+    response = client.post("/api/projects", json={"name": "  "}, headers={"Origin": PAGES})
     assert response.json() == {"detail": "Project name cannot be blank."}
+    assert (response.status_code, response.headers["access-control-allow-origin"]) == (400, PAGES)
 
 
-def test_demo_project_exercises_all_project_routes(client, base):
-    demo = client.post("/api/projects/demo")
-    assert demo.status_code == 201
-    project = demo.json()
-    assert f"/api/projects/{project['id']}" != base
-    assert [file["kind"] for file in project["files"]] == ["program", "copybook", "data"]
-    demo_base = f"/api/projects/{project['id']}"
-
-    analysis = client.post(f"{demo_base}/analyze")
-    assert analysis.status_code == 200
-    assert analysis.json()["status"] == "inventory_only"
-    assert analysis.json()["program_count"] == 1
-    assert analysis.json()["copybook_count"] == 1
-    assert analysis.json()["data_file_count"] == 1
-
-    conversion = client.post(f"{demo_base}/convert")
-    assert conversion.status_code == 200
-    assert conversion.json()["status"] == "draft"
-    generated = conversion.json()["files"][0]
-    assert generated["python_name"] == "store_report.py"
-    assert "Amount due: $14" in run_python(generated["python"])
-
-    verification = client.post(f"{demo_base}/verify")
-    assert verification.status_code == 200
-    assert verification.json()["status"] == "not_verified"
-    assert verification.json()["passed"] is None
-
-    runs = client.get(f"{demo_base}/runs").json()["runs"]
-    assert [run["kind"] for run in runs] == ["analyze", "convert", "verify"]
+@pytest.mark.parametrize("method", ["POST", "DELETE"])
+def test_pages_origin_can_call_the_api(client, method):
+    headers = {"Origin": PAGES, "Access-Control-Request-Method": method}
+    preflight = client.options("/api/projects/1", headers=headers)
+    assert (preflight.status_code, preflight.headers["access-control-allow-origin"]) == (200, PAGES)
 
 
-def test_routes_require_the_right_project_state(client, base):
-    assert client.get("/api/projects/missing").status_code == 404
-    assert client.post("/api/projects/missing/convert").status_code == 404
-    assert make_client(data_dir=None).get(base).status_code == 404  # another app
-    assert client.post(f"{base}/analyze").status_code == 400
-    assert client.post(f"{base}/verify").status_code == 400
-    assert client.get(f"{base}/runs").json()["runs"] == []
-
-
-def test_welcome_and_health_routes(client):
+def test_welcome_health_and_oversized_request(client):
     assert client.get("/").json()["docs"] == "/docs"
     assert client.get("/health").json() == {"status": "ok"}
-
-
-def test_pages_origin_can_call_the_api(client):
-    origin = "https://aadituh.github.io"
-    preflight = client.options(
-        "/api/projects/demo",
-        headers={
-            "Origin": origin,
-            "Access-Control-Request-Method": "POST",
-        },
-    )
-    assert preflight.status_code == 200
-    assert preflight.headers["access-control-allow-origin"] == origin
-
-    # Error responses need the header too, or the browser hides the message.
-    error = client.post("/api/projects", json={"name": " "}, headers={"Origin": origin})
-    assert error.status_code == 400
-    assert error.headers["access-control-allow-origin"] == origin
-
-
-def test_oversized_request_is_refused_before_it_is_read(client):
-    origin = "https://aadituh.github.io"
-    big = "x" * 1_300_000
-    response = client.post(
-        "/api/convert", files={"files": ("big.cbl", big)}, headers={"Origin": origin}
-    )
-    assert response.status_code == 413
-    assert response.headers["access-control-allow-origin"] == origin
+    big = {"files": ("big.cbl", "x" * 1_300_000)}
+    response = client.post("/api/convert", files=big, headers={"Origin": PAGES})
+    assert (response.status_code, response.headers["access-control-allow-origin"]) == (413, PAGES)

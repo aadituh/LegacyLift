@@ -1,4 +1,7 @@
-"""Stateless conversion route used by the React demo's file picker.
+"""``POST /api/convert``: convert up to 5 uploaded programs without saving anything.
+
+Reads the uploads, then runs ``services.conversion.convert_uploads`` in a
+worker thread so other requests keep being answered.
 
 Route docstrings: the text before ``\\f`` appears on the /docs page; the rest is
 for developers only.
@@ -7,6 +10,7 @@ for developers only.
 from typing import Annotated
 
 from fastapi import APIRouter, File, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from legacylift.schemas import ConvertFilesResponse
 from legacylift.services.conversion import convert_uploads
@@ -35,4 +39,5 @@ async def convert_files(files: Annotated[list[UploadFile], File()]) -> ConvertFi
     Example:
         ``curl -F files=@PAY.cbl http://127.0.0.1:8000/api/convert``
     """
-    return ConvertFilesResponse(files=convert_uploads(await read_uploads(files)))
+    uploads = await read_uploads(files)
+    return ConvertFilesResponse(files=await run_in_threadpool(convert_uploads, uploads))

@@ -1,4 +1,9 @@
-"""Read uploaded files and check them. Shared by every route that accepts uploads."""
+"""Read uploaded files and check them. Shared by every route that accepts uploads.
+
+``read_uploads`` reads each file's name and bytes and rejects bad names;
+``decode_upload`` checks one file's size and text. ``KIND_BY_SUFFIX`` says which
+extensions are accepted and what each one holds.
+"""
 
 from pathlib import PurePosixPath
 
@@ -6,8 +11,18 @@ from fastapi import UploadFile
 from pydantic import BaseModel
 
 from legacylift.errors import InvalidInputError
+from legacylift.models import FileKind
 
 MAX_FILE_BYTES = 100_000
+MAX_NAME_LENGTH = 255
+# The accepted extensions and the kind of file each one holds.
+KIND_BY_SUFFIX = {
+    ".cbl": FileKind.PROGRAM,
+    ".cob": FileKind.PROGRAM,
+    ".cpy": FileKind.COPYBOOK,
+    ".dat": FileKind.DATA,
+}
+PROGRAM_SUFFIXES = {suffix for suffix, kind in KIND_BY_SUFFIX.items() if kind == FileKind.PROGRAM}
 
 
 class RawUpload(BaseModel):
@@ -24,6 +39,9 @@ class RawUpload(BaseModel):
     @property
     def suffix(self) -> str:
         """The lowercase extension, used to decide the file kind.
+
+        Returns:
+            Text such as ``".cbl"``, or ``""`` if the name has none.
 
         Example:
             >>> RawUpload(name="PAY.CBL", data=b"").suffix
@@ -45,19 +63,29 @@ async def read_uploads(files: list[UploadFile]) -> list[RawUpload]:
         One ``RawUpload`` per file, in the same order. Folder paths that a
         client sent with the name, Windows or Unix style, are removed.
 
+    Raises:
+        InvalidInputError: If a name is longer than 255 characters or contains
+            a control character such as a line break.
+
     Example:
         >>> import asyncio, io
         >>> upload = UploadFile(io.BytesIO(b"DISPLAY 1."), filename="C:\\code\\PAY.cbl")
         >>> asyncio.run(read_uploads([upload]))
         [RawUpload(name='PAY.cbl', data=b'DISPLAY 1.')]
+        >>> asyncio.run(read_uploads([UploadFile(io.BytesIO(b""), filename="a\nb.cbl")]))
+        Traceback (most recent call last):
+            ...
+        legacylift.errors.InvalidInputError: File names must be at most 255 printable characters.
     """
-    return [
-        RawUpload(
-            name=PurePosixPath((file.filename or "").replace("\\", "/")).name,
-            data=await file.read(MAX_FILE_BYTES + 1),
-        )
-        for file in files
-    ]
+    uploads = []
+    for file in files:
+        name = PurePosixPath((file.filename or "").replace("\\", "/")).name
+        if len(name) > MAX_NAME_LENGTH or not name.isprintable():
+            raise InvalidInputError(
+                f"File names must be at most {MAX_NAME_LENGTH} printable characters."
+            )
+        uploads.append(RawUpload(name=name, data=await file.read(MAX_FILE_BYTES + 1)))
+    return uploads
 
 
 def decode_upload(upload: RawUpload) -> str:

@@ -1,7 +1,8 @@
 """Convert COBOL files into Python drafts and give each output file its name.
 
 The translation itself is in ``cobol/converter.py``; this module adds file
-names, upload checks, and logging around it.
+names, upload checks, and logging around it. ``convert_uploads`` backs
+``POST /api/convert``; ``convert_file`` is also used by ``ProjectService.convert``.
 """
 
 import logging
@@ -9,14 +10,29 @@ from pathlib import PurePosixPath
 
 from legacylift.cobol.converter import translate_program
 from legacylift.errors import ConversionError, InvalidInputError
-from legacylift.models import ConvertedFile
-from legacylift.services.uploads import RawUpload, decode_upload
+from legacylift.models import ConvertedFile, RunStatus
+from legacylift.services.uploads import PROGRAM_SUFFIXES, RawUpload, decode_upload
 
 MAX_BATCH_FILES = 5
-PROGRAM_SUFFIXES = {".cbl", ".cob"}
 # Uvicorn already prints this logger, so messages appear in the server console.
 # Log file names and counts only, never source code.
 logger = logging.getLogger("uvicorn.error")
+
+
+def conversion_status(notes: list[str]) -> RunStatus:
+    """Pick the status for converted code.
+
+    Args:
+        notes: Review notes; one per line that was not converted.
+
+    Returns:
+        ``REVIEW_REQUIRED`` if there are notes, otherwise ``DRAFT``.
+
+    Example:
+        >>> conversion_status(["Line 6: PERFORM PRINT-TOTAL"])
+        <RunStatus.REVIEW_REQUIRED: 'review_required'>
+    """
+    return RunStatus.REVIEW_REQUIRED if notes else RunStatus.DRAFT
 
 
 def python_file_name(source_name: str) -> str:
