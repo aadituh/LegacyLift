@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   apiConfigured,
   checkBackend,
@@ -25,6 +25,15 @@ DISPLAY "Hello, " WS-NAME.
 ADD 1 TO WS-COUNT.
 DISPLAY "Demo count: " WS-COUNT.
 STOP RUN.`
+
+/** Read a file as UTF-8. Browsers' file.text() replaces bad bytes instead of failing. */
+async function utf8Text(file) {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+  } catch {
+    throw new Error(`${file.name} must be UTF-8 text.`)
+  }
+}
 
 function programFilesFromProject(project) {
   if (!project?.files?.length) return []
@@ -133,6 +142,7 @@ export default function App() {
   const [runs, setRuns] = useState([])
   const [downloadRunId, setDownloadRunId] = useState('')
   const [batchDownloadId, setBatchDownloadId] = useState(() => savedBatch?.downloadId ?? '')
+  const sourceRead = useRef(0)
 
   const projectPrograms = useMemo(() => programFilesFromProject(project), [project])
   const canConvert = backendReady && (files.length > 0 || projectPrograms.length > 0) && !isConverting
@@ -227,15 +237,20 @@ export default function App() {
   }, [screen, project, backendReady])
 
   async function showFile(file, index) {
+    const readId = ++sourceRead.current
     setSelectedFile(index)
     try {
-      setSourceText(await file.text())
+      const text = await utf8Text(file)
+      if (readId !== sourceRead.current) return
+      setSourceText(text)
     } catch {
+      if (readId !== sourceRead.current) return
       setSourceText('Could not read this file.')
     }
   }
 
   function showProjectProgram(program, index) {
+    sourceRead.current += 1
     setSelectedFile(index)
     setSourceText(program.content || '')
   }
@@ -266,6 +281,12 @@ export default function App() {
     if (wrongType.length) {
       const names = wrongType.map((file) => file.name).join(', ')
       rejectFiles(`${names} must be a .cbl or .cob file.`)
+      return
+    }
+    try {
+      for (const file of chosen) await utf8Text(file)
+    } catch (cause) {
+      rejectFiles(cause.message)
       return
     }
 
@@ -417,6 +438,12 @@ export default function App() {
       setError(`${names} must be 100 KB or less.`)
       return
     }
+    try {
+      for (const file of chosen) await utf8Text(file)
+    } catch (cause) {
+      setError(cause.message)
+      return
+    }
     setError('')
     try {
       const uploaded = await uploadProjectFiles(project.id, chosen)
@@ -486,14 +513,14 @@ export default function App() {
         ? files.length > 0
           ? 'Convert these files before verification.'
           : 'Convert this project before verification.'
-        : 'Converted. Verification is not available yet.'
+        : 'Converted. Verification is coming soon.'
   const progressSteps = [
     { name: 'Upload', state: progressStep > 0 ? 'done' : 'current' },
     {
       name: 'Convert',
       state: progressStep > 1 ? 'done' : progressStep === 1 ? 'current' : 'waiting',
     },
-    { name: 'Verify', state: progressStep > 1 ? 'current' : 'locked'},
+    { name: 'Verify', state: progressStep > 1 ? 'soon' : 'locked' },
   ]
 
   return (
@@ -558,6 +585,7 @@ export default function App() {
                 {step.state === 'done' ? '✓ ' : ''}
                 {step.name}
                 {step.state === 'locked' ? ' Locked' : ''}
+                {step.state === 'soon' ? ' — coming soon' : ''}
               </p>
             ))}
             <p className="progress-note">{progressNote}</p>
