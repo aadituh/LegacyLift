@@ -5,9 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from legacylift.cobol.converter import translate_program
+from legacylift.cobol.converter import (
+    run_and_verify_python,
+    translate_and_verify,
+    translate_program,
+)
+from legacylift.errors import ConversionError
 
-from helpers import run_python
+from helpers import HELLO, run_python
 
 BACKEND = Path(__file__).parents[1]
 SAMPLES = sorted((BACKEND / "prototype" / "data").glob("*.cbl"))
@@ -87,3 +92,56 @@ def test_very_long_line_converts_quickly(verb):
 @pytest.mark.parametrize("path", SAMPLES, ids=lambda path: path.name)
 def test_sample_programs_convert_to_python_that_runs(path):
     run_python(translate_program(path.read_text(encoding="utf-8")).python)
+
+
+def test_run_and_verify_python_passes_on_exact_expected_output():
+    draft = translate_program(HELLO)
+    expected = "Hello, LegacyLift\nDemo count: 2\n"
+    result = run_and_verify_python(draft.python, expected)
+    assert result.passed is True
+    assert result.stdout == expected
+    assert result.error is None
+
+
+def test_run_and_verify_python_detects_syntax_errors():
+    result = run_and_verify_python("def main(:\n    pass\n", "")
+    assert result.passed is False
+    assert result.stdout == ""
+    assert result.error is not None
+    assert "SyntaxError" in result.error
+
+
+def test_run_and_verify_python_detects_runtime_errors():
+    result = run_and_verify_python("print(undefined_name)\n", "anything\n")
+    assert result.passed is False
+    assert result.error is not None
+    assert "NameError" in result.error
+
+
+def test_run_and_verify_python_rejects_wrong_output():
+    result = run_and_verify_python("print('hi')\n", "bye\n")
+    assert result.passed is False
+    assert result.stdout == "hi\n"
+    assert result.error is not None
+    assert "Output mismatch" in result.error
+    assert "bye\\n" in result.error or "bye\n" in result.error
+
+
+def test_translate_and_verify_checks_converted_cobol_output():
+    source = program('01 MSG PIC X(5) VALUE "ok".', "DISPLAY MSG.")
+    result = translate_and_verify(source, "ok\n")
+    assert result.passed is True
+    assert result.stdout == "ok\n"
+
+
+def test_translate_and_verify_fails_when_logic_output_differs():
+    source = program("01 N PIC 99 VALUE 5.", "ADD 1 TO N.\nDISPLAY N.")
+    result = translate_and_verify(source, "5\n")  # real output is 6
+    assert result.passed is False
+    assert result.stdout == "6\n"
+    assert "Output mismatch" in (result.error or "")
+
+
+def test_translate_and_verify_raises_when_cobol_cannot_convert():
+    with pytest.raises(ConversionError, match="PROGRAM-ID"):
+        translate_and_verify("DISPLAY 1.", "1\n")

@@ -20,11 +20,20 @@ which uses ``translate_display`` or ``translate_assignment``; all of them use
 ``translate_value`` for literals and field names. ``build_script`` wraps the
 result in a ``main()`` function. New statement rules go in
 ``translate_statement``.
+
+After conversion, ``run_and_verify_python`` compiles the draft, runs it, and
+checks that stdout matches an expected string exactly (syntax, runtime, and
+output).
 """
 
+from __future__ import annotations
+
 import builtins
+import contextlib
+import io
 import keyword
 import re
+import traceback
 from typing import NamedTuple
 
 from legacylift.errors import ConversionError
@@ -61,6 +70,22 @@ class Value(NamedTuple):
 
     code: str
     is_number: bool
+
+
+class VerificationResult(NamedTuple):
+    """Outcome of compiling, running, and checking generated Python.
+
+    Attributes:
+        passed: ``True`` only when the script is valid, runs cleanly, and
+            stdout equals ``expected_output`` exactly.
+        stdout: Text printed to standard output (empty if it never ran).
+        error: ``None`` on success; otherwise a short syntax, runtime, or
+            output-mismatch message.
+    """
+
+    passed: bool
+    stdout: str
+    error: str | None
 
 
 def clean_line(raw_line: str) -> str:
@@ -423,3 +448,104 @@ def build_script(program_name: str, body: list[str]) -> str:
             "",
         ]
     )
+
+
+def run_and_verify_python(python: str, expected_output: str) -> VerificationResult:
+    """Compile and run generated Python; require stdout to match exactly.
+
+    Steps:
+
+    1. **Syntax** — ``compile`` the script; a ``SyntaxError`` fails the check.
+    2. **Logic / runtime** — ``exec`` the script as ``__main__``; any exception
+       fails the check (type errors, ``NameError``, etc.).
+    3. **Output** — compare captured stdout to ``expected_output`` with an
+       exact string match (including newlines).
+
+    Args:
+        python: Full generated script (for example ``draft.python``).
+        expected_output: Exact text the program must print.
+
+    Returns:
+        A ``VerificationResult``. ``passed`` is ``True`` only when all three
+        steps succeed.
+
+    Example:
+        >>> ok = run_and_verify_python(
+        ...     "print('hi')\\n",
+        ...     "hi\\n",
+        ... )
+        >>> ok.passed, ok.stdout, ok.error
+        (True, 'hi\\n', None)
+        >>> bad = run_and_verify_python("print('hi')\\n", "bye\\n")
+        >>> bad.passed, bad.stdout
+        (False, 'hi\\n')
+        >>> broken = run_and_verify_python("def main(:\\n    pass\\n", "")
+        >>> broken.passed, broken.error is not None
+        (False, True)
+    """
+    try:
+        compiled = compile(python, "<generated>", "exec")
+    except SyntaxError as error:
+        return VerificationResult(
+            passed=False,
+            stdout="",
+            error=f"SyntaxError: {error.msg} (line {error.lineno})",
+        )
+
+    stdout_buffer = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(stdout_buffer):
+            # Running generated drafts is the point of this check.
+            exec(compiled, {"__name__": "__main__"})  # noqa: S102
+    except Exception as error:  # noqa: BLE001 - report any runtime failure to the caller
+        return VerificationResult(
+            passed=False,
+            stdout=stdout_buffer.getvalue(),
+            error=(
+                f"{type(error).__name__}: {error}\n"
+                f"{traceback.format_exc(limit=2).rstrip()}"
+            ),
+        )
+
+    stdout = stdout_buffer.getvalue()
+    if stdout != expected_output:
+        return VerificationResult(
+            passed=False,
+            stdout=stdout,
+            error=(
+                "Output mismatch.\n"
+                f"Expected: {expected_output!r}\n"
+                f"Actual:   {stdout!r}"
+            ),
+        )
+    return VerificationResult(passed=True, stdout=stdout, error=None)
+
+
+def translate_and_verify(source: str, expected_output: str) -> VerificationResult:
+    """Translate COBOL, then run and verify the generated Python output.
+
+    Args:
+        source: Full text of one COBOL program.
+        expected_output: Exact stdout expected from the generated script.
+
+    Returns:
+        The same ``VerificationResult`` as ``run_and_verify_python``.
+
+    Raises:
+        ConversionError: If the COBOL source cannot be translated at all
+            (missing ``PROGRAM-ID`` or ``PROCEDURE DIVISION``).
+
+    Example:
+        >>> result = translate_and_verify(
+        ...     '''PROGRAM-ID. HI.
+        ... WORKING-STORAGE SECTION.
+        ... PROCEDURE DIVISION.
+        ... DISPLAY "ok".
+        ... STOP RUN.''',
+        ...     "ok\\n",
+        ... )
+        >>> result.passed
+        True
+    """
+    draft = translate_program(source)
+    return run_and_verify_python(draft.python, expected_output)
