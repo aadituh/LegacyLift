@@ -451,7 +451,7 @@ def build_script(program_name: str, body: list[str]) -> str:
 
 
 def run_and_verify_python(python: str, expected_output: str) -> VerificationResult:
-    """Compile and run generated Python; require stdout to match exactly.
+    r"""Compile and run generated Python; require stdout to match exactly.
 
     Steps:
 
@@ -471,15 +471,15 @@ def run_and_verify_python(python: str, expected_output: str) -> VerificationResu
 
     Example:
         >>> ok = run_and_verify_python(
-        ...     "print('hi')\\n",
-        ...     "hi\\n",
+        ...     "print('hi')\n",
+        ...     "hi\n",
         ... )
         >>> ok.passed, ok.stdout, ok.error
-        (True, 'hi\\n', None)
-        >>> bad = run_and_verify_python("print('hi')\\n", "bye\\n")
+        (True, 'hi\n', None)
+        >>> bad = run_and_verify_python("print('hi')\n", "bye\n")
         >>> bad.passed, bad.stdout
-        (False, 'hi\\n')
-        >>> broken = run_and_verify_python("def main(:\\n    pass\\n", "")
+        (False, 'hi\n')
+        >>> broken = run_and_verify_python("def main(:\n    pass\n", "")
         >>> broken.passed, broken.error is not None
         (False, True)
     """
@@ -501,10 +501,7 @@ def run_and_verify_python(python: str, expected_output: str) -> VerificationResu
         return VerificationResult(
             passed=False,
             stdout=stdout_buffer.getvalue(),
-            error=(
-                f"{type(error).__name__}: {error}\n"
-                f"{traceback.format_exc(limit=2).rstrip()}"
-            ),
+            error=(f"{type(error).__name__}: {error}\n{traceback.format_exc(limit=2).rstrip()}"),
         )
 
     stdout = stdout_buffer.getvalue()
@@ -512,17 +509,13 @@ def run_and_verify_python(python: str, expected_output: str) -> VerificationResu
         return VerificationResult(
             passed=False,
             stdout=stdout,
-            error=(
-                "Output mismatch.\n"
-                f"Expected: {expected_output!r}\n"
-                f"Actual:   {stdout!r}"
-            ),
+            error=(f"Output mismatch.\nExpected: {expected_output!r}\nActual:   {stdout!r}"),
         )
     return VerificationResult(passed=True, stdout=stdout, error=None)
 
 
 def translate_and_verify(source: str, expected_output: str) -> VerificationResult:
-    """Translate COBOL, then run and verify the generated Python output.
+    r"""Translate COBOL, then run and verify the generated Python output.
 
     Args:
         source: Full text of one COBOL program.
@@ -542,7 +535,7 @@ def translate_and_verify(source: str, expected_output: str) -> VerificationResul
         ... PROCEDURE DIVISION.
         ... DISPLAY "ok".
         ... STOP RUN.''',
-        ...     "ok\\n",
+        ...     "ok\n",
         ... )
         >>> result.passed
         True
