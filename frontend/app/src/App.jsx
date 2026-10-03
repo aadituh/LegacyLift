@@ -34,6 +34,7 @@ const savedProjectKey = 'legacylift-project-id'
 const savedBatchKey = 'legacylift-batch'
 const savedScreenKey = 'legacylift-screen'
 const savedUploadModeKey = 'legacylift-upload-mode'
+const savedViewKey = 'legacylift-view'
 
 function clearSavedBatch() {
   sessionStorage.removeItem(savedBatchKey)
@@ -79,7 +80,12 @@ export default function App() {
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
   const [isConverting, setIsConverting] = useState(false)
-  const [viewMode, setViewMode] = useState('split')
+ 
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = sessionStorage.getItem(savedViewKey)
+    if (saved === 'split' || saved === 'cobol' || saved === 'python') return saved
+    return 'split'
+  })
   
   const [screen, setScreen] = useState(() => {
     const saved = sessionStorage.getItem(savedScreenKey)
@@ -109,6 +115,10 @@ export default function App() {
   useEffect(() => {
     sessionStorage.setItem(savedUploadModeKey, uploadMode)
   }, [uploadMode])
+
+  useEffect(() => {
+    sessionStorage.setItem(savedViewKey, viewMode)
+  }, [viewMode]) 
 
   useEffect(() => {
     let cancelled = false
