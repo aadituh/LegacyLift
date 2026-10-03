@@ -25,7 +25,7 @@ The side menu has three screens: **Upload**, **Convert**, and **Export**. A prog
 | Upload → **Batch files** | **Choose COBOL files**, **Load small sample** | None yet; files stay in the browser |
 | Convert | **Convert files** (batch) or **Convert project** | `POST /api/convert` (up to 5 `.cbl`/`.cob` files, not saved) or `POST /api/projects/{id}/convert` |
 | Convert | **Both / COBOL only / Python only** | No API call; switches the view |
-| Export | **Download .py** | No API call; saves the file in the browser |
+| Export | **Download .py** | `GET /api/projects/{id}/runs/{run_id}/files/{name}`, or `GET /api/convert/{download_id}/files/{name}` for a batch |
 
 ## Files
 

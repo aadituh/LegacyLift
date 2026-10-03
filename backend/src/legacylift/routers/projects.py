@@ -16,9 +16,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import Response
 
 from legacylift.dependencies import ProjectDep, ProjectServiceDep
 from legacylift.models import Project, Run
+from legacylift.responses import python_attachment
 from legacylift.schemas import (
     AnalyzeResponse,
     ConvertResponse,
@@ -181,3 +183,29 @@ def list_runs(project: ProjectDep) -> RunsResponse:
 def get_run(project: ProjectDep, service: ProjectServiceDep, run_id: str) -> Run:
     """Return one run. For a convert run, this includes the generated Python."""
     return service.get_run(project, run_id)
+
+
+@router.get("/{project_id}/runs/{run_id}/files/{python_name}")
+def download_run_file(
+    project: ProjectDep,
+    service: ProjectServiceDep,
+    run_id: str,
+    python_name: str,
+) -> Response:
+    """Download one Python file saved on a convert run.
+
+    \f
+    Args:
+        project: The project from the URL.
+        service: The project workflow.
+        run_id: The convert run's ID.
+        python_name: The generated file name, such as ``PAY.py``.
+
+    Returns:
+        The ``.py`` file as an attachment.
+
+    Raises:
+        NotFoundError: Unknown run, a run with no Python, or an unknown file (404).
+    """
+    converted = service.python_file(project, run_id, python_name)
+    return python_attachment(converted.python_name, converted.python)

@@ -3,7 +3,7 @@
 A route parameter typed ``ProjectServiceDep`` receives the app's
 ``ProjectService``. One typed ``ProjectDep`` receives the project named by
 ``{project_id}`` in the URL, or the request stops with 404 before the route
-runs.
+runs. ``BatchDownloadDep`` receives the in-memory batch conversions.
 """
 
 from typing import Annotated, cast
@@ -11,6 +11,7 @@ from typing import Annotated, cast
 from fastapi import Depends, Request
 
 from legacylift.models import Project
+from legacylift.services.batch_downloads import BatchDownloadStore
 from legacylift.services.projects import ProjectService
 
 
@@ -27,6 +28,21 @@ def get_project_service(request: Request) -> ProjectService:
 
 
 ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
+
+
+def get_batch_downloads(request: Request) -> BatchDownloadStore:
+    """Return the in-memory store of batch conversions.
+
+    Args:
+        request: The current request; FastAPI passes it in.
+
+    Returns:
+        The app's ``BatchDownloadStore``.
+    """
+    return cast(BatchDownloadStore, request.app.state.batch_downloads)
+
+
+BatchDownloadDep = Annotated[BatchDownloadStore, Depends(get_batch_downloads)]
 
 
 def get_project_from_url(project_id: str, service: ProjectServiceDep) -> Project:

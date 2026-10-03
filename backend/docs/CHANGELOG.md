@@ -6,6 +6,8 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Added
 
+- `GET /api/projects/{id}/runs/{run_id}/files/{name}` downloads one saved `.py` file.
+- `POST /api/convert` returns `download_id`. `GET /api/convert/{download_id}/files/{name}` downloads that batch file until the API restarts.
 - `GET /api/projects`: every project, newest first, with file counts and its last run.
 - `DELETE /api/projects/{id}` and `DELETE /api/projects/{id}/files/{file_id}` (204). CORS now allows `DELETE`.
 - Converter: `PIC 99`/`PIC XX` style pictures, and doubled quotes inside literals (`"It""s"`).

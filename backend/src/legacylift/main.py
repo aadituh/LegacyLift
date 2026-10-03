@@ -19,6 +19,7 @@ from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 from legacylift.config import Settings
 from legacylift.errors import LegacyLiftError
 from legacylift.routers import convert, projects
+from legacylift.services.batch_downloads import BatchDownloadStore
 from legacylift.services.projects import ProjectService
 from legacylift.storage import ProjectStore
 
@@ -70,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     store = ProjectStore(settings.data_dir, settings.max_projects)
     app.state.project_service = ProjectService(store)
+    app.state.batch_downloads = BatchDownloadStore()
     app.include_router(projects.router)
     app.include_router(convert.router)
 

@@ -44,6 +44,13 @@ def test_full_project_flow(client, base):
     assert [run["kind"] for run in runs] == ["analyze", "convert", "verify"]
     assert "files" not in runs[1]
     assert client.get(f"{base}/runs/2").json()["files"] == conversion["files"]
+    downloaded = client.get(f"{base}/runs/2/files/hello.py")
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-type"].startswith("text/x-python")
+    assert downloaded.headers["content-disposition"] == 'attachment; filename="hello.py"'
+    assert downloaded.text == conversion["files"][0]["python"]
+    missing = client.get(f"{base}/runs/2/files/missing.py")
+    assert (missing.status_code, missing.json()) == (404, {"detail": "Python file not found."})
 
     # The project list: counts and last run, no file contents.
     [summary] = client.get("/api/projects").json()["projects"]
@@ -53,6 +60,16 @@ def test_full_project_flow(client, base):
     response = client.delete(base)
     assert (response.status_code, response.content) == (204, b"")
     assert client.get("/api/projects").json() == {"projects": []}
+
+
+def test_a_non_convert_run_has_no_python_file(client, base):
+    upload(client, base, ("hello.cbl", HELLO))
+    run_id = client.post(f"{base}/analyze").json()["run_id"]
+    response = client.get(f"{base}/runs/{run_id}/files/hello.py")
+    assert (response.status_code, response.json()) == (
+        404,
+        {"detail": "That run has no generated Python."},
+    )
 
 
 def test_demo_project_converts_with_no_review_notes(client):
@@ -110,6 +127,7 @@ def test_bad_upload_is_rejected(client, base, files, detail):
         ("POST", "/1/convert", 400, "Upload a .cbl or .cob program before converting."),
         ("POST", "/1/verify", 400, "Convert the project before requesting verification."),
         ("GET", "/1/runs/9", 404, "Run not found."),
+        ("GET", "/1/runs/9/files/hello.py", 404, "Run not found."),
         ("DELETE", "/1/files/9", 404, "File not found."),
     ],
 )

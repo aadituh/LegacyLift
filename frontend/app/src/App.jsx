@@ -6,6 +6,7 @@ import {
   convertProject,
   createDemoProject,
   createProject,
+  downloadPythonFile,
   uploadProjectFiles,
   getProject,
   getRun,
@@ -40,14 +41,14 @@ function clearSavedBatch() {
   sessionStorage.removeItem(savedBatchKey)
 }
 
-async function rememberBatch(fileList, converted) {
+async function rememberBatch(fileList, converted, downloadId) {
   const sources = []
   for (const file of fileList) {
     sources.push({ name: file.name, text: await file.text() })
   }
   sessionStorage.setItem(
     savedBatchKey,
-    JSON.stringify({ sources, results: converted }),
+    JSON.stringify({ sources, results: converted, downloadId: downloadId || '' }),
   )
 }
 
@@ -63,6 +64,7 @@ function readSavedBatch() {
     return {
       files: sources.map((source) => new File([source.text], source.name, { type: 'text/plain' })),
       results,
+      downloadId: saved.downloadId || '',
       sourceText: sources[0]?.text || '',
       status: results.length
         ? 'Opened the batch conversion from this tab.'
@@ -128,6 +130,8 @@ export default function App() {
   const [backendReady, setBackendReady] = useState(false)
   const [backendChecked, setBackendChecked] = useState(false)
   const [runs, setRuns] = useState([])
+  const [downloadRunId, setDownloadRunId] = useState('')
+  const [batchDownloadId, setBatchDownloadId] = useState(() => savedBatch?.downloadId ?? '')
 
   const projectPrograms = useMemo(() => programFilesFromProject(project), [project])
   const canConvert = backendReady && (files.length > 0 || projectPrograms.length > 0) && !isConverting
@@ -189,6 +193,8 @@ export default function App() {
         }
         const run = await getRun(id, convertRun.id)
         if (cancelled) return
+        setDownloadRunId(convertRun.id)
+        setBatchDownloadId('')
         setResults(run.files || [])
         setStatus(`Opened "${saved.name}" with the saved Python. `)
       } catch (cause) {
@@ -264,19 +270,23 @@ export default function App() {
 
     setFiles(chosen)
     setProject(null)
+    setDownloadRunId('')
+    setBatchDownloadId('')
     sessionStorage.removeItem(savedProjectKey)
     clearSavedBatch()
     setResults([])
     setError('')
     setStatus(`${chosen.length} file(s) ready for batch conversion via /api/convert.`)
     showFile(chosen[0], 0)
-    await rememberBatch(chosen, [])
+    await rememberBatch(chosen, [], '')
   }
 
   async function loadSample() {
     const sample = new File([sampleCobol], 'hello_team.cbl', { type: 'text/plain' })
     setFiles([sample])
     setProject(null)
+    setDownloadRunId('')
+    setBatchDownloadId('')
     sessionStorage.removeItem(savedProjectKey)
     clearSavedBatch()
     setResults([])
@@ -287,7 +297,7 @@ export default function App() {
         : 'Sample loaded. Convert files not ready until the API is online.'
     )
     showFile(sample, 0)
-    await rememberBatch([sample], [])
+    await rememberBatch([sample], [], '')
   }
 
   async function handleConvert() {
@@ -302,13 +312,17 @@ export default function App() {
       // File-picker selections use the batch route. Open projects use their own route.
       if (files.length > 0) {
         const converted = await convertFiles(files)
-        setResults(converted)
-        await rememberBatch(files, converted)
-        setStatus(`Converted ${converted.length} file(s) through /api/convert.`)
-        if (selectedFile >= converted.length) setSelectedFile(0)
+        setResults(converted.files)
+        setDownloadRunId('')
+        setBatchDownloadId(converted.download_id)
+        await rememberBatch(files, converted.files, converted.download_id)
+        setStatus(`Converted ${converted.files.length} file(s) through /api/convert.`)
+        if (selectedFile >= converted.files.length) setSelectedFile(0)
       } else if (project && projectPrograms.length > 0) {
         const conversion = await convertProject(project.id)
         setResults(conversion.files)
+        setDownloadRunId(conversion.run_id)
+        setBatchDownloadId('')
         setStatus(
           `Converted project "${project.name}" (${conversion.files.length} program(s), status: ${conversion.status}).`
         )
@@ -319,8 +333,10 @@ export default function App() {
       }
     } catch (cause) {
       setResults([])
+      setDownloadRunId('')
+      setBatchDownloadId('')
       setError(cause.message)
-      if (files.length > 0) await rememberBatch(files, [])
+      if (files.length > 0) await rememberBatch(files, [], '')
       setError(cause.message)
     } finally {
       setIsConverting(false)
@@ -332,6 +348,8 @@ export default function App() {
     clearSavedBatch()
     setProject(nextProject)
     setProjectName(nextProject.name)
+    setDownloadRunId('')
+    setBatchDownloadId('')
     setFiles([])
     setResults([])
     setSelectedFile(0)
@@ -415,14 +433,22 @@ export default function App() {
     }
   }
 
-  function downloadPython(result) {
-    const file = new Blob([result.python], { type: 'text/x-python;charset=utf-8' })
-    const url = URL.createObjectURL(file)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = result.python_name
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  async function downloadPython(result) {
+    const path = downloadRunId && project
+      ? `/api/projects/${encodeURIComponent(project.id)}/runs/${encodeURIComponent(downloadRunId)}/files/${encodeURIComponent(result.python_name)}`
+      : batchDownloadId
+        ? `/api/convert/${encodeURIComponent(batchDownloadId)}/files/${encodeURIComponent(result.python_name)}`
+        : ''
+    if (!path) {
+      setError('Convert the files again before downloading. This copy is not on the API.')
+      return
+    }
+    setError('')
+    try {
+      await downloadPythonFile(path, result.python_name)
+    } catch (cause) {
+      setError(cause.message)
+    }
   }
 
   const currentResult = results[selectedFile]

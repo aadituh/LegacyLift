@@ -96,9 +96,12 @@ class ConvertFilesResponse(BaseModel):
     """Response from ``POST /api/convert``.
 
     Attributes:
+        download_id: Use this in ``GET /api/convert/{download_id}/files/{name}``.
+            The file is kept in memory until the API restarts.
         files: One result per uploaded file, in upload order.
     """
 
+    download_id: str
     files: list[ConvertedFile]
 
 

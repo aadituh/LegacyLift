@@ -22,7 +22,7 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | Route | Body | Result |
 | --- | --- | --- |
 | `GET /health` | none | `{"status": "ok"}` |
-| `POST /api/convert` | 1–5 `.cbl`/`.cob` files in multipart field `files` | Python for each file; nothing is saved |
+| `POST /api/convert` | 1–5 `.cbl`/`.cob` files in multipart field `files` | Python for each file, plus `download_id`. Not saved as a project |
 | `GET /api/projects` | none | Every project, newest first: id, name, file counts, last run (no file contents) |
 | `POST /api/projects` | `{"name": "Demo"}` | New empty project (201) |
 | `POST /api/projects/demo` | none | New project with 3 sample files (201) |
@@ -35,6 +35,8 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `POST /api/projects/{id}/verify` | none | Placeholder: status `not_verified`, `passed: null` |
 | `GET /api/projects/{id}/runs` | none | All runs, oldest first, without their Python |
 | `GET /api/projects/{id}/runs/{run_id}` | none | One run; a convert run includes its Python |
+| `GET /api/projects/{id}/runs/{run_id}/files/{name}` | none | One saved `.py` file (`Content-Disposition: attachment`) |
+| `GET /api/convert/{download_id}/files/{name}` | none | One batch `.py` file, until the API restarts |
 
 IDs are short numbers as text: projects `"1"`, `"2"`, … across the API; files and runs `"1"`, `"2"`, … within their project. IDs are never reused.
 
@@ -84,7 +86,8 @@ src/legacylift/
 ├── sample_data.py    files for the demo project
 ├── data/             sample COBOL bank (programs, copybooks, .dat files)
 ├── routers/          HTTP only: convert.py, projects.py
-├── services/         rules: uploads.py, conversion.py, projects.py
+├── responses.py      `.py` download responses
+├── services/         rules: uploads.py, conversion.py, projects.py, batch_downloads.py
 └── cobol/
     └── converter.py  translate_program(): COBOL subset → Python
 ```

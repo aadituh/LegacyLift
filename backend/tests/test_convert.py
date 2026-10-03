@@ -5,6 +5,20 @@ import pytest
 from helpers import HELLO, run_python
 
 
+def test_download_returns_the_generated_file(client):
+    created = client.post("/api/convert", files={"files": ("hello.cbl", HELLO)})
+    body = created.json()
+    downloaded = client.get(f"/api/convert/{body['download_id']}/files/hello.py")
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-disposition"] == 'attachment; filename="hello.py"'
+    assert downloaded.text == body["files"][0]["python"]
+    missing = client.get(f"/api/convert/{body['download_id']}/files/other.py")
+    assert (missing.status_code, missing.json()) == (404, {"detail": "Python file not found."})
+    gone = client.get("/api/convert/missing-id/files/hello.py")
+    assert gone.status_code == 404
+    assert gone.json()["detail"] == "Download not found. Convert the files again."
+
+
 def test_two_files_return_runnable_python(client):
     response = client.post(
         "/api/convert",

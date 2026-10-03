@@ -56,15 +56,42 @@ export async function checkBackend() {
 
 /**
  * Batch-convert COBOL File objects through POST /api/convert.
- * Returns the `files` array: { source_name, python_name, program_name, python, notes }.
+ * Returns `{ download_id, files }`. Each file is
+ * `{ source_name, python_name, program_name, python, notes }`.
  */
 export async function convertFiles(files) {
   const form = new FormData()
   for (const file of files) {
     form.append('files', file)
   }
-  const data = await request('/api/convert', { method: 'POST', body: form })
-  return data.files
+  return request('/api/convert', { method: 'POST', body: form })
+}
+
+/**
+ * Download one generated Python file from the API and save it in the browser.
+ * `path` is a project run file or a batch conversion file. The bytes come from
+ * that response, not from Python already held on the page.
+ */
+export async function downloadPythonFile(path, fileName) {
+  let response
+  try {
+    response = await fetch(endpoint(path))
+  } catch {
+    throw new Error('Cannot reach the LegacyLift backend. Check the API connection and try again.')
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(detailMessage(data, `Request failed (${response.status}).`))
+  }
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 export async function createProject(name) {

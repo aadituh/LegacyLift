@@ -208,6 +208,41 @@ class ProjectService:
                 return run
         raise NotFoundError("Run not found.")
 
+    def python_file(self, project: Project, run_id: str, python_name: str) -> ConvertedProjectFile:
+        """Return one generated Python file from a convert run.
+
+        Args:
+            project: The project.
+            run_id: The convert run's ID.
+            python_name: The generated file name, such as ``PAY.py``.
+
+        Returns:
+            The saved conversion for that file.
+
+        Raises:
+            NotFoundError: The run does not exist, is not a convert run, or has
+                no file with that name.
+
+        Example:
+            >>> service = ProjectService(ProjectStore(data_dir=None, max_projects=10))
+            >>> project = service.create_demo_project()
+            >>> analyze_run, _counts = service.analyze(project)
+            >>> service.python_file(project, analyze_run.id, "store_report.py")
+            Traceback (most recent call last):
+                ...
+            legacylift.errors.NotFoundError: That run has no generated Python.
+            >>> run = service.convert(project)
+            >>> service.python_file(project, run.id, "store_report.py").program_name
+            'STORE-REPORT'
+        """
+        run = self.get_run(project, run_id)
+        for converted in run.files:
+            if converted.python_name == python_name:
+                return converted
+        if run.kind is not RunKind.CONVERT:
+            raise NotFoundError("That run has no generated Python.")
+        raise NotFoundError("Python file not found.")
+
     def add_files(self, project: Project, uploads: list[RawUpload]) -> list[SourceFile]:
         """Check uploaded files, then add and save all of them, or none.
 

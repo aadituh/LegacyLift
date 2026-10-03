@@ -1,1 +1,1 @@
-"""HTTP routes: ``convert.py`` (``POST /api/convert``) and ``projects.py`` (``/api/projects``)."""
+"""HTTP routes: ``convert.py`` (batch convert and download) and ``projects.py``."""
