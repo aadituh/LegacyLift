@@ -3,6 +3,7 @@
 ``DEMO_FILES`` holds ``(name, kind, content)`` tuples; the project service
 turns each into a ``SourceFile``. ``store_report.cbl`` uses only statements
 the converter supports, so its Python output runs with no review notes.
+``orders.dat`` holds one 24-character record laid out by ``order.cpy``.
 """
 
 from legacylift.models import FileKind
@@ -39,6 +40,16 @@ DISPLAY "Thanks for your order!".
 STOP RUN.
 """,
     ),
-    ("order.cpy", FileKind.COPYBOOK, "01 ORDER-NUMBER PIC 9(4).\n"),
-    ("orders.dat", FileKind.DATA, "1042,Ada,Coffee\n"),
+    (
+        "order.cpy",
+        FileKind.COPYBOOK,
+        (
+            "01 ORDER-RECORD.\n"
+            "   05 ORDER-NUMBER PIC 9(4).\n"
+            "   05 ORDER-CUSTOMER PIC X(10).\n"
+            "   05 ORDER-ITEM PIC X(10).\n"
+        ),
+    ),
+    # One fixed-width record laid out by order.cpy: 4 + 10 + 10 characters.
+    ("orders.dat", FileKind.DATA, "1042Ada       Coffee    \n"),
 )

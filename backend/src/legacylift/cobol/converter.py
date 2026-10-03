@@ -2,17 +2,24 @@
 
 Supported:
 
-- ``WORKING-STORAGE`` fields at level ``01`` or ``77`` with ``PIC X``/``PIC X(n)``
-  (text) or ``PIC 9``/``PIC 9(n)`` (whole numbers), with an optional ``VALUE``.
+- ``WORKING-STORAGE`` fields at level ``01`` or ``77`` with ``PIC X``, ``XX``,
+  ``X(n)`` (text) or ``PIC 9``, ``99``, ``9(n)`` (whole numbers), with an
+  optional ``VALUE``. Text literals may use doubled quotes (``"It""s"``).
 - ``DISPLAY``, ``MOVE ... TO``, ``ADD ... TO``, ``SUBTRACT ... FROM``, ``STOP RUN``.
 
-Every other line in ``WORKING-STORAGE`` or the ``PROCEDURE DIVISION`` becomes a
-``# TODO`` comment and a review note. Statements that mix text and numbers, or
-use decimals, also go to review, so the generated Python never fails with a
-type error. New statement rules go in ``translate_statement``.
+Every other line in ``WORKING-STORAGE``, a later data section such as
+``LINKAGE``, or the ``PROCEDURE DIVISION`` becomes a ``# TODO`` comment and a
+review note. Statements that mix text and numbers, or use decimals, also go to
+review, so the generated Python never fails with a type error.
 
-The entry point is ``translate_program``; the other functions each handle one
-piece of it.
+How it works: ``translate_program`` (the entry point, called by
+``services.conversion.convert_file``) reads the program one line at a time.
+``clean_line`` strips line numbers and comments. ``translate_line`` sends each
+line to ``translate_field`` (storage) or ``translate_statement`` (procedure),
+which uses ``translate_display`` or ``translate_assignment``; all of them use
+``translate_value`` for literals and field names. ``build_script`` wraps the
+result in a ``main()`` function. New statement rules go in
+``translate_statement``.
 """
 
 import builtins
@@ -27,14 +34,19 @@ PROGRAM_ID = re.compile(r"\bPROGRAM-ID\s*\.\s*([A-Z][A-Z0-9-]*)", re.IGNORECASE)
 PROCEDURE_DIVISION = re.compile(r"\bPROCEDURE\s+DIVISION\b", re.IGNORECASE)
 # A field entry: level, name, picture, and an optional VALUE.
 FIELD_ENTRY = re.compile(
-    r"^(?:01|77)\s+([A-Z][A-Z0-9-]*)\s+PIC\s+(X|9)(?:\(\d+\))?(?:\s+VALUE\s+(.+))?$",
+    r"^(?:01|77)\s+([A-Z][A-Z0-9-]*)\s+PIC\s+(X+|9+)(?:\(\d+\))?(?:\s+VALUE\s+(.+))?$",
     re.IGNORECASE,
 )
-# One DISPLAY item: a quoted string, a number, or a name.
-DISPLAY_ITEM = re.compile(r'"[^"]*"|\'[^\']*\'|[-+]?\d+(?:\.\d+)?|[A-Z][A-Z0-9-]*', re.IGNORECASE)
+# A quoted text literal; a doubled quote inside it stands for one quote.
+TEXT_LITERAL = re.compile(r'"(?:[^"]|"")*"|\'(?:[^\']|\'\')*\'')
+# One DISPLAY item: a text literal, a number, or a name.
+DISPLAY_ITEM = re.compile(
+    rf"{TEXT_LITERAL.pattern}|[-+]?\d+(?:\.\d+)?|[A-Z][A-Z0-9-]*", re.IGNORECASE
+)
 WHOLE_NUMBER = re.compile(r"[-+]?\d+")
-# The assignment verbs: COBOL verb, the word before the target, Python operator.
-ASSIGNMENTS = (("MOVE", "TO", "="), ("ADD", "TO", "+="), ("SUBTRACT", "FROM", "-="))
+FIELD_NAME = re.compile(r"[A-Z][A-Z0-9-]*", re.IGNORECASE)
+# MOVE x TO y, ADD x TO y, SUBTRACT x FROM y: (verb, word before the target) -> operator.
+ASSIGNMENT_OPERATORS = {("MOVE", "TO"): "=", ("ADD", "TO"): "+=", ("SUBTRACT", "FROM"): "-="}
 # Names a field must not take: Python keywords, built-ins like print, and main().
 RESERVED_NAMES = set(keyword.kwlist) | set(dir(builtins)) | {"main"}
 
@@ -116,6 +128,8 @@ def translate_value(text: str, fields: dict[str, Value]) -> Value | None:
         >>> fields = {"WS-TOTAL": Value("ws_total", is_number=True)}
         >>> translate_value('"Hi"', fields)
         Value(code="'Hi'", is_number=False)
+        >>> print(translate_value('"It""s"', fields).code)
+        'It"s'
         >>> translate_value("007", fields)
         Value(code='7', is_number=True)
         >>> translate_value("ws-total", fields)
@@ -125,8 +139,9 @@ def translate_value(text: str, fields: dict[str, Value]) -> Value | None:
     """
     text = text.strip()
     upper = text.upper()
-    if len(text) >= 2 and text[0] in "\"'" and text[-1] == text[0]:
-        return Value(repr(text[1:-1]), is_number=False)
+    if TEXT_LITERAL.fullmatch(text):
+        quote = text[0]
+        return Value(repr(text[1:-1].replace(quote * 2, quote)), is_number=False)
     if WHOLE_NUMBER.fullmatch(text):
         return Value(str(int(text)), is_number=True)  # int() drops leading zeros
     if upper in {"ZERO", "ZEROS", "ZEROES"}:
@@ -162,7 +177,7 @@ def translate_field(line: str, fields: dict[str, Value]) -> str | None:
     if match is None:
         return None
     cobol_name, picture, initial_text = match.groups()
-    is_number = picture == "9"
+    is_number = picture[0] == "9"
     if initial_text is None:
         initial: Value | None = Value("0" if is_number else "''", is_number)
     else:
@@ -250,23 +265,53 @@ def translate_assignment(line: str, fields: dict[str, Value]) -> str | None:
         >>> fields = {"WS-TOTAL": Value("ws_total", True), "WS-NAME": Value("ws_name", False)}
         >>> translate_assignment("SUBTRACT 2 FROM WS-TOTAL", fields)
         'ws_total -= 2'
+        >>> translate_assignment('MOVE "GO  TO IT" TO WS-NAME', fields)
+        "ws_name = 'GO  TO IT'"
         >>> translate_assignment('MOVE "abc" TO WS-TOTAL', fields) is None
         True
     """
-    for verb, target_word, operator in ASSIGNMENTS:
-        match = re.fullmatch(
-            rf"{verb}\s+(.+?)\s+{target_word}\s+([A-Z][A-Z0-9-]*)", line, re.IGNORECASE
-        )
-        if match is None:
-            continue
-        value_text, target_name = match.groups()
-        value = translate_value(value_text, fields)
-        target = fields.get(target_name.upper())
-        if value is None or target is None or value.is_number != target.is_number:
-            return None
-        if verb != "MOVE" and not target.is_number:
-            return None  # ADD and SUBTRACT need numbers
-        return f"{target.code} {operator} {value.code}"
+    # Split on whitespace rather than one regex, so the time stays linear in the
+    # line length: "MOVE 5 TO X" -> ["MOVE 5", "TO", "X"] -> "MOVE", "5".
+    parts = line.rsplit(maxsplit=2)
+    verb_and_value = parts[0].split(maxsplit=1) if len(parts) == 3 else []
+    if len(verb_and_value) != 2:
+        return None
+    (verb, value_text), (_, target_word, target_name) = verb_and_value, parts
+    operator = ASSIGNMENT_OPERATORS.get((verb.upper(), target_word.upper()))
+    if operator is None or not FIELD_NAME.fullmatch(target_name):
+        return None
+    value = translate_value(value_text, fields)
+    target = fields.get(target_name.upper())
+    if value is None or target is None or value.is_number != target.is_number:
+        return None
+    if operator != "=" and not target.is_number:
+        return None  # ADD and SUBTRACT need numbers
+    return f"{target.code} {operator} {value.code}"
+
+
+def translate_line(section: str, line: str, fields: dict[str, Value]) -> str | None:
+    """Translate one line according to the section it is in.
+
+    Args:
+        section: ``"storage"`` (``WORKING-STORAGE``), ``"procedure"``, or
+            ``"other"`` (a later data section such as ``LINKAGE``).
+        line: The line after ``clean_line``, without its final period.
+        fields: Declared fields, by uppercase COBOL name.
+
+    Returns:
+        One line of Python, or ``None`` if the line goes to review. Lines in
+        ``"other"`` always go to review.
+
+    Example:
+        >>> translate_line("storage", "01 N PIC 9 VALUE 1", {})
+        'n = 1'
+        >>> translate_line("other", "01 LS-DAYS PIC 999", {}) is None
+        True
+    """
+    if section == "storage":
+        return translate_field(line, fields)
+    if section == "procedure":
+        return translate_statement(line, fields)
     return None
 
 
@@ -320,7 +365,7 @@ def translate_program(source: str) -> PythonDraft:
     fields: dict[str, Value] = {}
     body: list[str] = []
     notes: list[str] = []
-    section = ""  # becomes "storage", then "procedure"
+    section = ""  # becomes "storage", maybe "other", then "procedure"
     for number, line in numbered_lines:
         upper = line.upper()
         if upper == "WORKING-STORAGE SECTION":
@@ -328,10 +373,9 @@ def translate_program(source: str) -> PythonDraft:
         elif upper.startswith("PROCEDURE DIVISION"):
             section = "procedure"
         elif line and section:
-            if section == "storage":
-                translated = translate_field(line, fields)
-            else:
-                translated = translate_statement(line, fields)
+            if section == "storage" and upper.endswith(" SECTION"):
+                section = "other"  # LINKAGE and the like: parameters, not variables
+            translated = translate_line(section, line, fields)
             if translated is None:
                 body.append(f"# TODO: COBOL line {number}: {line}")
                 notes.append(f"Line {number}: {line}")
