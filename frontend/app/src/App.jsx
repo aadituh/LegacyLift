@@ -31,6 +31,7 @@ function programFilesFromProject(project) {
   return project.files.filter((file) => file.kind === 'program')
 }
 
+const maxProjectFiles = 10
 const savedProjectKey = 'legacylift-project-id'
 const savedBatchKey = 'legacylift-batch'
 const savedScreenKey = 'legacylift-screen'
@@ -400,8 +401,14 @@ export default function App() {
       setError('Backend is offline. Check the API connection, then try again.')
       return
     }
-    if (chosen.length > 10) {
-      setError('A project can take up to 10 files.')
+    const fileCount = project.files.length + chosen.length
+    if (fileCount > maxProjectFiles) {
+      const room = maxProjectFiles - project.files.length
+      const roomText =
+        room > 0
+          ? `This project already has ${project.files.length}, so ${room} more can be added.`
+          : `This project already has ${project.files.length}.`
+      setError(`A project can take up to ${maxProjectFiles} files. ${roomText}`)
       return
     } 
     const tooBig = chosen.filter((file) => file.size > 100_000)
@@ -651,7 +658,9 @@ export default function App() {
                     </div>
                   )}
 
-                  <p className="file-limit">Projects: up to 10 files via /api/projects, then /convert.</p>
+                  <p className="file-limit">
+                    Projects: up to {maxProjectFiles} files via /api/projects, then /convert.
+                  </p>
                 </>
               )}
 
