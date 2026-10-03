@@ -2,6 +2,29 @@
 
 Each entry describes the code at that time. The [backend README](../README.md) describes it now.
 
+## Unreleased
+
+### Added
+
+- `GET /api/projects`: every project, newest first, with file counts and its last run.
+- `DELETE /api/projects/{id}` and `DELETE /api/projects/{id}/files/{file_id}` (204). CORS now allows `DELETE`.
+- Converter: `PIC 99`/`PIC XX` style pictures, and doubled quotes inside literals (`"It""s"`).
+
+### Changed
+
+- Short IDs: projects are `"1"`, `"2"`, …; files and runs are numbered within their project. IDs are never reused (the project counter is saved in `last_id.txt`). Projects saved with the old long IDs still load.
+- `MOVE`/`ADD`/`SUBTRACT` lines are read by splitting on spaces; a 100 KB line converts in well under a second.
+- Upload and convert routes run conversion and saving in a worker thread, so other requests keep answering.
+- Fields after `LINKAGE SECTION` (or any later data section) become review notes instead of local variables.
+- File names longer than 255 characters or with control characters are rejected (400).
+- The demo project's `order.cpy` and `orders.dat` now describe the same 24-character record.
+- Internal cleanup with no change to routes or JSON: `conversion_status` moved to `services/conversion.py`, the accepted extensions live once in `services/uploads.py`, and the converter compiles its `MOVE`/`ADD`/`SUBTRACT` patterns once.
+- Shorter backend README; shorter tests (table-driven); every module docstring says what the module does and what it connects to.
+
+### Fixed
+
+- A deleted project stays deleted, even if a request on it finishes afterwards.
+
 ## Backend v2 — 2026-10-01
 
 Branch `feature/backend-v2`. Routes the React app already uses keep their fields; new fields are only added.

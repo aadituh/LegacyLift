@@ -1,4 +1,9 @@
-"""FastAPI application setup.
+"""Builds the FastAPI app: the entry point of the backend.
+
+``create_app`` sets up, in order: the request size limit (413), CORS for the
+frontend, one error handler that turns any ``LegacyLiftError`` into
+``{"detail": message}``, the ``ProjectStore`` and ``ProjectService`` (kept on
+``app.state``), the two routers, and the ``/`` and ``/health`` routes.
 
 Uvicorn imports the module-level ``app``:
 ``uv run --frozen uvicorn legacylift.main:app --reload``.
@@ -45,13 +50,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.all_cors_origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 
     @app.exception_handler(LegacyLiftError)
     async def handle_legacylift_error(request: Request, error: LegacyLiftError) -> JSONResponse:
-        """Send a service error as ``{"detail": message}`` with its status, and log it."""
+        """Send a service error as ``{"detail": message}`` with its status, and log it.
+
+        Args:
+            request: The request that failed.
+            error: The error a service raised.
+
+        Returns:
+            A JSON response with ``error.status_code``.
+        """
         logger.warning("Rejected %s %s: %s", request.method, request.url.path, error)
         return JSONResponse(status_code=error.status_code, content={"detail": str(error)})
 
@@ -62,12 +75,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/")
     def home() -> dict[str, str]:
-        """Point visitors to the health check and the interactive docs."""
+        """Point visitors to the health check and the interactive docs.
+
+        Returns:
+            A short message with the ``/health`` and ``/docs`` paths.
+        """
         return {"message": "LegacyLift API is running", "health": "/health", "docs": "/docs"}
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        """Report that the API is up. The frontend calls this on page load."""
+        """Report that the API is up. The frontend calls this on page load.
+
+        Returns:
+            ``{"status": "ok"}``.
+        """
         return {"status": "ok"}
 
     return app

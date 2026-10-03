@@ -1,4 +1,11 @@
-"""Project routes. Service errors become 4xx responses through the handler in main.py.
+"""Project routes under ``/api/projects``.
+
+List, create, read, and delete projects; upload and remove files; analyze,
+convert, and verify; read runs.
+
+Each route reads the request, calls one ``ProjectService`` method, and returns
+a body from ``schemas.py``. Service errors become 4xx responses through the
+handler in ``main.py``.
 
 Route docstrings: the text before ``\\f`` appears on the /docs page; the rest is
 for developers only. Every route with ``{project_id}`` gets the project through
@@ -8,6 +15,7 @@ for developers only. Every route with ``{project_id}`` gets the project through
 from typing import Annotated
 
 from fastapi import APIRouter, File, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from legacylift.dependencies import ProjectDep, ProjectServiceDep
 from legacylift.models import Project, Run
@@ -15,17 +23,20 @@ from legacylift.schemas import (
     AnalyzeResponse,
     ConvertResponse,
     CreateProjectRequest,
+    ProjectListResponse,
     ProjectResponse,
+    ProjectSummary,
     RunsResponse,
     UploadResponse,
     VerifyResponse,
 )
+from legacylift.services.projects import file_counts
 from legacylift.services.uploads import read_uploads
 
 router = APIRouter(
     prefix="/api/projects",
     tags=["projects"],
-    responses={404: {"description": "Project or run not found"}},
+    responses={404: {"description": "Project, file, or run not found"}},
 )
 
 
@@ -41,6 +52,22 @@ def create_project(body: CreateProjectRequest, service: ProjectServiceDep) -> Pr
     return service.create_project(body.name)
 
 
+@router.get("")
+def list_projects(service: ProjectServiceDep) -> ProjectListResponse:
+    """List every project, newest first, with file counts and its last run."""
+    summaries = [
+        ProjectSummary(
+            id=project.id,
+            name=project.name,
+            created_at=project.created_at,
+            last_run=project.runs[-1] if project.runs else None,
+            **file_counts(project).model_dump(),
+        )
+        for project in service.list_projects()
+    ]
+    return ProjectListResponse(projects=summaries)
+
+
 @router.post("/demo", response_model=ProjectResponse, status_code=201)
 def create_demo_project(service: ProjectServiceDep) -> Project:
     """Create a new project with sample files for API exploration."""
@@ -51,6 +78,12 @@ def create_demo_project(service: ProjectServiceDep) -> Project:
 def get_project(project: ProjectDep) -> Project:
     """Return a project and the content of its files."""
     return project
+
+
+@router.delete("/{project_id}", status_code=204)
+def delete_project(project: ProjectDep, service: ProjectServiceDep) -> None:
+    """Delete a project with its files and runs."""
+    service.delete_project(project)
 
 
 @router.post("/{project_id}/files")
@@ -71,8 +104,20 @@ async def upload_files(
     Example:
         ``curl -F files=@PAY.cbl -F files=@PAY.cpy http://127.0.0.1:8000/api/projects/<id>/files``
     """
-    added = service.add_files(project, await read_uploads(files))
+    uploads = await read_uploads(files)
+    added = await run_in_threadpool(service.add_files, project, uploads)
     return UploadResponse(project_id=project.id, files=added)
+
+
+@router.delete("/{project_id}/files/{file_id}", status_code=204)
+def delete_file(project: ProjectDep, service: ProjectServiceDep, file_id: str) -> None:
+    """Remove one file from a project. Saved runs keep their results.
+
+    \f
+    Raises:
+        NotFoundError: The project has no file with that ID (404).
+    """
+    service.delete_file(project, file_id)
 
 
 @router.post("/{project_id}/analyze")

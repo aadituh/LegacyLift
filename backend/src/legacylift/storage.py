@@ -1,7 +1,9 @@
 """Project storage: kept in memory and saved as one JSON file per project.
 
-This stands in for PostgreSQL until the API has a host with a database. Files
-on Render's disk last until the service restarts or redeploys.
+``ProjectService`` is the only caller. It asks ``ProjectStore`` for a new
+project ID, adds the project, and calls ``save`` after every change. This
+stands in for PostgreSQL until the API has a host with a database; files on
+Render's disk last until the service restarts or redeploys.
 """
 
 import logging
@@ -13,6 +15,7 @@ from legacylift.models import Project
 
 # Uvicorn already prints this logger, so messages appear in the server console.
 logger = logging.getLogger("uvicorn.error")
+LAST_ID_FILE = "last_id.txt"
 
 
 class ProjectStore:
@@ -24,11 +27,13 @@ class ProjectStore:
 
     Example:
         >>> store = ProjectStore(data_dir=None, max_projects=2)
-        >>> first, second, third = Project(name="A"), Project(name="B"), Project(name="C")
-        >>> for project in (first, second, third):
-        ...     store.add(project)
-        >>> store.get(first.id) is None, store.get(third.id) is third
-        (True, True)
+        >>> for name in ("A", "B", "C"):
+        ...     store.add(Project(id=store.next_id(), name=name))
+        >>> [(project.id, project.name) for project in store.all()]
+        [('2', 'B'), ('3', 'C')]
+        >>> store.delete("2")
+        >>> store.get("2") is None, store.next_id()
+        (True, '4')
     """
 
     def __init__(self, data_dir: Path | None, max_projects: int) -> None:
@@ -44,7 +49,24 @@ class ProjectStore:
         self._projects: dict[str, Project] = {}  # oldest first
         for project in sorted(self._read_saved_projects(), key=lambda p: p.created_at):
             self._projects[project.id] = project
+        numbers = [int(project_id) for project_id in self._projects if project_id.isdigit()]
+        self._last_number = max([*numbers, self._read_last_number()], default=0)
         self._remove_oldest()
+
+    def next_id(self) -> str:
+        """Hand out the next project ID: one more than the highest ever given.
+
+        The number is saved in ``data_dir/last_id.txt``, so an ID is never
+        reused, even after the newest project is deleted and the app restarts.
+
+        Returns:
+            ``"1"`` for the first project, then ``"2"``, ``"3"``, ...
+        """
+        self._last_number += 1
+        if self.data_dir is not None:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            (self.data_dir / LAST_ID_FILE).write_text(str(self._last_number), encoding="utf-8")
+        return str(self._last_number)
 
     def get(self, project_id: str) -> Project | None:
         """Find a project by ID.
@@ -56,6 +78,24 @@ class ProjectStore:
             The project, or ``None`` if there is none with that ID.
         """
         return self._projects.get(project_id)
+
+    def all(self) -> list[Project]:
+        """Return every stored project, oldest first.
+
+        Returns:
+            The projects in the order they were added.
+        """
+        return list(self._projects.values())
+
+    def delete(self, project_id: str) -> None:
+        """Remove a project and its file. Does nothing if there is no such project.
+
+        Args:
+            project_id: The project's ID.
+        """
+        self._projects.pop(project_id, None)
+        if self.data_dir is not None:
+            (self.data_dir / f"{project_id}.json").unlink(missing_ok=True)
 
     def add(self, project: Project) -> None:
         """Store and save a new project, deleting the oldest if over the limit.
@@ -71,11 +111,12 @@ class ProjectStore:
         """Write a project to its JSON file. Call after every change to it.
 
         Writes to a temporary file first, so a crash never leaves half a file.
+        A project that was deleted, or dropped past the limit, is not written.
 
         Args:
             project: The changed project.
         """
-        if self.data_dir is None:
+        if self.data_dir is None or project.id not in self._projects:
             return
         self.data_dir.mkdir(parents=True, exist_ok=True)
         temp_path = self.data_dir / f"{project.id}.tmp"
@@ -85,13 +126,26 @@ class ProjectStore:
     def _remove_oldest(self) -> None:
         """Delete the oldest projects, and their files, until at most ``max_projects`` remain."""
         while len(self._projects) > self.max_projects:
-            oldest_id = next(iter(self._projects))
-            del self._projects[oldest_id]
-            if self.data_dir is not None:
-                (self.data_dir / f"{oldest_id}.json").unlink(missing_ok=True)
+            self.delete(next(iter(self._projects)))
+
+    def _read_last_number(self) -> int:
+        """Read the highest ID ever given from ``last_id.txt``.
+
+        Returns:
+            The saved number, or 0 if there is no readable file.
+        """
+        path = self.data_dir / LAST_ID_FILE if self.data_dir is not None else None
+        if path is None or not path.is_file():
+            return 0
+        text = path.read_text(encoding="utf-8").strip()
+        return int(text) if text.isdigit() else 0
 
     def _read_saved_projects(self) -> list[Project]:
-        """Read every ``<id>.json`` in ``data_dir``, skipping files that cannot be parsed."""
+        """Read every ``<id>.json`` in ``data_dir``, skipping files that cannot be parsed.
+
+        Returns:
+            The projects that could be read, in no particular order.
+        """
         if self.data_dir is None or not self.data_dir.is_dir():
             return []
         projects = []

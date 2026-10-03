@@ -1,11 +1,15 @@
-"""Project workflow: store files, and record analyze, convert, and verify runs.
+"""Project workflow: ``ProjectService`` and its helpers.
+
+Create, list, and delete projects; add and remove files; record analyze,
+convert, and verify runs.
 
 Every change follows the same pattern: change the ``Project``, then
 ``store.save(project)``. A lock makes changes happen one at a time, because
-FastAPI runs routes on several threads.
+FastAPI runs routes on several threads. New files and runs get the project's
+next number as their ID (``"1"``, ``"2"``, ...).
 
-Dependency analysis and COBOL-versus-Python verification are not built yet;
-their runs say so in their status instead of reporting success.
+Analyze only counts files and verify compares nothing yet; their run statuses
+(``inventory_only``, ``not_verified``) say so.
 """
 
 import threading
@@ -22,37 +26,36 @@ from legacylift.models import (
     SourceFile,
 )
 from legacylift.sample_data import DEMO_FILES
-from legacylift.services.conversion import convert_file, python_file_name
-from legacylift.services.uploads import RawUpload, decode_upload
+from legacylift.services.conversion import conversion_status, convert_file, python_file_name
+from legacylift.services.uploads import KIND_BY_SUFFIX, RawUpload, decode_upload
 from legacylift.storage import ProjectStore
 
 MAX_PROJECT_FILES = 10
-KIND_BY_SUFFIX = {
-    ".cbl": FileKind.PROGRAM,
-    ".cob": FileKind.PROGRAM,
-    ".cpy": FileKind.COPYBOOK,
-    ".dat": FileKind.DATA,
-}
 
 
-def conversion_status(notes: list[str]) -> RunStatus:
-    """Pick the status for converted code.
+def file_counts(project: Project) -> FileCounts:
+    """Count a project's files by kind.
 
     Args:
-        notes: Review notes; one per line that was not converted.
+        project: The project.
 
     Returns:
-        ``REVIEW_REQUIRED`` if there are notes, otherwise ``DRAFT``.
+        How many programs, copybooks, and data files it has.
 
     Example:
-        >>> conversion_status(["Line 6: PERFORM PRINT-TOTAL"])
-        <RunStatus.REVIEW_REQUIRED: 'review_required'>
+        >>> file_counts(Project(id="1", name="Empty"))
+        FileCounts(program_count=0, copybook_count=0, data_file_count=0)
     """
-    return RunStatus.REVIEW_REQUIRED if notes else RunStatus.DRAFT
+    kinds = [file.kind for file in project.files]
+    return FileCounts(
+        program_count=kinds.count(FileKind.PROGRAM),
+        copybook_count=kinds.count(FileKind.COPYBOOK),
+        data_file_count=kinds.count(FileKind.DATA),
+    )
 
 
 class ProjectService:
-    """The project workflow: create, upload, analyze, convert, verify.
+    """The project workflow: create, list, upload, analyze, convert, verify, delete.
 
     Routes call these methods. Each step is saved as a ``Run`` on the project;
     a convert run also keeps the generated Python.
@@ -90,14 +93,15 @@ class ProjectService:
 
         Example:
             >>> service = ProjectService(ProjectStore(data_dir=None, max_projects=10))
-            >>> service.create_project("  Payroll ").name
-            'Payroll'
+            >>> project = service.create_project("  Payroll ")
+            >>> project.id, project.name
+            ('1', 'Payroll')
         """
         name = name.strip()
         if not name:
             raise InvalidInputError("Project name cannot be blank.")
-        project = Project(name=name)
         with self._lock:
+            project = Project(id=self.store.next_id(), name=name)
             self.store.add(project)
         return project
 
@@ -105,13 +109,13 @@ class ProjectService:
         """Create and save a project holding the files in ``sample_data.DEMO_FILES``.
 
         Returns:
-            A project with ``store_report.cbl``, ``order.cpy``, and ``orders.dat``.
+            A project with ``store_report.cbl``, ``order.cpy``, and ``orders.dat``
+            (file IDs ``"1"`` to ``"3"``).
         """
-        files = [
-            SourceFile(name=name, kind=kind, content=content) for name, kind, content in DEMO_FILES
-        ]
-        project = Project(name="LegacyLift demo", files=files)
         with self._lock:
+            project = Project(id=self.store.next_id(), name="LegacyLift demo")
+            for name, kind, content in DEMO_FILES:
+                self._attach_file(project, name, kind, content)
             self.store.add(project)
         return project
 
@@ -126,11 +130,65 @@ class ProjectService:
 
         Raises:
             NotFoundError: If no project has that ID. Routes return 404.
+
+        Example:
+            >>> service = ProjectService(ProjectStore(data_dir=None, max_projects=10))
+            >>> service.get_project(service.create_project("Payroll").id).name
+            'Payroll'
         """
         project = self.store.get(project_id)
         if project is None:
             raise NotFoundError("Project not found.")
         return project
+
+    def list_projects(self) -> list[Project]:
+        """Return every project, newest first.
+
+        Returns:
+            The projects, most recently created first.
+
+        Example:
+            >>> service = ProjectService(ProjectStore(data_dir=None, max_projects=10))
+            >>> _ = service.create_project("Old"), service.create_project("New")
+            >>> [project.name for project in service.list_projects()]
+            ['New', 'Old']
+        """
+        with self._lock:
+            return self.store.all()[::-1]
+
+    def delete_project(self, project: Project) -> None:
+        """Delete a project, its files, and its runs.
+
+        Args:
+            project: The project to delete.
+        """
+        with self._lock:
+            self.store.delete(project.id)
+
+    def delete_file(self, project: Project, file_id: str) -> None:
+        """Remove one file from a project. Earlier runs keep their results.
+
+        Args:
+            project: The project.
+            file_id: The ID returned when the file was uploaded.
+
+        Raises:
+            NotFoundError: If the project has no file with that ID.
+
+        Example:
+            >>> service = ProjectService(ProjectStore(data_dir=None, max_projects=10))
+            >>> project = service.create_demo_project()
+            >>> service.delete_file(project, project.files[2].id)
+            >>> [file.name for file in project.files]
+            ['store_report.cbl', 'order.cpy']
+        """
+        with self._lock:
+            for file in project.files:
+                if file.id == file_id:
+                    project.files.remove(file)
+                    self.store.save(project)
+                    return
+        raise NotFoundError("File not found.")
 
     def get_run(self, project: Project, run_id: str) -> Run:
         """Look up one of a project's runs, including any generated Python.
@@ -188,7 +246,7 @@ class ProjectService:
                 for file in project.files
                 if file.kind == FileKind.PROGRAM
             }
-            new_files = []
+            checked: list[tuple[str, FileKind, str]] = []  # (name, kind, text)
             for upload in uploads:
                 kind = KIND_BY_SUFFIX.get(upload.suffix)
                 if kind is None:
@@ -205,10 +263,9 @@ class ProjectService:
                             "COBOL program names must produce unique Python file names."
                         )
                     taken_python_names.add(python_name)
-                content = decode_upload(upload)
-                new_files.append(SourceFile(name=upload.name, kind=kind, content=content))
+                checked.append((upload.name, kind, decode_upload(upload)))
 
-            project.files.extend(new_files)
+            new_files = [self._attach_file(project, *file) for file in checked]
             self.store.save(project)
         return new_files
 
@@ -235,14 +292,8 @@ class ProjectService:
         """
         if not project.files:
             raise ProjectStateError("Upload files before analyzing.")
-        kinds = [file.kind for file in project.files]
-        counts = FileCounts(
-            program_count=kinds.count(FileKind.PROGRAM),
-            copybook_count=kinds.count(FileKind.COPYBOOK),
-            data_file_count=kinds.count(FileKind.DATA),
-        )
-        run = self._save_run(project, Run(kind=RunKind.ANALYZE, status=RunStatus.INVENTORY_ONLY))
-        return run, counts
+        run = self._save_run(project, RunKind.ANALYZE, RunStatus.INVENTORY_ONLY)
+        return run, file_counts(project)
 
     def convert(self, project: Project) -> Run:
         """Convert every program in a project and save the results in a convert run.
@@ -275,8 +326,9 @@ class ProjectService:
                 )
             )
         all_notes = [note for converted in converted_files for note in converted.notes]
-        run = Run(kind=RunKind.CONVERT, status=conversion_status(all_notes), files=converted_files)
-        return self._save_run(project, run)
+        return self._save_run(
+            project, RunKind.CONVERT, conversion_status(all_notes), converted_files
+        )
 
     def verify(self, project: Project) -> Run:
         """Save a verify run without comparing anything yet.
@@ -306,11 +358,33 @@ class ProjectService:
         """
         if not any(run.kind == RunKind.CONVERT for run in project.runs):
             raise ProjectStateError("Convert the project before requesting verification.")
-        return self._save_run(project, Run(kind=RunKind.VERIFY, status=RunStatus.NOT_VERIFIED))
+        return self._save_run(project, RunKind.VERIFY, RunStatus.NOT_VERIFIED)
 
-    def _save_run(self, project: Project, run: Run) -> Run:
-        """Append a run to the project, save the project, and return the run."""
+    def _attach_file(self, project: Project, name: str, kind: FileKind, content: str) -> SourceFile:
+        """Add a file with the project's next file ID. The caller holds the lock and saves.
+
+        Returns:
+            The new file.
+        """
+        project.files_added += 1
+        file = SourceFile(id=str(project.files_added), name=name, kind=kind, content=content)
+        project.files.append(file)
+        return file
+
+    def _save_run(
+        self,
+        project: Project,
+        kind: RunKind,
+        status: RunStatus,
+        files: list[ConvertedProjectFile] | None = None,
+    ) -> Run:
+        """Record a step as the project's next run (IDs ``"1"``, ``"2"``, ...) and save.
+
+        Returns:
+            The new run.
+        """
         with self._lock:
+            run = Run(id=str(len(project.runs) + 1), kind=kind, status=status, files=files or [])
             project.runs.append(run)
             self.store.save(project)
         return run

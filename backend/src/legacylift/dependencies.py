@@ -1,8 +1,9 @@
-"""Values FastAPI passes into route functions, like Spring's constructor injection.
+"""Values FastAPI passes into route functions (dependency injection).
 
-A route parameter typed ``ProjectServiceDep`` receives the app's service. One
-typed ``ProjectDep`` receives the project named by ``{project_id}`` in the URL,
-or the request stops with 404 before the route runs.
+A route parameter typed ``ProjectServiceDep`` receives the app's
+``ProjectService``. One typed ``ProjectDep`` receives the project named by
+``{project_id}`` in the URL, or the request stops with 404 before the route
+runs.
 """
 
 from typing import Annotated, cast
