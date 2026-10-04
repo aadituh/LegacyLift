@@ -1,10 +1,16 @@
 /**
  * HTTP client for the LegacyLift FastAPI backend.
  *
- * Local Vite (`npm run dev`) leaves VITE_API_URL empty and proxies `/api`
- * (and `/health`) to http://127.0.0.1:8000. Hosted builds set VITE_API_URL
- * to the public API origin (no trailing slash, no `/api` suffix).
+ * `npm run dev` and `npm run preview` on this machine leave VITE_API_URL empty.
+ * Vite proxies `/api` and `/health` to http://127.0.0.1:8000. A hosted build
+ * sets VITE_API_URL to the public API origin (no trailing slash, no `/api` suffix).
  */
+
+function usesLocalProxy() {
+  if (typeof window === 'undefined') return false
+  const host = window.location.hostname
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+}
 
 const apiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
 
@@ -41,8 +47,12 @@ async function request(path, options = {}) {
   return data
 }
 
-/** True when a hosted API URL is configured. Live readiness still uses checkBackend(). */
-export const apiConfigured = import.meta.env.DEV || Boolean(apiUrl)
+/**
+ * True when `/health` and `/api` can be requested.
+ * Dev and localhost preview use the Vite proxy. Hosted pages need VITE_API_URL.
+ * Whether that backend is up is checkBackend(), not this flag.
+ */
+export const apiConfigured = import.meta.env.DEV || usesLocalProxy() || Boolean(apiUrl)
 
 /** Probe FastAPI /health. Use this to enable Convert only when the API is up. */
 export async function checkBackend() {
