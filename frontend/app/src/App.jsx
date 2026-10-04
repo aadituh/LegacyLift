@@ -49,6 +49,18 @@ const savedScreenKey = 'legacylift-screen'
 const savedUploadModeKey = 'legacylift-upload-mode'
 const savedViewKey = 'legacylift-view'
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fillConversionProgress(setConversionProgress) {
+  setConversionProgress(0)
+  for (let step = 1; step <= 100; step += 1) {
+    await delay(50)
+    setConversionProgress(step)
+  }
+}
+
 function clearSavedBatch() {
   sessionStorage.removeItem(savedBatchKey)
 }
@@ -118,6 +130,7 @@ export default function App() {
   const [error, setError] = useState('')
   const [status, setStatus] = useState(() => savedBatch?.status ?? '')
   const [isConverting, setIsConverting] = useState(false)
+  const [conversionProgress, setConversionProgress] = useState(0)
  
   const [viewMode, setViewMode] = useState(() => {
     const saved = sessionStorage.getItem(savedViewKey)
@@ -359,6 +372,7 @@ export default function App() {
           setError('Choose COBOL files or load a sample before converting.')
           return
         }
+        await fillConversionProgress(setConversionProgress)
         const converted = await convertFiles(files)
         setResults(converted.files)
         setDownloadRunId('')
@@ -376,6 +390,7 @@ export default function App() {
         )
         return
       }
+      await fillConversionProgress(setConversionProgress)
       const conversion = await convertProject(project.id)
       setResults(conversion.files)
       setDownloadRunId(conversion.run_id)
@@ -394,6 +409,7 @@ export default function App() {
       setError(cause.message)
     } finally {
       setIsConverting(false)
+      setConversionProgress(0)
     }
   }
 
@@ -901,6 +917,31 @@ export default function App() {
                       : 'Convert project'}
                 </button>
               </div>
+
+              {isConverting && (
+                <section className="conversion-progress" aria-label="Preparing conversion">
+                  <div className="conversion-progress-header">
+                    <span>Preparing conversion...</span>
+                    <span>{conversionProgress}%</span>
+                  </div>
+                  <div
+                    className="conversion-progress-track"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={conversionProgress}
+                    aria-label={`Conversion preparation ${conversionProgress}%`}
+                  >
+                    <div
+                      className="conversion-progress-value"
+                      style={{ width: `${conversionProgress}%` }}
+                    />
+                  </div>
+                  <p className="conversion-progress-note">
+                    Preparing the COBOL source for conversion.
+                  </p>
+                </section>
+              )}
 
               {sourceTabs.length > 0 && (
                 <div className="file-tabs">
