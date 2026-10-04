@@ -23,7 +23,7 @@ Active code is in `backend/src/legacylift/`. `backend/prototype/` is research ma
 
 - [x] Create a project and upload `.cbl`, `.cob`, `.cpy`, and `.dat` files.
 - [x] Show source beside generated Python with review notes.
-- [ ] Reopen an existing project, and show the last translation after a page reload.
+- [x] Reopen an existing project, and show the last translation after a page reload.
 - [ ] Show dependency analysis and fields/paragraphs per program.
 - [ ] Show verification results, run history, and downloads.
 - [x] Explain upload and conversion errors clearly, including 413 (file too large).

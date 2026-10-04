@@ -8,9 +8,11 @@ import {
   createProject,
   downloadPythonFile,
   uploadProjectFiles,
+  deleteProject,
   getProject,
   getRun,
   getRuns,
+  listProjects,
 } from './api'
 import './App.css'
 
@@ -140,6 +142,7 @@ export default function App() {
   const [backendReady, setBackendReady] = useState(false)
   const [backendChecked, setBackendChecked] = useState(false)
   const [runs, setRuns] = useState([])
+  const [savedProjects, setSavedProjects] = useState([])
   const [downloadRunId, setDownloadRunId] = useState('')
   const [batchDownloadId, setBatchDownloadId] = useState(() => savedBatch?.downloadId ?? '')
   const sourceRead = useRef(0)
@@ -235,6 +238,23 @@ export default function App() {
       cancelled = true
     }
   }, [screen, project, backendReady])
+
+  useEffect(() => {
+    if (screen !== 'upload' || uploadMode !== 'project' || !backendReady) return
+    let cancelled = false
+    async function loadSavedProjects() {
+      try {
+        const data = await listProjects() 
+        if (!cancelled) setSavedProjects(data.projects || [])
+      } catch (cause) {
+        if (!cancelled) setError(cause.message)
+      }
+    }
+    loadSavedProjects()
+    return () => {
+      cancelled = true
+    }
+  }, [screen, uploadMode, backendReady, project])
 
   async function showFile(file, index) {
     const readId = ++sourceRead.current
@@ -376,6 +396,69 @@ export default function App() {
     setResults([])
     setSelectedFile(0)
     setSourceText(programFilesFromProject(nextProject)[0]?.content || '')
+  }
+
+  function closeProjectIfDeleted(projectId) {
+    if (project?.id !== projectId) return
+    sessionStorage.removeItem(savedProjectKey)
+    setProject(null)
+    setResults([])
+    setDownloadRunId('')
+    setSourceText('')
+    setSelectedFile(0)
+  }
+
+  async function handleOpenSavedProject(projectId) {
+    if (!backendReady) return
+    setError('')
+    try {
+      const saved = await getProject(projectId)
+      openProject(saved)
+      const runs = await getRuns(projectId)
+      const convertRun = [...runs.runs].reverse().find((run) => run.kind === 'convert')
+      if (!convertRun) {
+        setStatus(`Opened "${saved.name}". Convert it to see the Python again.`)
+        return
+      }
+      const run = await getRun(projectId, convertRun.id)
+      setDownloadRunId(convertRun.id)
+      setResults(run.files || [])
+      setScreen('convert')
+      setStatus(`Opened "${saved.name}" with the saved Python.`)
+    } catch (cause) {
+      setError(cause.message)
+    }
+  }
+
+  async function handleRemoveSavedProject(projectId) {
+    if (!backendReady) return
+    setError('')
+    try {
+      await deleteProject(projectId)
+      closeProjectIfDeleted(projectId)
+      setSavedProjects((current) => current.filter((item) => item.id !== projectId))
+      setStatus('Removed the saved project.')
+    } catch (cause) {
+      setError(cause.message)
+    }
+  }
+
+  async function handleClearSavedProjects() {
+    if (!backendReady || savedProjects.length === 0) return
+    setError('')
+    const ids = savedProjects.map((item) => item.id)
+    try {
+      for (const projectId of ids) {
+        await deleteProject(projectId)
+      }
+      if (ids.includes(project?.id)) closeProjectIfDeleted(project.id)
+      setSavedProjects([])
+      setStatus('Cleared saved projects')
+    } catch (cause) {
+      setError(cause.message)
+      const data = await listProjects().catch(() => null)
+      if (data) setSavedProjects(data.projects || [])
+    }
   }
 
   async function handleCreateProject() {
@@ -689,6 +772,49 @@ export default function App() {
                   <p className="file-limit">
                     Projects: up to {maxProjectFiles} files via /api/projects, then /convert.
                   </p>
+                  <div className="saved-projects">
+                    <h2 className="history-title">Saved projects</h2>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={handleClearSavedProjects}
+                      disabled={!backendReady || isConverting || savedProjects.length === 0}
+                    >
+                      Clear saved projects
+                    </button>
+                    {savedProjects.length === 0 ? (
+                    <p className="file-limit">No saved projects yet.</p>
+                  ) : (
+                    <ul className="export-list">
+                      {savedProjects.map((item) => (
+                        <li key={item.id} className="export-row">
+                          <span>
+                            {item.name}
+                            <span className="run-time">{runTime(item.created_at)}</span>
+                          </span>
+                          <span className="actions">
+                            <button
+                            className="button secondary"
+                            type="button"
+                            onClick={() => handleOpenSavedProject(item.id)}
+                            disabled={isConverting}
+                          >
+                            Open
+                          </button>
+                          <button
+                            className="button secondary"
+                            type="button"
+                            onClick={() => handleRemoveSavedProject(item.id)}
+                            disabled={isConverting}
+                          >
+                            Remove
+                          </button>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  </div>
                 </>
               )}
 
