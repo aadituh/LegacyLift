@@ -124,6 +124,14 @@ export async function convertProject(projectId) {
   return data
 }
 
+export async function listProjects() {
+  return request('/api/projects', { method: 'GET' })
+}
+
+export async function deleteProject(projectId) {
+  return request(`/api/projects/${projectId}`, { method: 'DELETE'})
+} 
+
 export async function getProject(projectId) {
   return request(`/api/projects/${projectId}`, { method: 'GET' })
 }

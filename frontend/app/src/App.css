@@ -475,3 +475,22 @@
   color: #698071;
   font-size: 13px;
 }
+.export-row .run-time {
+  margin-left: 8px;
+}
+
+.export-row .run-time {
+  margin-left: 8px;
+}
+
+.saved-projects {
+  margin-top:22px;
+}
+
+.saved-projects .history-title {
+  margin-bottom: 10px;
+}
+
+.saved-projects .button {
+  margin-bottom: 12px;
+}
