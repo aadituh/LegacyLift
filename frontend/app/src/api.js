@@ -37,6 +37,7 @@ async function request(path, options = {}) {
     throw new Error('Cannot reach the LegacyLift backend. Check the API connection and try again.')
   }
 
+  if (response.status === 204) return null
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
     if (response.status === 413) {
@@ -134,12 +135,14 @@ export async function convertProject(projectId) {
   return data
 }
 
+/** GET /api/projects. Newest first, with file counts and the last run, without file contents. */
 export async function listProjects() {
   return request('/api/projects', { method: 'GET' })
 }
 
+/** DELETE /api/projects/{id}. Removes the project, its files, and its runs (204). */
 export async function deleteProject(projectId) {
-  return request(`/api/projects/${projectId}`, { method: 'DELETE'})
+  return request(`/api/projects/${projectId}`, { method: 'DELETE' })
 } 
 
 export async function getProject(projectId) {

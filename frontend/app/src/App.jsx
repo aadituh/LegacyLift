@@ -148,7 +148,9 @@ export default function App() {
   const sourceRead = useRef(0)
 
   const projectPrograms = useMemo(() => programFilesFromProject(project), [project])
-  const canConvert = backendReady && (files.length > 0 || projectPrograms.length > 0) && !isConverting
+  const batchReady = uploadMode === 'batch' && files.length > 0
+  const projectReady = uploadMode === 'project' && projectPrograms.length > 0
+  const canConvert = backendReady && (batchReady || projectReady) && !isConverting
 
   useEffect(() => {
     sessionStorage.setItem(savedScreenKey, screen)
@@ -351,8 +353,12 @@ export default function App() {
     setIsConverting(true)
     setError('')
     try {
-      // File-picker selections use the batch route. Open projects use their own route.
-      if (files.length > 0) {
+      // The Upload screen's Project / Batch files choice decides the route.
+      if (uploadMode === 'batch') {
+        if (files.length === 0) {
+          setError('Choose COBOL files or load a sample before converting.')
+          return
+        }
         const converted = await convertFiles(files)
         setResults(converted.files)
         setDownloadRunId('')
@@ -360,19 +366,25 @@ export default function App() {
         await rememberBatch(files, converted.files, converted.download_id)
         setStatus(`Converted ${converted.files.length} file(s) through /api/convert.`)
         if (selectedFile >= converted.files.length) setSelectedFile(0)
-      } else if (project && projectPrograms.length > 0) {
-        const conversion = await convertProject(project.id)
-        setResults(conversion.files)
-        setDownloadRunId(conversion.run_id)
-        setBatchDownloadId('')
-        setStatus(
-          `Converted project "${project.name}" (${conversion.files.length} program(s), status: ${conversion.status}).`
-        )
-        setSelectedFile(0)
-        setSourceText(projectPrograms[0].content || '')
-      } else {
-        setError('Choose COBOL files or upload programs to a project first.')
+        return
       }
+      if (!project || projectPrograms.length === 0) {
+        setError(
+          project
+            ? 'Upload a COBOL program before converting this project.'
+            : 'Create a project and upload a COBOL program before converting.',
+        )
+        return
+      }
+      const conversion = await convertProject(project.id)
+      setResults(conversion.files)
+      setDownloadRunId(conversion.run_id)
+      setBatchDownloadId('')
+      setStatus(
+        `Converted project "${project.name}" (${conversion.files.length} program(s), status: ${conversion.status}).`,
+      )
+      setSelectedFile(0)
+      setSourceText(projectPrograms[0].content || '')
     } catch (cause) {
       setResults([])
       setDownloadRunId('')
@@ -568,8 +580,10 @@ export default function App() {
     }
   }
 
-  const currentResult = results[selectedFile]
-  const sourceTabs = files.length
+  const showingBatch = uploadMode === 'batch'
+  const shownResults = showingBatch ? (batchDownloadId ? results : []) : downloadRunId ? results : []
+  const currentResult = shownResults[selectedFile]
+  const sourceTabs = showingBatch
     ? files.map((file, index) => ({
         key: `${file.name}-${index}`,
         label: file.name,
@@ -582,9 +596,11 @@ export default function App() {
       }))
 
 
-  const hasPrograms= files.length > 0 || projectPrograms.length > 0
-  const hasOnlyOtherFiles = Boolean(project?.files?.length) && projectPrograms.length === 0 && files.length === 0
-  const progressStep = results.length > 0 ? 2 : hasPrograms ? 1 : 0
+  const modeReady = showingBatch ? files.length > 0 : projectPrograms.length > 0
+  const modeConverted = shownResults.length > 0
+  const hasOnlyOtherFiles =
+    !showingBatch && Boolean(project?.files?.length) && projectPrograms.length === 0
+  const progressStep = modeConverted ? 2 : modeReady ? 1 : 0
   const ringRadius = 32
   const ringLength = 2 * Math.PI * ringRadius
   const progressNote = 
@@ -593,7 +609,7 @@ export default function App() {
         ? 'Upload a COBOL program before converting.'
         : 'Add files before converting.'
       : progressStep === 1
-        ? files.length > 0
+        ? showingBatch
           ? 'Convert these files before verification.'
           : 'Convert this project before verification.'
         : 'Converted. Verification is coming soon.'
@@ -638,7 +654,9 @@ export default function App() {
 
       <div className="shell-main">
         <header className="site-header">
-          <strong>{project ? project.name : files.length ? 'Batch conversion' : 'No project yet'}</strong>
+          <strong>
+            {showingBatch ? 'Batch conversion' : project ? project.name : 'No project yet'}
+          </strong>
           {backendChecked && (
             <span className={backendReady ? 'api-badge ok' : 'api-badge down'} role="status">
               {backendReady ? 'API connected' : 'API offline'}
@@ -878,11 +896,9 @@ export default function App() {
                 >
                   {isConverting
                     ? 'Converting...'
-                    : files.length
+                    : showingBatch
                       ? 'Convert files'
-                      : projectPrograms.length
-                        ? 'Convert project'
-                        : 'Convert'}
+                      : 'Convert project'}
                 </button>
               </div>
 
@@ -911,7 +927,9 @@ export default function App() {
                     <pre className="code">
                       {sourceTabs.length
                         ? sourceText
-                        : 'Choose files, load a sample, or upload programs to a project.'}
+                        : showingBatch
+                          ? 'Choose COBOL files or load a sample.'
+                          : 'Upload programs to a project.'}
                     </pre>
                   </section>
                 )}
@@ -955,12 +973,12 @@ export default function App() {
         {screen === 'export' && (
           <>
             <h2 className="history-title">Run history</h2>
-            {!project ? (
+            {showingBatch ? (
               <p className="file-limit">
-                {files.length
-                  ? 'Batch conversion is not saved, so there is no run history.'
-                  : 'Open a project to see its runs.'}
+                Batch conversion is not saved, so there is no run history.
               </p>
+            ) : !project ? (
+              <p className="file-limit">Open a project to see its runs.</p>
             ) : runs.length === 0 ? (
               <p className="file-limit">No runs yet. Convert the project to add one.</p>
             ) : (
@@ -976,11 +994,11 @@ export default function App() {
             )}
 
             <h2 className="history-title">Downloads</h2>
-            {results.length === 0 ? (
+            {shownResults.length === 0 ? (
               <p className="file-limit">Convert a program first. The Python files will show up here.</p>
             ) : (
               <ul className="export-list">
-                {results.map((result, index) => (
+                {shownResults.map((result, index) => (
                   <li
                     key={result.python_name}
                     className={index === selectedFile ? 'export-row selected' : 'export-row'}
