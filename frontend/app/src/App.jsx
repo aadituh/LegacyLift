@@ -15,6 +15,7 @@ import {
   listProjects,
 } from './api'
 import './App.css'
+import BackgroundFx from './BackgroundFx'
 
 const sampleCobol = `IDENTIFICATION DIVISION.
 PROGRAM-ID. HELLO-TEAM.
@@ -640,6 +641,7 @@ export default function App() {
 
   return (
     <div className="page app-shell">
+      <BackgroundFx />
       <aside className="side-nav">
         <div className="nav-brand">
           <span className="logo">L</span>

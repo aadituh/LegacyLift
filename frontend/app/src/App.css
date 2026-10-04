@@ -109,7 +109,7 @@
 }
 
 .primary {
-  color: #fff;
+  color: #000000;
   background: #2d6d43;
   cursor: pointer;
 }
@@ -169,8 +169,8 @@
 }
 
 .message.error {
-  border-color: #ebc8c0;
-  background: #fff0ec;
+  border-color: #000000;
+  background: #000000;
   color: #983c34;
 }
 
@@ -189,7 +189,7 @@
   overflow: hidden;
   border: 1px solid #dce6dc;
   border-radius: 12px;
-  background: #fff;
+  background: #3b3b3b;
 }
 
 .panel-heading {
@@ -223,7 +223,7 @@
   border: 0;
   border-radius: 6px;
   padding: 6px 9px;
-  background: #f2f6f1;
+  background: #6d6d6d;
   color: #46604c;
   font-size: 11px;
 }
@@ -244,7 +244,7 @@
   border: 0;
   border-radius: 6px;
   padding: 7px 9px;
-  background: #d7ebd9;
+  background: #000000;
   color: #1b4b2e;
   font-size: 11px;
   font-weight: 700;
@@ -261,7 +261,7 @@
   padding: 18px;
   overflow: auto;
   border-top: 1px solid #edf1ec;
-  background: #fbfcfa;
+  background: #a5a5a5;
   color: #263b2c;
   font: 12px/1.6 Consolas, 'Courier New', monospace;
 }
@@ -271,7 +271,7 @@
   padding: 15px 18px;
   border: 1px solid #eadbad;
   border-radius: 9px;
-  background: #fff9e9;
+  background: #000000;
 }
 
 .review-notes h2 {
@@ -319,8 +319,8 @@
 
 .side-nav {
   padding: 24px 16px;
-  background: #fff;
-  border-right: 1px solid #dce6dc;
+  background: #000000;
+  border-right: 1px solid #232623;
 }
 
 .nav-brand {
@@ -344,8 +344,8 @@
 }
 
 .nav-button.active {
-  background: #dff5c8;
-  color: #1f5b2c;
+  background: #000000;
+  color: #26362a;
 }
 
 .shell-main {
@@ -377,12 +377,12 @@
   padding: 12px 14px;
   border: 1px solid #dce6dc;
   border-radius: 8px;
-  background: #fff;
+  background: #000000;
 }
 
 .export-row.selected {
-  border-color: #8fbf96;
-  background: #f3faee;
+  border-color: #39463b;
+  background: #000000;
 }
 
 @media (max-width: 800px) {
@@ -500,7 +500,7 @@
   padding: 14px 16px;
   border: 1px solid #dce6dc;
   border-radius: 10px;
-  background: #fff;
+  background: #000000;
 }
 
 .conversion-progress-header {
@@ -534,4 +534,502 @@
   margin: 8px 0 0;
   color: #728174;
   font-size: 11px;
+}
+
+:root {
+  --tech-bg: #030807;
+  --tech-panel: rgba(5, 17, 13, 0.74);
+  --tech-line: rgba(15, 24, 20, 0.12);
+  --tech-line-bright: rgba(41, 54, 47, 0.24);
+  --tech-green: #070b09;
+  --tech-cyan: #2b3434;
+  --tech-text: #d8f3e5;
+  --mx: 0px;
+  --my: 0px;
+  --mx-soft: 0px;
+  --my-soft: 0px;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--tech-bg);
+}
+
+/* Put the animation behind every real application surface. */
+.page.app-shell {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: transparent !important;
+}
+
+.page.app-shell > .side-nav,
+.page.app-shell > .shell-main {
+  position: relative;
+  z-index: 2;
+}
+
+.page.app-shell > .side-nav {
+  z-index: 4;
+  background: rgba(3, 13, 10, 0.78);
+  border-right-color: rgba(0, 0, 0, 0.14);
+  box-shadow: 18px 0 45px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+
+.page.app-shell > .shell-main {
+  min-width: 0;
+  background: transparent;
+}
+
+.site-header {
+  position: relative;
+  z-index: 3;
+  background: rgba(3, 13, 10, 0.62) !important;
+  border-bottom-color: rgba(41, 69, 55, 0.14) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+/* Main animated field */
+.tech-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 48% 34%, rgba(36, 150, 102, 0.09), transparent 24%),
+    radial-gradient(circle at 88% 82%, rgba(47, 184, 177, 0.06), transparent 25%),
+    linear-gradient(145deg, #020605 0%, #05110c 52%, #020706 100%);
+}
+
+.tech-background__base,
+.tech-background__vignette,
+.tech-grid,
+.tech-scanline,
+.tech-horizon,
+.tech-network,
+.tech-particles,
+.tech-beam,
+.tech-corner,
+.tech-orbit,
+.tech-background__glow {
+  position: absolute;
+}
+
+.tech-background__base {
+  inset: -14%;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.018), rgba(0, 0, 0, 0.018)) 50% 50% / 100% 1px no-repeat,
+    linear-gradient(90deg, rgba(0, 0, 0, 0.015), rgba(0, 0, 0, 0.015)) 50% 50% / 1px 100% no-repeat;
+  transform: translate3d(var(--mx-soft), var(--my-soft), 0) scale(1.04);
+  transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tech-background__glow {
+  width: 55vw;
+  height: 55vw;
+  max-width: 850px;
+  max-height: 850px;
+  border-radius: 50%;
+  filter: blur(10px);
+  opacity: 0.6;
+  mix-blend-mode: screen;
+  will-change: transform;
+}
+
+.glow-one {
+  top: -24%;
+  left: 20%;
+  background: radial-gradient(circle, rgba(20, 43, 33, 0.14), transparent 68%);
+  transform: translate3d(var(--mx-soft), var(--my-soft), 0);
+}
+
+.glow-two {
+  right: -22%;
+  bottom: -30%;
+  background: radial-gradient(circle, rgba(51, 192, 198, 0.10), transparent 68%);
+  animation: glow-drift-two 15s ease-in-out infinite alternate;
+}
+
+.glow-three {
+  left: -28%;
+  bottom: 4%;
+  background: radial-gradient(circle, rgba(61, 157, 111, 0.08), transparent 66%);
+  animation: glow-drift-three 19s ease-in-out infinite alternate;
+}
+
+.tech-grid {
+  inset: -18%;
+  background-position: center;
+  transform-origin: 50% 45%;
+}
+
+.tech-grid--fine {
+  opacity: 0.34;
+  background-image:
+    linear-gradient(to right, rgba(15, 25, 20, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(43, 67, 55, 0.07) 1px, transparent 1px);
+  background-size: 34px 34px;
+  transform: perspective(900px) rotateX(64deg) translateY(12%) translate3d(var(--mx-soft), var(--my-soft), 0) scale(1.42);
+  animation: grid-float 16s ease-in-out infinite alternate;
+}
+
+.tech-grid--major {
+  opacity: 0.46;
+  background-image:
+    linear-gradient(to right, rgba(52, 100, 79, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 80, 60, 0.1) 1px, transparent 1px);
+  background-size: 140px 140px;
+  transform: perspective(1100px) rotateX(64deg) translateY(13%) translate3d(var(--mx), var(--my), 0) scale(1.28);
+  animation: grid-pulse 8s ease-in-out infinite alternate;
+}
+
+.tech-horizon {
+  left: -8%;
+  right: -8%;
+  top: 50%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(28, 59, 45, 0.24), rgba(30, 47, 47, 0.18), transparent);
+  box-shadow: 0 0 25px rgba(31, 55, 45, 0.16);
+  transform: translate3d(var(--mx-soft), var(--my-soft), 0);
+  opacity: 0.5;
+}
+
+.tech-scanline {
+  top: -20%;
+  left: 0;
+  right: 0;
+  height: 28%;
+  background: linear-gradient(to bottom, transparent, rgba(72, 224, 158, 0.045), transparent);
+  filter: blur(1px);
+  animation: scan 9s linear infinite;
+}
+
+.tech-orbit {
+  border: 1px solid rgba(25, 50, 39, 0.11);
+  border-radius: 50%;
+  transform: translate3d(var(--mx-soft), var(--my-soft), 0) rotate(-10deg);
+  box-shadow: inset 0 0 60px rgba(50, 180, 130, 0.025), 0 0 40px rgba(42, 185, 135, 0.02);
+}
+
+.tech-orbit::before,
+.tech-orbit::after,
+.tech-orbit span::before,
+.tech-orbit span::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+}
+
+.tech-orbit::before {
+  inset: 8%;
+  border: 1px dashed rgba(87, 213, 161, 0.08);
+}
+
+.tech-orbit::after {
+  top: 50%;
+  left: -7px;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  background: rgba(12, 21, 17, 0.82);
+  box-shadow: 0 0 18px rgba(35, 49, 43, 0.7);
+  animation: orbit-dot 6s linear infinite;
+}
+
+.orbit-one {
+  width: min(50vw, 720px);
+  height: min(18vw, 260px);
+  right: 8%;
+  top: 10%;
+  animation: orbit-breathe 12s ease-in-out infinite alternate;
+}
+
+.orbit-two {
+  width: min(42vw, 610px);
+  height: min(16vw, 230px);
+  left: 3%;
+  bottom: 6%;
+  transform: translate3d(var(--mx-soft), var(--my-soft), 0) rotate(8deg);
+  animation: orbit-breathe-two 17s ease-in-out infinite alternate;
+}
+
+.orbit-three {
+  width: min(34vw, 500px);
+  height: min(12vw, 170px);
+  left: 33%;
+  top: 38%;
+  transform: translate3d(var(--mx-soft), var(--my-soft), 0) rotate(-28deg);
+  opacity: 0.55;
+  animation: orbit-spin 22s linear infinite;
+}
+
+.orbit-two::after {
+  animation-duration: 8s;
+  animation-direction: reverse;
+}
+
+.orbit-three::after {
+  animation-duration: 5s;
+}
+
+.tech-particles,
+.tech-network {
+  inset: 0;
+  transform: translate3d(var(--mx), var(--my), 0);
+  transition: transform 800ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tech-particle {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: rgba(40, 57, 48, 0.88);
+  box-shadow: 0 0 8px rgba(37, 52, 45, 0.55), 0 0 18px rgba(69, 220, 147, 0.22);
+  animation: particle-float var(--particle-duration, 12s) ease-in-out infinite;
+  opacity: 0.2;
+}
+
+.tech-node {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: rgba(40, 57, 50, 0.78);
+  box-shadow: 0 0 8px rgba(25, 36, 32, 0.72), 0 0 26px rgba(70, 203, 164, 0.16);
+  animation: node-pulse 4.5s ease-in-out infinite;
+}
+
+.tech-beam {
+  left: -15%;
+  width: 130%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(69, 220, 147, 0) 28%, rgba(26, 45, 36, 0.26) 50%, rgba(68, 216, 220, 0) 72%, transparent 100%);
+  filter: blur(0.4px);
+  opacity: 0.5;
+}
+
+.beam-one {
+  top: 23%;
+  transform: rotate(-8deg) translate3d(var(--mx-soft), var(--my-soft), 0);
+  animation: beam-sweep 13s ease-in-out infinite;
+}
+
+.beam-two {
+  top: 67%;
+  transform: rotate(6deg) translate3d(var(--mx-soft), var(--my-soft), 0);
+  animation: beam-sweep-two 17s ease-in-out infinite;
+}
+
+.beam-three {
+  top: 42%;
+  transform: rotate(-2deg) translate3d(var(--mx-soft), var(--my-soft), 0);
+  opacity: 0.25;
+  animation: beam-sweep-three 21s ease-in-out infinite;
+}
+
+.tech-corner {
+  width: 120px;
+  height: 120px;
+  opacity: 0.18;
+}
+
+.tech-corner::before,
+.tech-corner::after {
+  content: '';
+  position: absolute;
+  background: rgba(41, 62, 53, 0.42);
+}
+
+.corner-top-left {
+  top: 20px;
+  left: 20px;
+  border-top: 1px solid rgba(34, 52, 44, 0.28);
+  border-left: 1px solid rgba(28, 40, 34, 0.28);
+}
+
+.corner-top-right {
+  top: 20px;
+  right: 20px;
+  border-top: 1px solid rgba(39, 58, 50, 0.28);
+  border-right: 1px solid rgba(27, 41, 35, 0.28);
+}
+
+.corner-bottom-left {
+  bottom: 20px;
+  left: 20px;
+  border-bottom: 1px solid rgba(30, 43, 37, 0.28);
+  border-left: 1px solid rgba(36, 51, 44, 0.28);
+}
+
+.corner-bottom-right {
+  bottom: 20px;
+  right: 20px;
+  border-bottom: 1px solid rgba(33, 45, 40, 0.28);
+  border-right: 1px solid rgba(32, 53, 43, 0.28);
+}
+
+.tech-background__vignette {
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 45%, transparent 30%, rgba(0, 0, 0, 0.10) 72%, rgba(0, 0, 0, 0.42) 100%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.20), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.24));
+}
+
+/* Glass treatment for the content so the background remains visible. */
+.progress-status,
+.message,
+.panel,
+.review-notes,
+.saved-projects,
+.export-list,
+.workspace > .actions,
+.workspace > .project-card,
+.workspace > section:not(.panel) {
+  position: relative;
+  z-index: 2;
+}
+
+@media (min-width: 801px) {
+  .progress-status,
+  .message,
+  .review-notes,
+  .saved-projects,
+  .export-list,
+  .workspace > .actions,
+  .workspace > .project-card {
+    backdrop-filter: blur(11px) saturate(120%);
+    -webkit-backdrop-filter: blur(11px) saturate(120%);
+  }
+}
+
+/* Keep text/code surfaces readable while preserving the new atmosphere. */
+.panel,
+.review-notes,
+.saved-projects,
+.progress-status,
+.message,
+.export-list {
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(105, 225, 169, 0.03);
+}
+
+@keyframes grid-float {
+  from { background-position: 0 0; }
+  to { background-position: 46px 30px; }
+}
+
+@keyframes grid-pulse {
+  from { opacity: 0.26; }
+  to { opacity: 0.52; }
+}
+
+@keyframes scan {
+  0% { transform: translateY(-18vh); opacity: 0; }
+  18% { opacity: 0.75; }
+  84% { opacity: 0.5; }
+  100% { transform: translateY(118vh); opacity: 0; }
+}
+
+@keyframes glow-drift-two {
+  from { transform: translate3d(-30px, 18px, 0) scale(0.96); }
+  to { transform: translate3d(60px, -34px, 0) scale(1.08); }
+}
+
+@keyframes glow-drift-three {
+  from { transform: translate3d(30px, 12px, 0) scale(1); }
+  to { transform: translate3d(-50px, -35px, 0) scale(1.12); }
+}
+
+@keyframes orbit-breathe {
+  from { transform: translate3d(var(--mx-soft), var(--my-soft), 0) rotate(-10deg) scale(0.98); }
+  to { transform: translate3d(var(--mx-soft), var(--my-soft), 0) rotate(-5deg) scale(1.03); }
+}
+
+@keyframes orbit-breathe-two {
+  from { transform: translate3d(var(--mx-soft), var(--my-soft), 0) rotate(8deg) scale(1); }
+  to { transform: translate3d(var(--mx-soft), var(--my-soft), 0) rotate(13deg) scale(0.96); }
+}
+
+@keyframes orbit-spin {
+  from { transform: translate3d(var(--mx-soft), var(--my-soft), 0) rotate(-28deg); }
+  to { transform: translate3d(var(--mx-soft), var(--my-soft), 0) rotate(332deg); }
+}
+
+@keyframes orbit-dot {
+  0% { transform: rotate(0deg) translateX(0); }
+  25% { transform: rotate(90deg) translateX(260px); }
+  50% { transform: rotate(180deg) translateX(0); }
+  75% { transform: rotate(270deg) translateX(-260px); }
+  100% { transform: rotate(360deg) translateX(0); }
+}
+
+@keyframes particle-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(0.7); opacity: 0.06; }
+  18% { opacity: 0.34; }
+  50% { transform: translate3d(var(--particle-drift), -18px, 0) scale(1); opacity: 0.2; }
+  82% { opacity: 0.28; }
+}
+
+@keyframes node-pulse {
+  0%, 100% { opacity: 0.12; transform: scale(0.8); }
+  50% { opacity: 0.66; transform: scale(1.9); }
+}
+
+@keyframes beam-sweep {
+  0%, 100% { opacity: 0.08; transform: rotate(-8deg) translateX(-8%); }
+  50% { opacity: 0.48; transform: rotate(-8deg) translateX(7%); }
+}
+
+@keyframes beam-sweep-two {
+  0%, 100% { opacity: 0.06; transform: rotate(6deg) translateX(8%); }
+  50% { opacity: 0.34; transform: rotate(6deg) translateX(-7%); }
+}
+
+@keyframes beam-sweep-three {
+  0%, 100% { opacity: 0.06; }
+  50% { opacity: 0.2; }
+}
+
+/* Users who request reduced motion should get the same visual depth without movement. */
+@media (prefers-reduced-motion: reduce) {
+  .tech-background *,
+  .tech-background,
+  .tech-grid,
+  .tech-particles,
+  .tech-network {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (max-width: 800px) {
+  .tech-grid--fine {
+    background-size: 26px 26px;
+  }
+
+  .tech-grid--major {
+    background-size: 100px 100px;
+  }
+
+  .tech-orbit {
+    opacity: 0.6;
+  }
+
+  .tech-corner {
+    display: none;
+  }
 }
