@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   apiConfigured,
   checkBackend,
@@ -6,7 +6,11 @@ import {
   convertProject,
   createDemoProject,
   createProject,
+  downloadPythonFile,
   uploadProjectFiles,
+  getProject,
+  getRun,
+  getRuns,
 } from './api'
 import './App.css'
 
@@ -22,27 +26,138 @@ ADD 1 TO WS-COUNT.
 DISPLAY "Demo count: " WS-COUNT.
 STOP RUN.`
 
+/** Read a file as UTF-8. Browsers' file.text() replaces bad bytes instead of failing. */
+async function utf8Text(file) {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+  } catch {
+    throw new Error(`${file.name} must be UTF-8 text.`)
+  }
+}
+
 function programFilesFromProject(project) {
   if (!project?.files?.length) return []
   return project.files.filter((file) => file.kind === 'program')
 }
 
+const maxProjectFiles = 10
+const savedProjectKey = 'legacylift-project-id'
+const savedBatchKey = 'legacylift-batch'
+const savedScreenKey = 'legacylift-screen'
+const savedUploadModeKey = 'legacylift-upload-mode'
+const savedViewKey = 'legacylift-view'
+
+function clearSavedBatch() {
+  sessionStorage.removeItem(savedBatchKey)
+}
+
+async function rememberBatch(fileList, converted, downloadId) {
+  const sources = []
+  for (const file of fileList) {
+    sources.push({ name: file.name, text: await file.text() })
+  }
+  sessionStorage.setItem(
+    savedBatchKey,
+    JSON.stringify({ sources, results: converted, downloadId: downloadId || '' }),
+  )
+}
+
+function readSavedBatch() {
+  if (sessionStorage.getItem(savedProjectKey)) return null
+  const raw = sessionStorage.getItem(savedBatchKey)
+  if (!raw) return null
+  try {
+    const saved = JSON.parse(raw)
+    const sources = saved.sources || []
+    if (!sources.length) return null
+    const results = saved.results || []
+    return {
+      files: sources.map((source) => new File([source.text], source.name, { type: 'text/plain' })),
+      results,
+      downloadId: saved.downloadId || '',
+      sourceText: sources[0]?.text || '',
+      status: results.length
+        ? 'Opened the batch conversion from this tab.'
+        : 'Opened the batch files from this tab. Click Convert files.',
+    }
+  } catch {
+    clearSavedBatch()
+    return null
+  }
+}
+
+function runLabel(kind) {
+  if (kind === 'convert') return 'Convert'
+  if (kind === 'analyze') return 'Analyze'
+  if (kind === 'verify') return 'Verify'
+  return kind
+}
+
+function runStatusLabel(status) {
+  if (status === 'draft') return 'Draft'
+  if (status === 'review_required') return 'Review required'
+  if (status === 'inventory_only') return 'File count only'
+  if (status === 'not_verified') return 'Not compared'
+    return status
+}
+
+function runTime(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString()
+}
+
 export default function App() {
-  const [files, setFiles] = useState([])
-  const [sourceText, setSourceText] = useState('')
+  const [savedBatch] = useState(readSavedBatch)
+  const [files, setFiles] = useState(() => savedBatch?.files ?? [])
+  const [sourceText, setSourceText] = useState(() => savedBatch?.sourceText ?? '')
   const [selectedFile, setSelectedFile] = useState(0)
-  const [results, setResults] = useState([])
+  const [results, setResults] = useState(() => savedBatch?.results ?? [])
   const [error, setError] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(() => savedBatch?.status ?? '')
   const [isConverting, setIsConverting] = useState(false)
-  const [viewMode, setViewMode] = useState('split')
+ 
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = sessionStorage.getItem(savedViewKey)
+    if (saved === 'split' || saved === 'cobol' || saved === 'python') return saved
+    return 'split'
+  })
+  
+  const [screen, setScreen] = useState(() => {
+    const saved = sessionStorage.getItem(savedScreenKey)
+    if (saved === 'upload' || saved === 'convert' || saved === 'export') return saved
+    return 'upload'
+  })
+
+  const [uploadMode, setUploadMode] = useState(() => {
+    const saved = sessionStorage.getItem(savedUploadModeKey)
+    if (saved === 'project' || saved === 'batch') return saved
+    return 'project'
+  })
+
   const [projectName, setProjectName] = useState('')
   const [project, setProject] = useState(null)
   const [backendReady, setBackendReady] = useState(false)
   const [backendChecked, setBackendChecked] = useState(false)
+  const [runs, setRuns] = useState([])
+  const [downloadRunId, setDownloadRunId] = useState('')
+  const [batchDownloadId, setBatchDownloadId] = useState(() => savedBatch?.downloadId ?? '')
+  const sourceRead = useRef(0)
 
   const projectPrograms = useMemo(() => programFilesFromProject(project), [project])
   const canConvert = backendReady && (files.length > 0 || projectPrograms.length > 0) && !isConverting
+
+  useEffect(() => {
+    sessionStorage.setItem(savedScreenKey, screen)
+  }, [screen])
+
+  useEffect(() => {
+    sessionStorage.setItem(savedUploadModeKey, uploadMode)
+  }, [uploadMode])
+
+  useEffect(() => {
+    sessionStorage.setItem(savedViewKey, viewMode)
+  }, [viewMode]) 
 
   useEffect(() => {
     let cancelled = false
@@ -60,7 +175,7 @@ export default function App() {
         setBackendChecked(true)
         if (!ok) {
           setStatus('Backend is not reachable. Check the API connection, then refresh this page.')
-        } else {
+        } else if (!savedBatch) {
           setStatus('Connected to LegacyLift API. Choose COBOL files or a project, then Convert.')
         }
       }
@@ -69,18 +184,73 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [savedBatch])
+
+  useEffect(() => {
+    const id = sessionStorage.getItem(savedProjectKey)
+    
+    if(!backendReady || !id) return
+    let cancelled = false
+    async function restore() {
+      try {
+        const saved = await getProject(id)
+        if (cancelled) return
+        openProject(saved)
+        const runs = await getRuns(id)
+        const convertRun = [...runs.runs].reverse().find((run) => run.kind === 'convert')
+        if (!convertRun) {
+          setStatus(`Opened "${saved.name}". Convert it to see the Python again.`)
+          return
+        }
+        const run = await getRun(id, convertRun.id)
+        if (cancelled) return
+        setDownloadRunId(convertRun.id)
+        setBatchDownloadId('')
+        setResults(run.files || [])
+        setStatus(`Opened "${saved.name}" with the saved Python. `)
+      } catch (cause) {
+        sessionStorage.removeItem(savedProjectKey)
+        if (!cancelled) setError(cause.message)
+      }
+    }
+    restore()
+    return () => {
+      cancelled = true
+    }
+  }, [backendReady])
+
+  useEffect(() => {
+    if (screen !== 'export' || !project?.id || !backendReady) return
+    let cancelled = false
+    async function  loadRuns() {
+      try {
+        const data = await getRuns(project.id)
+        if (!cancelled) setRuns(data.runs || [])
+      } catch (cause) {
+        if (!cancelled) setError(cause.message)
+      }
+    }
+    loadRuns()
+    return () => {
+      cancelled = true
+    }
+  }, [screen, project, backendReady])
 
   async function showFile(file, index) {
+    const readId = ++sourceRead.current
     setSelectedFile(index)
     try {
-      setSourceText(await file.text())
+      const text = await utf8Text(file)
+      if (readId !== sourceRead.current) return
+      setSourceText(text)
     } catch {
+      if (readId !== sourceRead.current) return
       setSourceText('Could not read this file.')
     }
   }
 
   function showProjectProgram(program, index) {
+    sourceRead.current += 1
     setSelectedFile(index)
     setSourceText(program.content || '')
   }
@@ -93,36 +263,63 @@ export default function App() {
     setError(message)
   }
 
-  function chooseFiles(event) {
+  async function chooseFiles(event) {
     const chosen = Array.from(event.target.files || [])
     event.target.value = ''
     if (!chosen.length) return
-
-    if (chosen.length > 5 || chosen.some((file) => file.size > 100_000)) {
-      rejectFiles('Choose up to 5 files, each up to 100 KB.')
+    if (chosen.length > 5) {
+      rejectFiles('Choose up to 5 files.')
       return
     }
-    if (chosen.some((file) => !/\.(cbl|cob)$/i.test(file.name))) {
-      rejectFiles('Choose only .cbl or .cob files.')
+    const tooBig = chosen.filter((file) => file.size > 100_000)
+    if (tooBig.length) {
+      const names = tooBig.map((file) => file.name).join(', ')
+      rejectFiles(`${names} must be 100 KB or less.`)
+      return
+    }
+    const wrongType = chosen.filter((file) => !/\.(cbl|cob)$/i.test(file.name))
+    if (wrongType.length) {
+      const names = wrongType.map((file) => file.name).join(', ')
+      rejectFiles(`${names} must be a .cbl or .cob file.`)
+      return
+    }
+    try {
+      for (const file of chosen) await utf8Text(file)
+    } catch (cause) {
+      rejectFiles(cause.message)
       return
     }
 
     setFiles(chosen)
     setProject(null)
+    setDownloadRunId('')
+    setBatchDownloadId('')
+    sessionStorage.removeItem(savedProjectKey)
+    clearSavedBatch()
     setResults([])
     setError('')
     setStatus(`${chosen.length} file(s) ready for batch conversion via /api/convert.`)
     showFile(chosen[0], 0)
+    await rememberBatch(chosen, [], '')
   }
 
-  function loadSample() {
+  async function loadSample() {
     const sample = new File([sampleCobol], 'hello_team.cbl', { type: 'text/plain' })
     setFiles([sample])
     setProject(null)
+    setDownloadRunId('')
+    setBatchDownloadId('')
+    sessionStorage.removeItem(savedProjectKey)
+    clearSavedBatch()
     setResults([])
     setError('')
-    setStatus('Sample loaded. Click Convert files to run the Python backend.')
+    setStatus(
+      backendReady
+        ? 'Sample loaded. Click Convert files to run the Python backend.'
+        : 'Sample loaded. Convert files not ready until the API is online.'
+    )
     showFile(sample, 0)
+    await rememberBatch([sample], [], '')
   }
 
   async function handleConvert() {
@@ -137,12 +334,17 @@ export default function App() {
       // File-picker selections use the batch route. Open projects use their own route.
       if (files.length > 0) {
         const converted = await convertFiles(files)
-        setResults(converted)
-        setStatus(`Converted ${converted.length} file(s) through /api/convert.`)
-        if (selectedFile >= converted.length) setSelectedFile(0)
+        setResults(converted.files)
+        setDownloadRunId('')
+        setBatchDownloadId(converted.download_id)
+        await rememberBatch(files, converted.files, converted.download_id)
+        setStatus(`Converted ${converted.files.length} file(s) through /api/convert.`)
+        if (selectedFile >= converted.files.length) setSelectedFile(0)
       } else if (project && projectPrograms.length > 0) {
         const conversion = await convertProject(project.id)
         setResults(conversion.files)
+        setDownloadRunId(conversion.run_id)
+        setBatchDownloadId('')
         setStatus(
           `Converted project "${project.name}" (${conversion.files.length} program(s), status: ${conversion.status}).`
         )
@@ -153,6 +355,10 @@ export default function App() {
       }
     } catch (cause) {
       setResults([])
+      setDownloadRunId('')
+      setBatchDownloadId('')
+      setError(cause.message)
+      if (files.length > 0) await rememberBatch(files, [], '')
       setError(cause.message)
     } finally {
       setIsConverting(false)
@@ -160,8 +366,12 @@ export default function App() {
   }
 
   function openProject(nextProject) {
+    sessionStorage.setItem(savedProjectKey, nextProject.id)
+    clearSavedBatch()
     setProject(nextProject)
     setProjectName(nextProject.name)
+    setDownloadRunId('')
+    setBatchDownloadId('')
     setFiles([])
     setResults([])
     setSelectedFile(0)
@@ -212,6 +422,28 @@ export default function App() {
       setError('Backend is offline. Check the API connection, then try again.')
       return
     }
+    const fileCount = project.files.length + chosen.length
+    if (fileCount > maxProjectFiles) {
+      const room = maxProjectFiles - project.files.length
+      const roomText =
+        room > 0
+          ? `This project already has ${project.files.length}, so ${room} more can be added.`
+          : `This project already has ${project.files.length}.`
+      setError(`A project can take up to ${maxProjectFiles} files. ${roomText}`)
+      return
+    } 
+    const tooBig = chosen.filter((file) => file.size > 100_000)
+    if (tooBig.length) {
+      const names = tooBig.map((file) => file.name).join(', ')
+      setError(`${names} must be 100 KB or less.`)
+      return
+    }
+    try {
+      for (const file of chosen) await utf8Text(file)
+    } catch (cause) {
+      setError(cause.message)
+      return
+    }
     setError('')
     try {
       const uploaded = await uploadProjectFiles(project.id, chosen)
@@ -235,14 +467,22 @@ export default function App() {
     }
   }
 
-  function downloadPython(result) {
-    const file = new Blob([result.python], { type: 'text/x-python;charset=utf-8' })
-    const url = URL.createObjectURL(file)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = result.python_name
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  async function downloadPython(result) {
+    const path = downloadRunId && project
+      ? `/api/projects/${encodeURIComponent(project.id)}/runs/${encodeURIComponent(downloadRunId)}/files/${encodeURIComponent(result.python_name)}`
+      : batchDownloadId
+        ? `/api/convert/${encodeURIComponent(batchDownloadId)}/files/${encodeURIComponent(result.python_name)}`
+        : ''
+    if (!path) {
+      setError('Convert the files again before downloading. This copy is not on the API.')
+      return
+    }
+    setError('')
+    try {
+      await downloadPythonFile(path, result.python_name)
+    } catch (cause) {
+      setError(cause.message)
+    }
   }
 
   const currentResult = results[selectedFile]
@@ -258,171 +498,268 @@ export default function App() {
         onSelect: () => showProjectProgram(program, index),
       }))
 
+
+  const hasPrograms= files.length > 0 || projectPrograms.length > 0
+  const hasOnlyOtherFiles = Boolean(project?.files?.length) && projectPrograms.length === 0 && files.length === 0
+  const progressStep = results.length > 0 ? 2 : hasPrograms ? 1 : 0
+  const ringRadius = 32
+  const ringLength = 2 * Math.PI * ringRadius
+  const progressNote = 
+    progressStep === 0
+      ? hasOnlyOtherFiles
+        ? 'Upload a COBOL program before converting.'
+        : 'Add files before converting.'
+      : progressStep === 1
+        ? files.length > 0
+          ? 'Convert these files before verification.'
+          : 'Convert this project before verification.'
+        : 'Converted. Verification is coming soon.'
+  const progressSteps = [
+    { name: 'Upload', state: progressStep > 0 ? 'done' : 'current' },
+    {
+      name: 'Convert',
+      state: progressStep > 1 ? 'done' : progressStep === 1 ? 'current' : 'waiting',
+    },
+    { name: 'Verify', state: progressStep > 1 ? 'soon' : 'locked' },
+  ]
+
   return (
-    <div className="page">
-      <header className="site-header">
-        <span className="logo">L</span>
-        <div>
+    <div className="page app-shell">
+      <aside className="side-nav">
+        <div className="nav-brand">
+          <span className="logo">L</span>
           <strong>LegacyLift</strong>
-          <span>COBOL to Python demo</span>
         </div>
-        {backendChecked && (
-          <span className={backendReady ? 'api-badge ok' : 'api-badge down'} role="status">
-            {backendReady ? 'API connected' : 'API offline'}
-          </span>
-        )}
-      </header>
+        <button
+          className={screen === 'upload' ? 'nav-button active' : "nav-button"}
+          type="button"
+          onClick={() => setScreen('upload')}
+        >
+          Upload
+        </button>
+        <button
+          className={screen === 'convert' ? 'nav-button active' : 'nav-button'}
+          type="button"
+          onClick={() => setScreen('convert')}
+        >
+          Convert
+        </button>
+        <button
+          className={screen === 'export' ? 'nav-button active' : 'nav-button'}
+          type="button"
+          onClick={() => setScreen('export')}
+        >
+          Export
+        </button>
+      </aside>
 
-      <main className="workspace">
-        <div className="intro">
-          <p className="eyebrow">BACKEND-LINKED DEMO</p>
-          <h1>Turn COBOL files into Python drafts.</h1>
-          <p>
-            Try the larger demo project, choose COBOL files for a quick conversion, or create your
-            own project and upload files.
-          </p>
-        </div>
+      <div className="shell-main">
+        <header className="site-header">
+          <strong>{project ? project.name : files.length ? 'Batch conversion' : 'No project yet'}</strong>
+          {backendChecked && (
+            <span className={backendReady ? 'api-badge ok' : 'api-badge down'} role="status">
+              {backendReady ? 'API connected' : 'API offline'}
+            </span>
+          )}
+        </header>
 
-        {!apiConfigured && (
-          <p className="message" role="status">
-            The frontend is ready. Set VITE_API_URL to your backend origin to enable conversion on
-            this host.
-          </p>
-        )}
-        {status && !error && (
-          <p className="message" role="status">
-            {status}
-          </p>
-        )}
-        {error && (
-          <p className="message error" role="alert">
-            {error}
-          </p>
-        )}
-
-        <div className="actions project-row">
-          <input
-            value={projectName}
-            onChange={(event) => setProjectName(event.target.value)}
-            placeholder="Project name"
-          />
-          <button
-            className="button dark"
-            type="button"
-            onClick={handleCreateProject}
-            disabled={!backendReady || isConverting}
-          >
-            Create project
-          </button>
-          <button
-            className="button secondary"
-            type="button"
-            onClick={handleLoadDemoProject}
-            disabled={!backendReady || isConverting}
-          >
-            Load demo project
-          </button>
-        </div>
-
-        {project && (
-          <div className="project-row">
-            <p className="file-limit">
-              Project: {project.name} ({projectPrograms.length} program
-              {projectPrograms.length === 1 ? '' : 's'}
-              {project.files.length !== projectPrograms.length
-                ? `, ${project.files.length - projectPrograms.length} other`
-                : ''}
-              )
-            </p>
-            <label className="button secondary" htmlFor="project-files">
-              Upload project files
-              <input
-                id="project-files"
-                className="file-input"
-                type="file"
-                accept=".cbl,.cob,.cpy,.dat"
-                multiple
-                onChange={handleUpload}
-              />
-            </label>
-            <ul>
-              {project.files.map((file) => (
-                <li key={file.id}>
-                  {file.name} <span className="file-kind">({file.kind})</span>
-                </li>
-              ))}
-            </ul>
+        <section className="progress-status" aria-label={`Progress ${progressStep} of 3. ${progressNote}`}>
+          <div className="status-ring-wrap">
+            <svg className="status-ring" viewBox="0 0 88 88" aria-hidden="true">
+              <circle className="status-ring-track" cx="44" cy="44" r={ringRadius} />
+              {progressStep > 0 && (
+                <circle
+                  className="status-ring-value"
+                  cx="44"
+                  cy="44"
+                  r={ringRadius}
+                  strokeDasharray={`${(progressStep / 3) * ringLength} ${ringLength}`}
+                />
+              )}
+            </svg>
+            <span className="status-ring-count">{progressStep}/3</span>
           </div>
-        )}
+          <div className="progress-steps">
+            {progressSteps.map((step) => (
+              <p key={step.name} className={`progress-step ${step.state}`}>
+                {step.state === 'done' ? '✓ ' : ''}
+                {step.name}
+                {step.state === 'locked' ? ' Locked' : ''}
+                {step.state === 'soon' ? ' — coming soon' : ''}
+              </p>
+            ))}
+            <p className="progress-note">{progressNote}</p>
+          </div>
+        </section>
 
-        <div className="actions">
-          <label className="button primary" htmlFor="cobol-files">
-            Choose COBOL files
-            <input
-              id="cobol-files"
-              className="file-input"
-              type="file"
-              accept=".cbl,.cob"
-              multiple
-              disabled={isConverting}
-              onChange={chooseFiles}
-            />
-          </label>
-          <button className="button secondary" type="button" onClick={loadSample} disabled={isConverting}>
-            Load small sample
-          </button>
-          <button
-            className="button dark"
-            type="button"
-            onClick={handleConvert}
-            disabled={!canConvert}
-          >
-            {isConverting
-              ? 'Converting…'
-              : files.length
-                ? 'Convert files'
-                : projectPrograms.length
-                  ? 'Convert project'
-                  : 'Convert'}
-          </button>
-        </div>
+        <main className="workspace">
+          {!apiConfigured && (
+            <p className="message" role="status">
+              The frontend is ready. Set VITE_API_URL to your backend origin to enable conversion on
+              this host.
+            </p>
+          )}
+          {status && !error && (
+            <p className="message" role="status">
+              {status}
+            </p>
+          )}
+          {error && (
+            <p className="message error" role="alert">
+              {error}
+            </p>
+          )}
 
-        <p className="file-limit">
-          Batch: up to 5 UTF-8 .cbl/.cob files (100 KB each) via /api/convert. Projects: up to 10
-          files via /api/projects, then /convert.
-        </p>
-
-        <div>
-          <button
-            className={viewMode === 'split' ? 'button dark' : 'button secondary'}
-            type="button"
-            onClick={() => setViewMode('split')}
-          >
-            Both
-          </button>
-          <button
-            className={viewMode === 'cobol' ? 'button dark' : 'button secondary'}
-            type="button"
-            onClick={() => setViewMode('cobol')}
-          >
-            COBOL only
-          </button>
-          <button
-            className={viewMode === 'python' ? 'button dark' : 'button secondary'}
-            type="button"
-            onClick={() => setViewMode('python')}
-          >
-            Python only
-          </button>
-        </div>
-
-        <div className={viewMode === 'split' ? 'panels' : 'panels single'}>
-          {(viewMode === 'split' || viewMode === 'cobol') && (
-            <section className="panel" aria-labelledby="source-title">
-              <div className="panel-heading">
-                <span>INPUT</span>
-                <h2 id="source-title">COBOL files</h2>
+          {screen === 'upload' && (
+            <>
+              <div className="actions project-row">
+                <button
+                  className={uploadMode === 'project' ? 'button dark' : 'button secondary'}
+                  type="button"
+                  onClick={() => setUploadMode('project')}
+                >
+                  Project
+                </button>
+                <button
+                  className={uploadMode === 'batch' ? 'button dark' : 'button secondary'}
+                  type="button"
+                  onClick={() => setUploadMode('batch')}
+                >
+                  Batch files
+                </button>
               </div>
+
+              {uploadMode === 'project' && (
+                <>
+                  <div className="actions project-row">
+                    <input
+                      value={projectName}
+                      onChange={(event) => setProjectName(event.target.value)}
+                      placeholder="Project name"
+                    />
+                    <button
+                      className="button primary"
+                      type="button"
+                      onClick={handleCreateProject}
+                      disabled={!backendReady || isConverting}
+                    >
+                      Create project
+                    </button>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={handleLoadDemoProject}
+                      disabled={!backendReady || isConverting}
+                    >
+                      Load demo project
+                    </button>
+                  </div>
+
+                  {project && (
+                    <div className="project-row">
+                      <p className="file-limit">
+                        Project: {project.name} ({projectPrograms.length} program
+                        {projectPrograms.length === 1 ? '' : 's'}
+                        {project.files.length !== projectPrograms.length
+                          ? `, ${project.files.length - projectPrograms.length} other`
+                          : ''}
+                        )
+                      </p>
+                      <label className="button secondary" htmlFor="project-files">
+                        Upload project files
+                        <input
+                          id="project-files"
+                          className="file-input"
+                          type="file"
+                          accept=".cbl,.cob,.cpy,.dat"
+                          multiple
+                          onChange={handleUpload}
+                        />
+                      </label>
+                      <ul>
+                        {project.files.map((file) => (
+                          <li key={file.id}>
+                            {file.name} <span className="file-kind">({file.kind})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <p className="file-limit">
+                    Projects: up to {maxProjectFiles} files via /api/projects, then /convert.
+                  </p>
+                </>
+              )}
+
+              {uploadMode === 'batch' && (
+                <>
+                  <p className="file-limit">
+                    These files are converted on their own and are not added to a project.
+                  </p>
+                  <div className="actions">
+                    <label className="button primary" htmlFor="cobol-files">
+                      Choose COBOL files
+                      <input
+                        id="cobol-files"
+                        className="file-input"
+                        type="file"
+                        accept=".cbl,.cob"
+                        multiple
+                        disabled={isConverting}
+                        onChange={chooseFiles}
+                      />
+                    </label>
+                    <button className="button secondary" type="button" onClick={loadSample} disabled={isConverting}>
+                      Load small sample
+                    </button>
+                  </div>
+                  <p className="file-limit">Batch: up to 5 UTF-8 .cbl/.cob files (100 KB each) via /api/convert.</p>
+                </>
+              )}
+            </>  
+          )}
+
+          {screen === 'convert' && (
+            <>
+              <div className="actions project-row">
+                <button
+                  className={viewMode === 'split' ? 'button dark' : 'button secondary'}
+                  type="button"
+                  onClick={() => setViewMode('split')}
+                >
+                  Both
+                </button>
+                <button
+                  className={viewMode === 'cobol' ? 'button dark' : 'button secondary'}
+                  type="button"
+                  onClick={() => setViewMode('cobol')}
+                >
+                  COBOL only
+                </button>
+                <button
+                  className={viewMode === 'python' ? 'button dark' : 'button secondary'}
+                  type = "button"
+                  onClick={() => setViewMode('python')}
+                >
+                  Python only
+                </button>
+                <button
+                  className="button dark"
+                  type="button"
+                  onClick={handleConvert}
+                  disabled={!canConvert}
+                >
+                  {isConverting
+                    ? 'Converting...'
+                    : files.length
+                      ? 'Convert files'
+                      : projectPrograms.length
+                        ? 'Convert project'
+                        : 'Convert'}
+                </button>
+              </div>
+
               {sourceTabs.length > 0 && (
                 <div className="file-tabs">
                   {sourceTabs.map((tab, index) => (
@@ -437,51 +774,103 @@ export default function App() {
                   ))}
                 </div>
               )}
-              <pre className="code">
-                {sourceTabs.length
-                  ? sourceText
-                  : 'Choose files, load a sample, or upload programs to a project.'}
-              </pre>
-            </section>
-          )}
+                    
+              <div className={viewMode === 'split' ? 'panels' : 'panels single'}>
+                {(viewMode === 'split' || viewMode === 'cobol') && (
+                  <section className="panel" aria-labelledby="source-title">
+                    <div className="panel-heading">
+                      <span>INPUT</span>
+                      <h2 id="source-title">COBOL files</h2>
+                    </div>
+                    <pre className="code">
+                      {sourceTabs.length
+                        ? sourceText
+                        : 'Choose files, load a sample, or upload programs to a project.'}
+                    </pre>
+                  </section>
+                )}
 
-          {(viewMode === 'split' || viewMode === 'python') && (
-            <section className="panel" aria-labelledby="output-title">
-              <div className="panel-heading">
-                <span>OUTPUT</span>
-                <h2 id="output-title">Python files</h2>
+                {(viewMode === 'split' || viewMode === 'python') && (
+                  <section className="panel" aria-labelledby="output-title">
+                    <div className="panel-heading">
+                      <span>OUTPUT</span>
+                      <h2 id="output-title">Python files</h2>
+                    </div>
+                    {currentResult && (
+                      <div className="output-toolbar">
+                        <span>
+                          {currentResult.python_name}
+                          {currentResult.status ? ` . ${currentResult.status}` : ''}
+                        </span>
+                      </div>
+                    )}
+                    <pre className="code">{currentResult?.python || 'Converted Python will appear here.'}</pre>
+                  </section>
+                )}
               </div>
-              {currentResult && (
-                <div className="output-toolbar">
-                  <span>
-                    {currentResult.python_name}
-                    {currentResult.status ? ` · ${currentResult.status}` : ''}
-                  </span>
-                  <button className="download" type="button" onClick={() => downloadPython(currentResult)}>
-                    Download .py
-                  </button>
-                </div>
-              )}
-              <pre className="code">{currentResult?.python || 'Converted Python will appear here.'}</pre>
-            </section>
-          )}
-        </div>
 
-        {currentResult?.notes?.length > 0 && (
-          <section className="review-notes">
-            <h2>Lines to review</h2>
-            <ul>
-              {currentResult.notes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          </section>
-        )}
-        <p className="footnote">
-          Conversion runs on the Python backend (`legacylift.converter`). Supported: simple fields,
-          DISPLAY, MOVE, ADD, SUBTRACT, STOP RUN. Other lines are marked TODO in the draft.
-        </p>
-      </main>
+              {currentResult?.notes?.length > 0 && (
+                <section className="review-notes">
+                  <h2>Lines to review</h2>
+                  <ul>
+                    {currentResult.notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              <p className="footnote">
+                Conversion runs on the Python backend (`legacylift.converter`). Supported: simple fields,
+                DISPLAY, MOVE, ADD, SUBTRACT, STOP RUN. Other lines are marked TODO in the draft.
+              </p>
+            </>
+          )}
+
+        {screen === 'export' && (
+          <>
+            <h2 className="history-title">Run history</h2>
+            {!project ? (
+              <p className="file-limit">
+                {files.length
+                  ? 'Batch conversion is not saved, so there is no run history.'
+                  : 'Open a project to see its runs.'}
+              </p>
+            ) : runs.length === 0 ? (
+              <p className="file-limit">No runs yet. Convert the project to add one.</p>
+            ) : (
+              <ul className="export-list">
+                {[...runs].reverse().map((run) => (
+                  <li key={run.id} className="export-row">
+                    <span>{runLabel(run.kind)}</span>
+                    <span className="run-status">{runStatusLabel(run.status)}</span>
+                    <span className="run-time">{runTime(run.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <h2 className="history-title">Downloads</h2>
+            {results.length === 0 ? (
+              <p className="file-limit">Convert a program first. The Python files will show up here.</p>
+            ) : (
+              <ul className="export-list">
+                {results.map((result, index) => (
+                  <li
+                    key={result.python_name}
+                    className={index === selectedFile ? 'export-row selected' : 'export-row'}
+                  >
+                    <span>{result.python_name}</span>
+                    <button className="download" type="button" onClick={() => downloadPython(result)}>
+                      Download .py
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+          )} 
+        </main>
+      </div>
     </div>
   )
 }

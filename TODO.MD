@@ -6,40 +6,42 @@ Upload `BANKMAIN`, `INTCALC`, `TXNPOST`, `ACCTDEF`, and test data as one project
 
 ## API and backend
 
-- [x] Create the FastAPI project skeleton: project creation, upload/read-back, draft conversion, and run summaries.
-- [ ] Review the initial API schemas with the frontend teammate before building new views.
-- [ ] Parse fixed-format COBOL, comments, divisions, fields, paragraphs, and copybooks while retaining source lines.
-- [ ] Analyze files together; return `COPY`, `CALL`, and `PERFORM` links and unresolved references.
-- [ ] Convert the sample's groups, level 88 fields, `OCCURS`, paragraphs, loops, conditions, calls, and decimal arithmetic with `ROUNDED`.
-- [ ] Implement `/analyze` and `/verify`; both currently return HTTP 501.
-- [ ] Run COBOL and Python with the same input in a limited runner; return pass/fail and a diff.
-- [ ] Keep unsupported constructs visible as review notes instead of claiming verified conversion.
+- [x] Project API: create, upload, read back, convert, and list runs.
+- [x] Backend v2: Pydantic models, JSON saving, saved translations, size and project limits, pytest/ruff/mypy in CI.
+- [x] Keep unsupported code visible as review notes instead of claiming a conversion works.
+- [x] List projects (`GET /api/projects`) so the page can reopen one.
+- [x] Delete a project or one of its files.
+- [ ] Parse fixed-format COBOL: divisions, fields, paragraphs, and copybooks, keeping line numbers.
+- [ ] Analyze files together: return `COPY`, `CALL`, and `PERFORM` links and unresolved references.
+- [ ] Make Python behave like COBOL: number padding, overflow, unsigned fields, text length, and `Decimal` arithmetic with `ROUNDED`.
+- [ ] Convert the sample's groups, level 88 fields, `OCCURS`, paragraphs, loops, conditions, and calls.
+- [ ] Verify: run COBOL (GnuCOBOL) and Python on the same input in a sandbox; return pass/fail and a diff.
 
-Active code belongs under `backend/src/legacylift/`. `backend/prototype/` is research material and is not imported by the API.
+Active code is in `backend/src/legacylift/`. `backend/prototype/` is research material that the API doesn't use.
 
 ## Frontend
 
-- [ ] Create/open project and upload `.cbl`, `.cob`, `.cpy`, and `.dat` files.
+- [x] Create a project and upload `.cbl`, `.cob`, `.cpy`, and `.dat` files.
+- [x] Show source beside generated Python with review notes.
+- [ ] Reopen an existing project, and show the last translation after a page reload.
 - [ ] Show dependency analysis and fields/paragraphs per program.
-- [ ] Show source beside generated Python with review notes.
-- [ ] Show verification results, run history, and artifact downloads.
-- [ ] Explain upload and conversion errors clearly.
+- [ ] Show verification results, run history, and downloads.
+- [x] Explain upload and conversion errors clearly, including 413 (file too large).
 
 ## Demo data and tests
 
-- [ ] Add `TXNPOST.cbl` for deposits, withdrawals, overdrafts, and fees.
-- [ ] Change `BANKMAIN` to read `accounts.dat` instead of hard-coded values.
+- [x] Add `TXNPOST.cbl` for deposits, withdrawals, overdrafts, and fees.
+- [x] Change `BANKMAIN` to read `accounts.dat` instead of hard-coded values.
 - [ ] Record GnuCOBOL outputs for normal, overdraft, and closed-account inputs.
-- [ ] Add parser, API, and COBOL-versus-Python equivalence tests with these fixtures.
+- [ ] Add parser and COBOL-versus-Python equivalence tests with these files.
 - [ ] Check the full flow from a fresh clone before Demo 2.
 
 ## Persistence and delivery
 
-- [ ] Add PostgreSQL and migrations for projects, source files, dependencies, runs, and audit events.
-- [ ] Save analysis, conversion, and verification results plus downloadable artifacts.
-- [ ] Add Docker Compose for UI, API, database, and an isolated GnuCOBOL runner; document one-command startup.
-- [ ] Update the design diagrams, feature table, website, and demo slides to match implemented behavior.
+- [ ] PostgreSQL and migrations for projects, files, dependencies, runs, and audit events (replaces the JSON files).
+- [ ] Docker Compose for UI, API, database, and an isolated GnuCOBOL runner, with one-command startup.
+- [ ] Update the design diagrams, feature table, website, and demo slides to match what is built.
 
 ## Later
 
-Gemini/RAG comparison and pgvector can follow a deterministic, verified demo. Defer Fortran, JCL, GCP deployment, login, clustering notebooks, and a React rewrite.
+Gemini/RAG and pgvector after a deterministic, verified demo. Fortran, JCL, GCP deployment, login, and the clustering notebooks are deferred.

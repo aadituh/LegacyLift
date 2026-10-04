@@ -1,10 +1,16 @@
 /**
  * HTTP client for the LegacyLift FastAPI backend.
  *
- * Local Vite (`npm run dev`) leaves VITE_API_URL empty and proxies `/api`
- * (and `/health`) to http://127.0.0.1:8000. Hosted builds set VITE_API_URL
- * to the public API origin (no trailing slash, no `/api` suffix).
+ * `npm run dev` and `npm run preview` on this machine leave VITE_API_URL empty.
+ * Vite proxies `/api` and `/health` to http://127.0.0.1:8000. A hosted build
+ * sets VITE_API_URL to the public API origin (no trailing slash, no `/api` suffix).
  */
+
+function usesLocalProxy() {
+  if (typeof window === 'undefined') return false
+  const host = window.location.hostname
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+}
 
 const apiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
 
@@ -33,13 +39,20 @@ async function request(path, options = {}) {
 
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
+    if (response.status === 413) {
+      throw new Error(`That upload is too large. The API rejects a request over 1.2 MB.`)
+    }
     throw new Error(detailMessage(data, `Request failed (${response.status}).`))
   }
   return data
 }
 
-/** True when a hosted API URL is configured. Live readiness still uses checkBackend(). */
-export const apiConfigured = import.meta.env.DEV || Boolean(apiUrl)
+/**
+ * True when `/health` and `/api` can be requested.
+ * Dev and localhost preview use the Vite proxy. Hosted pages need VITE_API_URL.
+ * Whether that backend is up is checkBackend(), not this flag.
+ */
+export const apiConfigured = import.meta.env.DEV || usesLocalProxy() || Boolean(apiUrl)
 
 /** Probe FastAPI /health. Use this to enable Convert only when the API is up. */
 export async function checkBackend() {
@@ -53,15 +66,42 @@ export async function checkBackend() {
 
 /**
  * Batch-convert COBOL File objects through POST /api/convert.
- * Returns the `files` array: { source_name, python_name, program_name, python, notes }.
+ * Returns `{ download_id, files }`. Each file is
+ * `{ source_name, python_name, program_name, python, notes }`.
  */
 export async function convertFiles(files) {
   const form = new FormData()
   for (const file of files) {
     form.append('files', file)
   }
-  const data = await request('/api/convert', { method: 'POST', body: form })
-  return data.files
+  return request('/api/convert', { method: 'POST', body: form })
+}
+
+/**
+ * Download one generated Python file from the API and save it in the browser.
+ * `path` is a project run file or a batch conversion file. The bytes come from
+ * that response, not from Python already held on the page.
+ */
+export async function downloadPythonFile(path, fileName) {
+  let response
+  try {
+    response = await fetch(endpoint(path))
+  } catch {
+    throw new Error('Cannot reach the LegacyLift backend. Check the API connection and try again.')
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(detailMessage(data, `Request failed (${response.status}).`))
+  }
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 export async function createProject(name) {
@@ -96,4 +136,12 @@ export async function convertProject(projectId) {
 
 export async function getProject(projectId) {
   return request(`/api/projects/${projectId}`, { method: 'GET' })
+}
+
+export async function  getRuns(projectId) {
+  return request(`/api/projects/${projectId}/runs`, { method: 'GET' })
+}
+
+export async function getRun(projectId, runId) {
+  return request(`/api/projects/${projectId}/runs/${runId}`, { method: 'GET' })
 }

@@ -1,35 +1,24 @@
 # LegacyLift
 
-A tool for analyzing and converting legacy COBOL codebases to Python, plus the
-team's course website.
+LegacyLift analyzes legacy COBOL programs and converts them to Python for human review. It is the ODU CS 411W team project; the full design is in [the design presentation](docs/Formal%20Design%20Presentation%20Final.pdf).
 
-The current demo lets you select COBOL files in a React page, send them to a FastAPI service, review draft Python, and download each result. The converter supports a small, explicit set of COBOL statements. It adds `TODO` comments and review notes for lines it cannot convert.
+## Status
 
-## Run locally
+| Pipeline step | Today |
+| --- | --- |
+| Upload programs, copybooks, and data files | Working; saved as JSON on the API's disk |
+| Convert COBOL to Python | Working for a small subset; other lines become `TODO` review notes. Each run is saved |
+| Dependency analysis (`COPY`, `CALL`, `PERFORM`) | Placeholder: counts files |
+| Verify against COBOL (GnuCOBOL) | Placeholder: `not_verified` |
+| PostgreSQL, Gemini + RAG | Not started |
 
-Install [uv](https://docs.astral.sh/uv/) and a Node.js version supported by the `frontend/app` Vite dependencies. Open **two terminals** at the repository root, then use the commands for your system.
+Generated Python is a draft; review it before use.
 
-### Windows (PowerShell)
+## Quick start
 
-Terminal 1 — API:
+You need [uv](https://docs.astral.sh/uv/) and Node.js 24. Open two terminals at the repository root.
 
-```powershell
-cd backend
-uv sync --frozen
-uv run --frozen uvicorn legacylift.main:app --reload
-```
-
-Terminal 2 — React app:
-
-```powershell
-cd frontend/app
-npm.cmd ci
-npm.cmd run dev
-```
-
-### macOS (Terminal)
-
-Terminal 1 — API:
+**Terminal 1: API** on <http://127.0.0.1:8000>
 
 ```bash
 cd backend
@@ -37,56 +26,42 @@ uv sync --frozen
 uv run --frozen uvicorn legacylift.main:app --reload
 ```
 
-Terminal 2 — React app:
+**Terminal 2: web app** on <http://127.0.0.1:5173>
 
 ```bash
 cd frontend/app
-npm ci
-npm run dev
+npm ci          # Windows PowerShell: npm.cmd ci
+npm run dev     # Windows PowerShell: npm.cmd run dev
 ```
 
-Open <http://127.0.0.1:5173>. Click **Load sample**, **Convert files**, and **Download .py** to try the full path. The Vite development server forwards `/api` requests to <http://127.0.0.1:8000>. The API health check is at <http://127.0.0.1:8000/health>; interactive API docs are at <http://127.0.0.1:8000/docs>.
+In the browser: on **Upload**, click **Load demo project**; on **Convert**, click **Convert project**; on **Export**, click **Download .py**. To call the API directly, use the interactive docs at <http://127.0.0.1:8000/docs>.
 
 ## Repository map
 
-| Path | Purpose |
+| Path | What it holds |
 | --- | --- |
-| [`frontend/app/`](frontend/app/) | React and Vite upload, preview, and download app |
-| [`backend/src/legacylift/`](backend/src/legacylift/) | FastAPI project routes, legacy demo route, and draft converter |
-| [`backend/tests/`](backend/tests/) | API workflow and conversion checks |
-| [`backend/prototype/`](backend/prototype/) | Earlier research scripts and notebooks; separate from the active app |
-| [`docs/`](docs/) | Static course website copied to `/course/` on Pages, plus the [developer guide](docs/developer.md) |
-| [`TODO.MD`](TODO.MD) | Longer-term team ideas; the running demo is intentionally smaller |
+| [`backend/`](backend/) | FastAPI service: routes, project workflow, COBOL converter, tests. [README](backend/README.md), [changelog](backend/docs/CHANGELOG.md) |
+| [`frontend/app/`](frontend/app/) | React + Vite app for uploading, converting, and downloading. [README](frontend/app/README.md) |
+| [`backend/prototype/`](backend/prototype/) | Earlier research scripts shown in the design deck. The API does not use them. [README](backend/prototype/README.md) |
+| [`docs/`](docs/) | Course website, design deck, and the [developer guide](docs/developer.md) |
+| [`TODO.MD`](TODO.MD) | Work planned for Demo 2 |
+| [`.github/workflows/`](.github/workflows/) | Backend checks, and the GitHub Pages deployment |
 
-## GitHub Pages
+## Checks
 
-The [Pages workflow](.github/workflows/pages.yml) builds the React app for <https://aadituh.github.io/LegacyLift/> and includes the course website at <https://aadituh.github.io/LegacyLift/course/>. In GitHub, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**, then push this branch to `main` or run the workflow from the Actions tab. The workflow keeps generated files out of Git.
+| Where | Commands |
+| --- | --- |
+| `backend/` | `uv run --frozen pytest`, `uv run --frozen ruff check src tests`, `uv run --frozen ruff format --check src tests`, `uv run --frozen mypy` |
+| `frontend/app/` | `npm run lint`, `npm run build` (Windows PowerShell: `npm.cmd`) |
 
-GitHub Pages hosts only static files; the FastAPI backend runs on Render. The Pages build uses `https://legacylift-api.onrender.com` by default. To use a different backend, set the repository **Actions variable** `VITE_API_URL` to its HTTPS origin (without `/api`) and rerun the Pages workflow. The backend already allows the LegacyLift Pages origin; use `LEGACYLIFT_CORS_ORIGINS` to add other frontend origins. See the [developer guide](docs/developer.md#configuration-and-hosting) for details.
+GitHub Actions runs the backend checks on every change under `backend/`.
 
-## Check changes
+## Hosting
 
-Backend checks (Windows or macOS), from the repository root:
+| Part | Where | URL |
+| --- | --- | --- |
+| Web app | GitHub Pages | <https://aadituh.github.io/LegacyLift/> |
+| Course website | GitHub Pages | <https://aadituh.github.io/LegacyLift/course/> |
+| API | Render | <https://legacylift-api.onrender.com> |
 
-```text
-cd backend
-uv run --frozen python -m unittest discover -s tests -v
-```
-
-Frontend checks on Windows, from the repository root:
-
-```powershell
-cd frontend/app
-npm.cmd run lint
-npm.cmd run build
-```
-
-Frontend checks on macOS, from the repository root:
-
-```bash
-cd frontend/app
-npm run lint
-npm run build
-```
-
-The conversion is a teaching draft, not a general COBOL translator. Review generated Python and every reported line before using the output. For the file-by-file walkthrough, API shape, logs, and common changes, see [docs/developer.md](docs/developer.md).
+Pages redeploys on every push to `main`. See [Configuration and hosting](docs/developer.md#configuration-and-hosting) for settings.

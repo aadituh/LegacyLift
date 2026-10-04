@@ -1,7 +1,61 @@
 # Changelog — LegacyLift Backend
 
-Earlier entries describe the code as it existed at that time. Use the current
-[backend README](../README.md) for today's routes and commands.
+Each entry describes the code at that time. The [backend README](../README.md) describes it now.
+
+## Unreleased
+
+### Added
+
+- `GET /api/projects/{id}/runs/{run_id}/files/{name}` downloads one saved `.py` file.
+- `POST /api/convert` returns `download_id`. `GET /api/convert/{download_id}/files/{name}` downloads that batch file until the API restarts.
+- `GET /api/projects`: every project, newest first, with file counts and its last run.
+- `DELETE /api/projects/{id}` and `DELETE /api/projects/{id}/files/{file_id}` (204). CORS now allows `DELETE`.
+- Converter: `PIC 99`/`PIC XX` style pictures, and doubled quotes inside literals (`"It""s"`).
+
+### Changed
+
+- Short IDs: projects are `"1"`, `"2"`, …; files and runs are numbered within their project. IDs are never reused (the project counter is saved in `last_id.txt`). Projects saved with the old long IDs still load.
+- `MOVE`/`ADD`/`SUBTRACT` lines are read by splitting on spaces; a 100 KB line converts in well under a second.
+- Upload and convert routes run conversion and saving in a worker thread, so other requests keep answering.
+- Fields after `LINKAGE SECTION` (or any later data section) become review notes instead of local variables.
+- File names longer than 255 characters or with control characters are rejected (400).
+- The demo project's `order.cpy` and `orders.dat` now describe the same 24-character record.
+- Internal cleanup with no change to routes or JSON: `conversion_status` moved to `services/conversion.py`, the accepted extensions live once in `services/uploads.py`, and the converter compiles its `MOVE`/`ADD`/`SUBTRACT` patterns once.
+- Shorter backend README; shorter tests (table-driven); every module docstring says what the module does and what it connects to.
+
+### Fixed
+
+- A deleted project stays deleted, even if a request on it finishes afterwards.
+
+## Backend v2 — 2026-10-01
+
+Branch `feature/backend-v2`. Routes the React app already uses keep their fields; new fields are only added.
+
+### Added
+
+- Projects are saved as `data/projects/<id>.json` and reloaded at startup.
+- Convert runs keep their Python; `GET /api/projects/{id}/runs/{run_id}` returns it.
+- `created_at` on projects and runs.
+- Limits: 413 for requests over 1.2 MB, and only the newest 100 projects are kept.
+- Settings with `pydantic-settings`, from `LEGACYLIFT_*` variables or `backend/.env`.
+- pytest, ruff, and `mypy --strict`, run by a GitHub Actions workflow. 68 tests, 100% coverage.
+- Docstrings with `Args`/`Returns`/`Raises`/`Example` on every function; pytest runs the examples.
+
+### Changed
+
+- All data is Pydantic: `models.py` (stored) and `schemas.py` (request/response), replacing dataclasses and dicts.
+- New layout: `cobol/converter.py`, `routers/convert.py` (was `legacy.py`), `services/` (uploads, conversion, projects), `storage.py`, `errors.py`, `config.py`.
+- One error handler turns service errors into `{"detail": ...}` responses, and logs every rejected request.
+- Routes load the project through `ProjectDep`, so 404 is handled in one place.
+- Project changes happen one at a time, so two uploads at once can't both pass the file limit.
+- Clearer names: converter functions are `translate_*` (`convert_source` → `translate_program`, `convert_statement` → `translate_statement`, `python_name` → `variable_name`), and route functions say what they do (`convert_files`, `convert_project`, `list_runs`). URLs and JSON fields are unchanged.
+
+### Fixed
+
+- Generated Python crashed while marked `draft` when a field was named like a Python built-in (`PRINT`), or when `MOVE` put text into a number field.
+- `VALUE 007` produced invalid Python (`x = 007`).
+- Decimals, text/number mixes, and unsupported `WORKING-STORAGE` lines (group items, level 88) were sometimes dropped silently. They now become review notes.
+- Uploads larger than the limit were fully received before being rejected.
 
 ## Demo conversion — 2026-09-29
 
@@ -11,45 +65,11 @@ Earlier entries describe the code as it existed at that time. Use the current
 - Added request and rejection logs without recording source code.
 - Kept the research prototype separate from the running API.
 
-## [v1] — 2026-08-25
+## v1 — 2026-08-25
 
-First backend scaffold: project skeleton, tooling, and a single liveness
-route. No feature logic yet.
+First backend scaffold: project skeleton, tooling, and one route.
 
-### Added
-
-- uv project pinned to Python 3.12, with `fastapi` and `uvicorn[standard]`
-  locked in `uv.lock`.
-- `src/legacylift/main.py` — a `create_app()` factory plus a module-level
-  `app` for uvicorn to import.
-- `GET /` returning `{"message": "Hello from LegacyLift"}`, verified against
-  a running server.
-- Empty feature packages: `core/`, `projects/`, `analysis/`, `conversion/`,
-  `ai/`, and `tests/`.
-- `.env.example` placeholder for environment configuration.
-
-### Changed
-
-- Renamed the package from `backend` to `legacylift`. `uv_build` derives the
-  source path from `project.name`, so the directory and the name had to move
-  together.
-
-### Removed
-
-- The generated `[project.scripts]` entry, which pointed at a placeholder
-  `main()` superseded by the app factory.
-
-### Fixed
-
-- Added docstrings in `main.py`, and renamed the local `app` inside
-  `create_app()` to `fastapi_app` so it no longer shadows the module-level
-  `app`.
-
-### Known issues
-
-- Feature directories have no `__init__.py`. Each needs one before its
-  modules can be imported as `legacylift.<feature>.<module>`.
-- Git does not track empty directories, so the feature packages will not
-  survive a clone until they contain a file.
-- `pytest` is not a project dependency yet; add it with `uv add --dev pytest`
-  before writing tests.
+- uv project on Python 3.12, with `fastapi` and `uvicorn[standard]` locked in `uv.lock`.
+- `src/legacylift/main.py` with a `create_app()` factory and a module-level `app` for uvicorn.
+- `GET /` returning `{"message": "Hello from LegacyLift"}`.
+- Renamed the package from `backend` to `legacylift`, because `uv_build` derives the source path from `project.name`.

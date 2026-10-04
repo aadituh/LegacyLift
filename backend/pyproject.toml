@@ -4,17 +4,54 @@ version = "0.2.0"
 description = "LegacyLift backend — COBOL to Python conversion service"
 readme = "README.md"
 authors = [
-    { name = "ODU 411W" }
+    { name = "ODU 411W LegacyLift Team" }
 ]
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",
+    "psycopg[binary,pool]>=3.3.6",
+    "pydantic-settings>=2.15.0",
     "python-multipart>=0.0.32",
     "uvicorn[standard]>=0.52.4",
 ]
 
 [dependency-groups]
-dev = ["httpx>=0.28.1"]
+dev = [
+    "httpx2>=2.13.1",
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+]
+
+[tool.pytest.ini_options]
+# Also run the >>> examples in source docstrings as tests.
+addopts = "--doctest-modules"
+testpaths = ["tests", "src"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+plugins = ["pydantic.mypy"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# Defaults plus import order, bugbear, pyupgrade, simplification, and docstring checks.
+extend-select = ["I", "B", "UP", "SIM", "D"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+# Route docstrings need a real form feed (\f): FastAPI hides the text after it from /docs.
+"src/legacylift/routers/*" = ["D301"]
+
+[tool.ruff.lint.pydocstyle]
+# Args:, Returns:, Raises:, Example: sections, the Python equivalent of Javadoc tags.
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["legacylift"]
+known-local-folder = ["helpers"]
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]

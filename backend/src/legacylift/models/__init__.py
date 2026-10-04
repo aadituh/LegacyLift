@@ -1,1 +1,0 @@
-"""Internal project models."""

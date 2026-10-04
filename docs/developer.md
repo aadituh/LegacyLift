@@ -1,33 +1,49 @@
 # Developer guide
 
-The [root README](../README.md) has local run commands. The React app talks to FastAPI for both batch conversion and project conversion. Both paths use [`converter.py`](../backend/src/legacylift/converter.py).
+How the frontend and backend connect, where to make changes, and how the app is hosted. Commands are in the [root README](../README.md#quick-start); routes and rules are in the [backend README](../backend/README.md).
 
-## Current request path
+## How a conversion travels
 
-1. On load, [`App.jsx`](../frontend/app/src/App.jsx) probes `/health` through [`api.js`](../frontend/app/src/api.js) and enables Convert only when the API is up.
-2. **Batch (file picker / Load small sample):** `POST /api/convert` with multipart field `files` (1–5 `.cbl`/`.cob`). Handled by [`routers/legacy.py`](../backend/src/legacylift/routers/legacy.py).
-3. **Project:** **Load demo project** calls `POST /api/projects/demo` and shows its larger `store_report.cbl` source. For your own files, use `POST /api/projects` then `POST /api/projects/{id}/files`. **Convert project** calls `POST /api/projects/{id}/convert` in either case. Handled by [`routers/projects.py`](../backend/src/legacylift/routers/projects.py) and [`services/projects.py`](../backend/src/legacylift/services/projects.py).
-4. Each COBOL program is converted by [`converter.py`](../backend/src/legacylift/converter.py). The API returns Python drafts and review notes; the browser displays them and downloads the selected `.py` file.
+```text
+App.jsx ──api.js──▶ FastAPI router ──▶ service ──▶ cobol/converter.py
+   ▲                                       │
+   └────── JSON: Python + review notes ◀───┘
+```
 
-Local Vite proxies `/api` and `/health` to port 8000. The converter handles a small subset of COBOL. Unsupported lines become `TODO` comments and review notes; generated code requires review.
+1. On page load, [`App.jsx`](../frontend/app/src/App.jsx) calls `GET /health` through [`api.js`](../frontend/app/src/api.js). Convert stays disabled until the API answers.
+2. The app has three screens: **Upload**, **Convert**, **Export**.
+3. **Batch:** on Upload → **Batch files**, **Choose COBOL files** or **Load small sample**; on Convert, **Convert files** calls `POST /api/convert`. Nothing is saved.
+4. **Project:** on Upload → **Project**, **Create project** or **Load demo project** creates a project and **Upload project files** adds files; on Convert, **Convert project** calls `POST /api/projects/{id}/convert`. The result is saved.
+5. Convert shows COBOL and Python side by side with review notes. Export **Download .py** fetches that file from the API.
+6. Errors come back as `{"detail": "message"}`, and `api.js` shows the message.
+
+The browser checks files for quick feedback; the backend checks everything again.
 
 ## Where to edit
 
-| Change | File |
+| Change | Where |
 | --- | --- |
-| Frontend controls and display | [`frontend/app/src/App.jsx`](../frontend/app/src/App.jsx) |
+| Screen, buttons, display | [`frontend/app/src/App.jsx`](../frontend/app/src/App.jsx) |
 | Frontend HTTP calls | [`frontend/app/src/api.js`](../frontend/app/src/api.js) |
-| Legacy upload route | [`backend/src/legacylift/routers/legacy.py`](../backend/src/legacylift/routers/legacy.py) |
-| Project routes and HTTP errors | [`backend/src/legacylift/routers/projects.py`](../backend/src/legacylift/routers/projects.py) |
-| Project upload and conversion workflow | [`backend/src/legacylift/services/projects.py`](../backend/src/legacylift/services/projects.py) |
-| Built-in demo project files | [`backend/src/legacylift/sample_data.py`](../backend/src/legacylift/sample_data.py) |
-| JSON request and response shapes | [`backend/src/legacylift/schemas/projects.py`](../backend/src/legacylift/schemas/projects.py) |
-| COBOL conversion rules | [`backend/src/legacylift/converter.py`](../backend/src/legacylift/converter.py) |
+| Anything in the backend | See the [backend code layout](../backend/README.md#code-layout) |
 
-Add a focused test under [`backend/tests/`](../backend/tests/) when changing API behavior or a conversion rule. The older [`backend/prototype/`](../backend/prototype/) is research code and is not imported by the running app.
+If you change a route's JSON, update `api.js` and `App.jsx` in the same pull request.
 
-The sample project is created only when requested and gets a new ID each time. `analyze` reports file counts without dependency analysis. `verify` reports `not_verified` with `passed: null`; it does not compare COBOL and Python output. Both calls appear in `/runs` so teammates can test the route sequence without mistaking placeholders for completed features.
+## Making a change
+
+1. Branch from `main`.
+2. Add or update a test in [`backend/tests/`](../backend/tests/) for any backend change.
+3. Run the checks: `pytest`, `ruff`, and `mypy` in `backend/`; `npm run lint` and `npm run build` in `frontend/app/`.
+4. Add a line to the [backend changelog](../backend/docs/CHANGELOG.md).
+5. Open a pull request. GitHub Actions runs the backend checks.
 
 ## Configuration and hosting
 
-Vite forwards local `/api` requests to port 8000. The hosted frontend uses `VITE_API_URL` for the backend's public HTTPS origin. The backend allows the LegacyLift GitHub Pages origin by default; `LEGACYLIFT_CORS_ORIGINS` adds other origins. The backend does not load `.env` files automatically. GitHub Pages hosts the static frontend and course site; it cannot run FastAPI. See [GitHub Pages in the root README](../README.md#github-pages) for the deployment steps.
+| Piece | Host | Notes |
+| --- | --- | --- |
+| Web app | GitHub Pages | [`pages.yml`](../.github/workflows/pages.yml) builds it on every push to `main` and copies `docs/` to `/course/`. In GitHub, **Settings → Pages → Source** must be **GitHub Actions**. |
+| API address used by the web app | Actions variable `VITE_API_URL` | The API's HTTPS origin, without `/api`. Default: `https://legacylift-api.onrender.com`. |
+| API | Render | Set up in the Render dashboard. Saved projects are lost on every redeploy or restart. |
+| Allowed frontend origins | `LEGACYLIFT_CORS_ORIGINS` on the API | Local Vite and `https://aadituh.github.io` are always allowed. |
+
+Locally, Vite forwards `/api` and `/health` to `http://127.0.0.1:8000` ([`vite.config.js`](../frontend/app/vite.config.js)), so no address or CORS setup is needed.
