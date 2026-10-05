@@ -1,1 +1,1 @@
-"""COBOL source handling: conversion now, parsing and analysis next."""
+"""COBOL source handling: conversion, GnuCOBOL execution, and equivalence checks."""

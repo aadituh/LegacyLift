@@ -15,7 +15,7 @@ Upload `BANKMAIN`, `INTCALC`, `TXNPOST`, `ACCTDEF`, and test data as one project
 - [ ] Analyze files together: return `COPY`, `CALL`, and `PERFORM` links and unresolved references.
 - [ ] Make Python behave like COBOL: number padding, overflow, unsigned fields, text length, and `Decimal` arithmetic with `ROUNDED`.
 - [ ] Convert the sample's groups, level 88 fields, `OCCURS`, paragraphs, loops, conditions, and calls.
-- [ ] Verify: run COBOL (GnuCOBOL) and Python on the same input in a sandbox; return pass/fail and a diff.
+- [x] Verify: run COBOL (GnuCOBOL) and Python on the same input; return pass/fail and per-file stdout diff (`POST /api/projects/{id}/verify`).
 
 Active code is in `backend/src/legacylift/`. `backend/prototype/` is research material that the API doesn't use.
 

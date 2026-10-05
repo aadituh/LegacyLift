@@ -8,15 +8,19 @@ Every change follows the same pattern: change the ``Project``, then
 FastAPI runs routes on several threads. New files and runs get the project's
 next number as their ID (``"1"``, ``"2"``, ...).
 
-Analyze only counts files and verify compares nothing yet; their run statuses
-(``inventory_only``, ``not_verified``) say so.
+Analyze only counts files for now (``inventory_only``). Verify compiles each
+program with GnuCOBOL, runs it beside the generated Python, and records whether
+stdout matches (``verified`` / ``mismatch`` / ``not_verified`` if ``cobc`` is
+missing).
 """
 
 import threading
 
+from legacylift.cobol.equivalence import check_functional_equivalence
 from legacylift.errors import InvalidInputError, NotFoundError, ProjectStateError
 from legacylift.models import (
     ConvertedProjectFile,
+    EquivalenceCheck,
     FileCounts,
     FileKind,
     Project,
@@ -31,6 +35,25 @@ from legacylift.services.uploads import KIND_BY_SUFFIX, RawUpload, decode_upload
 from legacylift.storage import ProjectRepository, ProjectStore  # noqa: F401
 
 MAX_PROJECT_FILES = 10
+
+
+def _cobc_missing(check: EquivalenceCheck) -> bool:
+    """True when a check failed only because GnuCOBOL was not installed."""
+    if check.error is None:
+        return False
+    text = check.error.lower()
+    return "cobc" in text and "not found" in text
+
+
+def _verify_status(checks: list[EquivalenceCheck]) -> RunStatus:
+    """Pick the verify-run status from per-program equivalence checks."""
+    if not checks:
+        return RunStatus.NOT_VERIFIED
+    if all(_cobc_missing(check) for check in checks):
+        return RunStatus.NOT_VERIFIED
+    if all(check.equivalent for check in checks):
+        return RunStatus.VERIFIED
+    return RunStatus.MISMATCH
 
 
 def file_counts(project: Project) -> FileCounts:
@@ -70,13 +93,15 @@ class ProjectService:
         True
     """
 
-    def __init__(self, store: ProjectRepository) -> None:
+    def __init__(self, store: ProjectRepository, *, cobc_path: str | None = None) -> None:
         """Create the service.
 
         Args:
             store: Where projects are kept and saved.
+            cobc_path: Optional path to GnuCOBOL ``cobc`` for verify runs.
         """
         self.store = store
+        self.cobc_path = cobc_path
         self._lock = threading.Lock()
 
     def create_project(self, name: str) -> Project:
@@ -366,16 +391,18 @@ class ProjectService:
         )
 
     def verify(self, project: Project) -> Run:
-        """Save a verify run without comparing anything yet.
+        """Run each converted program under GnuCOBOL and compare stdout to Python.
 
-        A placeholder: the status is always ``NOT_VERIFIED`` until COBOL and
-        Python outputs are compared with GnuCOBOL.
+        Uses the latest convert run's drafts. Copybooks in the project are
+        written beside the program for ``COPY``. Status is ``verified`` when
+        every program matches, ``mismatch`` when any differs or fails, and
+        ``not_verified`` when ``cobc`` is not installed.
 
         Args:
             project: The project to verify.
 
         Returns:
-            The saved run.
+            The saved verify run (with ``checks`` filled in).
 
         Raises:
             ProjectStateError: If the project has never been converted.
@@ -387,13 +414,54 @@ class ProjectService:
             Traceback (most recent call last):
                 ...
             legacylift.errors.ProjectStateError: Convert the project before requesting verification.
-            >>> _ = service.convert(project)
-            >>> service.verify(project).status
-            <RunStatus.NOT_VERIFIED: 'not_verified'>
         """
-        if not any(run.kind == RunKind.CONVERT for run in project.runs):
+        convert_runs = [run for run in project.runs if run.kind == RunKind.CONVERT]
+        if not convert_runs:
             raise ProjectStateError("Convert the project before requesting verification.")
-        return self._save_run(project, RunKind.VERIFY, RunStatus.NOT_VERIFIED)
+
+        latest = convert_runs[-1]
+        if not latest.files:
+            raise ProjectStateError("The last convert run has no generated Python to verify.")
+
+        by_id = {file.id: file for file in project.files}
+        copybooks = {
+            file.name: file.content for file in project.files if file.kind == FileKind.COPYBOOK
+        }
+
+        checks: list[EquivalenceCheck] = []
+        for converted in latest.files:
+            source = by_id.get(converted.source_file_id)
+            if source is None or source.kind != FileKind.PROGRAM:
+                checks.append(
+                    EquivalenceCheck(
+                        source_name=converted.source_name,
+                        python_name=converted.python_name,
+                        equivalent=False,
+                        error=f"Source program {converted.source_name!r} is missing from the project.",
+                    )
+                )
+                continue
+            result = check_functional_equivalence(
+                source_name=source.name,
+                python_name=converted.python_name,
+                cobol_source=source.content,
+                python_source=converted.python,
+                copybooks=copybooks,
+                cobc_path=self.cobc_path,
+            )
+            checks.append(
+                EquivalenceCheck(
+                    source_name=result.source_name,
+                    python_name=result.python_name,
+                    equivalent=result.equivalent,
+                    cobol_stdout=result.cobol_stdout,
+                    python_stdout=result.python_stdout,
+                    error=result.error,
+                )
+            )
+
+        status = _verify_status(checks)
+        return self._save_run(project, RunKind.VERIFY, status, checks=checks)
 
     def _attach_file(self, project: Project, name: str, kind: FileKind, content: str) -> SourceFile:
         """Add a file with the project's next file ID. The caller holds the lock and saves.
@@ -412,6 +480,7 @@ class ProjectService:
         kind: RunKind,
         status: RunStatus,
         files: list[ConvertedProjectFile] | None = None,
+        checks: list[EquivalenceCheck] | None = None,
     ) -> Run:
         """Record a step as the project's next run (IDs ``"1"``, ``"2"``, ...) and save.
 
@@ -419,7 +488,13 @@ class ProjectService:
             The new run.
         """
         with self._lock:
-            run = Run(id=str(len(project.runs) + 1), kind=kind, status=status, files=files or [])
+            run = Run(
+                id=str(len(project.runs) + 1),
+                kind=kind,
+                status=status,
+                files=files or [],
+                checks=checks or [],
+            )
             project.runs.append(run)
             self.store.save(project)
         return run

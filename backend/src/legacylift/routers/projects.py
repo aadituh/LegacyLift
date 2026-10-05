@@ -19,12 +19,13 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
 from legacylift.dependencies import ProjectDep, ProjectServiceDep
-from legacylift.models import Project, Run
+from legacylift.models import Project, Run, RunStatus
 from legacylift.responses import python_attachment
 from legacylift.schemas import (
     AnalyzeResponse,
     ConvertResponse,
     CreateProjectRequest,
+    FileEquivalenceResponse,
     ProjectListResponse,
     ProjectResponse,
     ProjectSummary,
@@ -157,19 +158,45 @@ def convert_project(project: ProjectDep, service: ProjectServiceDep) -> ConvertR
 
 @router.post("/{project_id}/verify")
 def verify_project(project: ProjectDep, service: ProjectServiceDep) -> VerifyResponse:
-    """Placeholder: record a verify run without comparing COBOL and Python output.
+    """Compile each program with GnuCOBOL and compare stdout to generated Python.
+
+    Status is ``verified`` when every program matches, ``mismatch`` when any
+    differ, and ``not_verified`` when ``cobc`` is not installed.
 
     \f
     Raises:
         ProjectStateError: The project has never been converted (400).
     """
     run = service.verify(project)
+    if run.status == RunStatus.VERIFIED:
+        passed: bool | None = True
+        note = "COBOL and Python outputs matched for every program."
+    elif run.status == RunStatus.MISMATCH:
+        passed = False
+        note = "COBOL and Python outputs differed, or a program failed to run."
+    else:
+        passed = None
+        note = (
+            "GnuCOBOL (cobc) was not available, so outputs were not compared. "
+            "Install GnuCOBOL or set LEGACYLIFT_COBC_PATH."
+        )
     return VerifyResponse(
         project_id=project.id,
         run_id=run.id,
         status=run.status,
-        passed=None,
-        note="Demo response only; COBOL and Python outputs were not compared.",
+        passed=passed,
+        note=note,
+        files=[
+            FileEquivalenceResponse(
+                source_name=check.source_name,
+                python_name=check.python_name,
+                equivalent=check.equivalent,
+                cobol_stdout=check.cobol_stdout,
+                python_stdout=check.python_stdout,
+                error=check.error,
+            )
+            for check in run.checks
+        ],
     )
 
 

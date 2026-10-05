@@ -1,5 +1,7 @@
 """The project routes, in the order a user calls them, plus their errors."""
 
+from unittest.mock import patch
+
 import pytest
 
 from helpers import HELLO, run_python
@@ -37,7 +39,12 @@ def test_full_project_flow(client, base):
     conversion = client.post(f"{base}/convert").json()
     assert (conversion["run_id"], conversion["status"]) == ("2", "draft")
     assert run_python(conversion["files"][0]["python"]) == "Hello, LegacyLift\nDemo count: 2\n"
-    assert client.post(f"{base}/verify").json()["status"] == "not_verified"
+    # Without GnuCOBOL: not_verified. With working cobc + matching stdout: verified.
+    with patch("legacylift.cobol.equivalence.cobc_available", return_value=False):
+        verify = client.post(f"{base}/verify").json()
+    assert verify["status"] == "not_verified"
+    assert verify["passed"] is None
+    assert verify["files"]
 
     # Reopen: the run list is small; one run carries its Python.
     runs = client.get(f"{base}/runs").json()["runs"]
