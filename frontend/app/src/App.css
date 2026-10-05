@@ -109,7 +109,7 @@
 }
 
 .primary {
-  color: #000000;
+  color: #ffffff;
   background: #2d6d43;
   cursor: pointer;
 }
@@ -171,7 +171,7 @@
 .message.error {
   border-color: #000000;
   background: #000000;
-  color: #983c34;
+  color: #ffd2cc;
 }
 
 .panels {
@@ -245,7 +245,7 @@
   border-radius: 6px;
   padding: 7px 9px;
   background: #000000;
-  color: #1b4b2e;
+  color: #ffffff;
   font-size: 11px;
   font-weight: 700;
 }
@@ -345,7 +345,7 @@
 
 .nav-button.active {
   background: #000000;
-  color: #26362a;
+  color: #ffffff;
 }
 
 .shell-main {
