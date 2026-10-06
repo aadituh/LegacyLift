@@ -11,7 +11,7 @@ Upload `BANKMAIN`, `INTCALC`, `TXNPOST`, `ACCTDEF`, and test data as one project
 - [x] Keep unsupported code visible as review notes instead of claiming a conversion works.
 - [x] List projects (`GET /api/projects`) so the page can reopen one.
 - [x] Delete a project or one of its files.
-- [ ] Parse fixed-format COBOL: divisions, fields, paragraphs, and copybooks, keeping line numbers.
+- [x] Parse fixed-format COBOL: divisions, fields, paragraphs, and copybooks, keeping line numbers.
 - [ ] Analyze files together: return `COPY`, `CALL`, and `PERFORM` links and unresolved references.
 - [ ] Make Python behave like COBOL: number padding, overflow, unsigned fields, text length, and `Decimal` arithmetic with `ROUNDED`.
 - [ ] Convert the sample's groups, level 88 fields, `OCCURS`, paragraphs, loops, conditions, and calls.
@@ -33,7 +33,7 @@ Active code is in `backend/src/legacylift/`. `backend/prototype/` is research ma
 - [x] Add `TXNPOST.cbl` for deposits, withdrawals, overdrafts, and fees.
 - [x] Change `BANKMAIN` to read `accounts.dat` instead of hard-coded values.
 - [ ] Record GnuCOBOL outputs for normal, overdraft, and closed-account inputs.
-- [ ] Add parser and COBOL-versus-Python equivalence tests with these files.
+- [x] Add parser and COBOL-versus-Python equivalence tests with these files.
 - [ ] Check the full flow from a fresh clone before Demo 2.
 
 ## Persistence and delivery

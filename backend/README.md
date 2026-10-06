@@ -90,6 +90,7 @@ src/legacylift/
 ├── responses.py      `.py` download responses
 ├── services/         rules: uploads.py, conversion.py, projects.py, batch_downloads.py
 └── cobol/
+    ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
     ├── converter.py     translate_program(): COBOL subset → Python
     ├── gnucobol.py      compile/run programs with cobc
     └── equivalence.py   compare GnuCOBOL stdout to generated Python
