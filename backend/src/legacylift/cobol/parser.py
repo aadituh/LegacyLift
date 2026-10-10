@@ -10,6 +10,7 @@ IBM fixed format:
 Hand-off for the API and analyzer::
 
     parse_program(name, text) -> ParsedProgram
+    ParsedProgram.fields: list[Field(level, name, picture, value, occurs, line)]
 """
 
 from __future__ import annotations
@@ -17,7 +18,8 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field as PydanticField
 
 DivisionName = Literal[
     "IDENTIFICATION",
@@ -48,10 +50,26 @@ _SECTION_HEADER_RE = re.compile(
     re.IGNORECASE,
 )
 
-_FIELD_RE = re.compile(
-    r"^(0[1-9]|[1-4]\d|66|77|88)\s+"
-    r"([A-Z0-9][A-Z0-9-]*|FILLER)"
-    r"(?:\s+.*?PIC(?:TURE)?\s+([\w()V+\-./]+))?",
+# Levels 01–49, 66, 77, 88 (copybooks often use 10 under a host 01/05).
+_FIELD_START_RE = re.compile(
+    r"^(0?[1-9]|[1-4]\d|66|77|88)\s+([A-Z0-9][A-Z0-9-]*|FILLER)\b",
+    re.IGNORECASE,
+)
+
+_PIC_RE = re.compile(r"\bPIC(?:TURE)?\s+([^\s]+)", re.IGNORECASE)
+
+_OCCURS_RE = re.compile(
+    r"\bOCCURS\s+(\d+)(?:\s+TO\s+(\d+))?\s+TIMES\b",
+    re.IGNORECASE,
+)
+
+_VALUE_KW_RE = re.compile(r"\bVALUE(?:\s+IS)?\s+", re.IGNORECASE)
+
+_SIGN_SEPARATE_RE = re.compile(r"\bSIGN\b.+\bSEPARATE\b", re.IGNORECASE)
+
+# One PIC symbol with optional repeat count, or V / P (no storage).
+_PIC_TOKEN_RE = re.compile(
+    r"([AX9Z*])(?:\((\d+)\))?|(DB|CR)|([-+.$,/CRB0]+)|V|P(?:\((\d+)\))?",
     re.IGNORECASE,
 )
 
@@ -103,16 +121,23 @@ class Division(BaseModel):
     name: DivisionName
     start_line: int
     end_line: int
-    lines: list[SourceLine] = Field(default_factory=list)
+    lines: list[SourceLine] = PydanticField(default_factory=list)
 
 
-class DataField(BaseModel):
-    """A data-item declaration (level + name, optional PIC)."""
+class Field(BaseModel):
+    """A data-item declaration with PIC / VALUE / OCCURS when present.
 
-    name: str
+    Level-88 condition names set ``parent`` to the elementary field above them.
+    """
+
     level: str
-    pic: str | None = None
+    name: str
+    picture: str | None = None
+    value: str | None = None
+    occurs: int | None = None
     line: int
+    parent: str | None = None
+    sign_separate: bool = False
     section: str | None = None
 
 
@@ -140,15 +165,15 @@ class CallRef(BaseModel):
 
 
 class ParsedProgram(BaseModel):
-    """Structured view of one COBOL program for the API / analyzer."""
+    """Structured view of one COBOL program or copybook for the API / analyzer."""
 
     name: str
     program_id: str
-    divisions: list[Division] = Field(default_factory=list)
-    fields: list[DataField] = Field(default_factory=list)
-    paragraphs: list[Paragraph] = Field(default_factory=list)
-    copies: list[CopyRef] = Field(default_factory=list)
-    calls: list[CallRef] = Field(default_factory=list)
+    divisions: list[Division] = PydanticField(default_factory=list)
+    fields: list[Field] = PydanticField(default_factory=list)
+    paragraphs: list[Paragraph] = PydanticField(default_factory=list)
+    copies: list[CopyRef] = PydanticField(default_factory=list)
+    calls: list[CallRef] = PydanticField(default_factory=list)
 
 
 def _code_area(raw: str) -> tuple[str, str] | None:
@@ -169,7 +194,6 @@ def _code_area(raw: str) -> tuple[str, str] | None:
             return None
         return indicator, code
 
-    # Free-format / truncated line: no sequence area
     stripped = line.lstrip()
     if stripped.startswith("*"):
         return None
@@ -180,8 +204,7 @@ def _physical_lines(text: str) -> list[SourceLine]:
     """Map file text to non-comment code lines, applying ``-`` continuations.
 
     Continued fragments keep the *first* line's number for the merged text so
-    statements stay anchored where they begin; each physical non-comment line
-    still appears separately when it is not a continuation.
+    statements stay anchored where they begin.
     """
     result: list[SourceLine] = []
     for number, raw in enumerate(text.splitlines(), start=1):
@@ -190,7 +213,6 @@ def _physical_lines(text: str) -> list[SourceLine]:
             continue
         indicator, code = parsed
         if indicator == "-" and result:
-            # Continuation: append Area B text to the previous logical line
             prev = result[-1]
             result[-1] = SourceLine(number=prev.number, text=prev.text + code)
             continue
@@ -228,7 +250,6 @@ def _split_divisions(lines: list[SourceLine]) -> list[Division]:
                 lines=chunk,
             )
         )
-    # Stable order for callers that expect the usual COBOL sequence
     order = {n: i for i, n in enumerate(_DIVISION_ORDER)}
     divisions.sort(key=lambda d: (order.get(d.name, 99), d.start_line))
     return divisions
@@ -252,38 +273,224 @@ def _division_by_name(
     return None
 
 
-def _extract_fields(data: Division | None) -> list[DataField]:
-    if data is None:
-        return []
+def _normalize_level(raw: str) -> str:
+    """Normalize a level number to two digits (``5`` → ``05``)."""
+    return f"{int(raw):02d}"
 
-    fields: list[DataField] = []
+
+def _clause_ends_field(text: str) -> bool:
+    """True when the accumulated field clause ends with a period."""
+    return text.rstrip().endswith(".")
+
+
+def _is_field_start(text: str) -> bool:
+    return _FIELD_START_RE.match(text.strip()) is not None
+
+
+def _extract_value(clause: str) -> str | None:
+    """Pull the VALUE operand from a field clause (quotes preserved)."""
+    match = _VALUE_KW_RE.search(clause)
+    if not match:
+        return None
+
+    rest = clause[match.end() :].rstrip().rstrip(".")
+    parts: list[str] = []
+    i = 0
+    while i < len(rest):
+        ch = rest[i]
+        if ch in " \t":
+            i += 1
+            continue
+        if ch == ",":
+            parts.append(",")
+            i += 1
+            continue
+        if ch in "\"'":
+            quote = ch
+            j = i + 1
+            while j < len(rest):
+                if rest[j] == quote:
+                    if j + 1 < len(rest) and rest[j + 1] == quote:
+                        j += 2
+                        continue
+                    j += 1
+                    break
+                j += 1
+            parts.append(rest[i:j])
+            i = j
+            continue
+
+        m = re.match(r"[^\s,]+", rest[i:])
+        if not m:
+            break
+        token = m.group(0)
+        upper = token.upper()
+        if upper in {"OCCURS", "SIGN", "ASCENDING", "DESCENDING", "INDEXED", "REDEFINES"}:
+            break
+        parts.append(token)
+        i += m.end()
+
+    if not parts:
+        return None
+    value = " ".join(parts)
+    value = re.sub(r"\s*,\s*", ", ", value).strip()
+    return value or None
+
+
+def _extract_occurs(clause: str) -> int | None:
+    match = _OCCURS_RE.search(clause)
+    if not match:
+        return None
+    low = int(match.group(1))
+    high = match.group(2)
+    return int(high) if high else low
+
+
+def _extract_picture(clause: str) -> str | None:
+    match = _PIC_RE.search(clause)
+    if not match:
+        return None
+    return match.group(1).upper().rstrip(".")
+
+
+def picture_size(picture: str, *, sign_separate: bool = False) -> int:
+    """Return DISPLAY storage bytes for a PIC string.
+
+    ``V`` (implied decimal) and ``P`` (scaling) take no storage. A leading
+    ``S`` takes one extra byte only when ``sign_separate`` is true (SIGN
+    LEADING/TRAILING SEPARATE).
+    """
+    pic = re.sub(r"\s+", "", picture.upper())
+    signed = pic.startswith("S")
+    if signed:
+        pic = pic[1:]
+
+    size = 0
+    pos = 0
+    for match in _PIC_TOKEN_RE.finditer(pic):
+        if match.start() != pos:
+            # Unrecognized character (edited insertion); count it
+            size += match.start() - pos
+        pos = match.end()
+        token = match.group(0)
+        if token.startswith("V") or token.startswith("P"):
+            continue
+        if match.group(1):
+            count = int(match.group(2)) if match.group(2) else 1
+            size += count
+            continue
+        if match.group(3):  # DB / CR
+            size += len(match.group(3))
+            continue
+        if match.group(4):  # edited symbols run
+            size += len(match.group(4))
+            continue
+    if pos < len(pic):
+        size += len(pic) - pos
+
+    if signed and sign_separate:
+        size += 1
+    return size
+
+
+def record_byte_length(fields: list[Field]) -> int:
+    """Sum elementary field sizes (with OCCURS); skip groups and level 88."""
+    total = 0
+    for field in fields:
+        if field.level == "88" or not field.picture:
+            continue
+        size = picture_size(field.picture, sign_separate=field.sign_separate)
+        if field.occurs is not None:
+            size *= field.occurs
+        total += size
+    return total
+
+
+def _parse_field_clause(
+    clause: str,
+    *,
+    line: int,
+    section: str | None,
+    parent: str | None,
+) -> Field | None:
+    match = _FIELD_START_RE.match(clause.strip())
+    if not match:
+        return None
+
+    level = _normalize_level(match.group(1))
+    name = match.group(2).upper()
+    picture = _extract_picture(clause)
+    value = _extract_value(clause)
+    occurs = _extract_occurs(clause)
+    sign_separate = bool(_SIGN_SEPARATE_RE.search(clause))
+
+    return Field(
+        level=level,
+        name=name,
+        picture=picture,
+        value=value,
+        occurs=occurs,
+        line=line,
+        parent=parent if level == "88" else None,
+        sign_separate=sign_separate,
+        section=section,
+    )
+
+
+def _extract_fields_from_lines(lines: list[SourceLine]) -> list[Field]:
+    """Parse data-item declarations from DATA DIVISION or copybook lines."""
+    fields: list[Field] = []
     section: str | None = None
-    for line in data.lines:
-        stripped = line.text.strip()
+    last_data_name: str | None = None
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].text.strip()
         if not stripped:
+            i += 1
             continue
 
         section_match = _SECTION_HEADER_RE.match(stripped)
         if section_match:
             section = section_match.group(1).upper()
+            i += 1
             continue
 
-        field_match = _FIELD_RE.match(stripped)
-        if not field_match:
+        if _match_division(stripped):
+            i += 1
             continue
 
-        level = field_match.group(1)
-        name = field_match.group(2).upper()
-        pic = field_match.group(3)
-        fields.append(
-            DataField(
-                name=name,
-                level=level,
-                pic=pic.upper() if pic else None,
-                line=line.number,
-                section=section,
-            )
+        if not _is_field_start(stripped):
+            i += 1
+            continue
+
+        start_line = lines[i].number
+        clause = stripped
+        i += 1
+        while i < len(lines) and not _clause_ends_field(clause):
+            nxt = lines[i].text.strip()
+            if not nxt:
+                i += 1
+                continue
+            if (
+                _is_field_start(nxt)
+                or _SECTION_HEADER_RE.match(nxt)
+                or _match_division(nxt)
+            ):
+                break
+            clause = f"{clause} {nxt}"
+            i += 1
+
+        field = _parse_field_clause(
+            clause,
+            line=start_line,
+            section=section,
+            parent=last_data_name,
         )
+        if field is None:
+            continue
+        fields.append(field)
+        if field.level != "88":
+            last_data_name = field.name
     return fields
 
 
@@ -291,7 +498,6 @@ def _extract_paragraphs(procedure: Division | None) -> list[Paragraph]:
     if procedure is None:
         return []
 
-    # Drop the PROCEDURE DIVISION header line itself
     body_lines = procedure.lines[1:] if procedure.lines else []
     headers: list[tuple[int, str]] = []
     for i, line in enumerate(body_lines):
@@ -315,7 +521,6 @@ def _extract_paragraphs(procedure: Division | None) -> list[Paragraph]:
     for i, (start_i, name) in enumerate(headers):
         end_i = headers[i + 1][0] - 1 if i + 1 < len(headers) else len(body_lines) - 1
         chunk = body_lines[start_i : end_i + 1]
-        # Body excludes the paragraph-name line
         body = "\n".join(sl.text.rstrip() for sl in chunk[1:]).strip()
         paragraphs.append(
             Paragraph(
@@ -361,9 +566,12 @@ def _extract_calls(lines: list[SourceLine]) -> list[CallRef]:
 def parse_program(name: str, text: str) -> ParsedProgram:
     """Parse fixed-format COBOL text into a ``ParsedProgram``.
 
+    Works on programs (``.cbl`` / ``.cob``) and copybooks (``.cpy``). Copybooks
+    have no divisions; their field lines are parsed directly.
+
     Args:
-        name: Program/file name (e.g. ``BANKMAIN.cbl``). Used as a fallback
-            when ``PROGRAM-ID`` is missing.
+        name: Program/file name (e.g. ``BANKMAIN.cbl`` or ``ACCTDEF.cpy``).
+            Used as a fallback when ``PROGRAM-ID`` is missing.
         text: Full source text. Never executed.
 
     Returns:
@@ -376,11 +584,17 @@ def parse_program(name: str, text: str) -> ParsedProgram:
     data = _division_by_name(divisions, "DATA")
     procedure = _division_by_name(divisions, "PROCEDURE")
 
+    # Programs: fields live in DATA DIVISION. Copybooks: whole file is data.
+    if data is not None:
+        field_lines = data.lines
+    else:
+        field_lines = lines
+
     return ParsedProgram(
         name=name,
         program_id=program_id,
         divisions=divisions,
-        fields=_extract_fields(data),
+        fields=_extract_fields_from_lines(field_lines),
         paragraphs=_extract_paragraphs(procedure),
         copies=_extract_copies(lines),
         calls=_extract_calls(lines),

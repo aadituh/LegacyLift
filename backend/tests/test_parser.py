@@ -1,10 +1,10 @@
-"""Fixed-format COBOL parser: divisions, line numbers, comments skipped."""
+"""Fixed-format COBOL parser: divisions, fields, line numbers, comments skipped."""
 
 from pathlib import Path
 
 import pytest
 
-from legacylift.cobol.parser import parse_program
+from legacylift.cobol.parser import parse_program, picture_size, record_byte_length
 
 DATA = Path(__file__).parents[1] / "src" / "legacylift" / "data"
 
@@ -80,14 +80,49 @@ def test_bankmain_copies_calls_paragraphs() -> None:
     assert "PERFORM LOAD-ACCOUNTS" in main.body
 
 
-def test_fields_keep_source_line_numbers() -> None:
+def test_fields_keep_picture_value_occurs_and_line() -> None:
     parsed = parse_program(*_load("BANKMAIN.cbl"))
     by_name = {f.name: f for f in parsed.fields if f.name != "FILLER"}
     assert by_name["WS-DAYS"].line == 31
-    assert by_name["WS-DAYS"].pic == "999"
+    assert by_name["WS-DAYS"].picture == "999"
     assert by_name["WS-DAYS"].level == "01"
+    assert by_name["WS-DAYS"].value == "30"
+    assert by_name["WS-ACCOUNT"].occurs == 10
+    assert by_name["WS-ACCOUNT"].picture is None
     assert by_name["END-OF-FILE"].level == "88"
     assert by_name["END-OF-FILE"].line == 27
+    assert by_name["END-OF-FILE"].parent == "WS-END-OF-FILE"
+    assert by_name["END-OF-FILE"].value == '"Y"'
+    fillers = [f for f in parsed.fields if f.name == "FILLER"]
+    assert any(f.value == "SPACES" for f in fillers)
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected_bytes"),
+    [
+        ("ACCTDEF.cpy", 43),
+        ("TXNDEF.cpy", 16),
+    ],
+)
+def test_copybook_record_byte_length(filename: str, expected_bytes: int) -> None:
+    parsed = parse_program(*_load(filename))
+    assert parsed.divisions == []
+    assert parsed.fields
+    assert record_byte_length(parsed.fields) == expected_bytes
+
+
+def test_acctdef_fields_and_level_88_parents() -> None:
+    parsed = parse_program(*_load("ACCTDEF.cpy"))
+    by_name = {f.name: f for f in parsed.fields}
+    assert by_name["ACCT-ID"].level == "10"
+    assert by_name["ACCT-ID"].picture == "X(6)"
+    assert by_name["ACCT-BALANCE"].picture == "S9(7)V99"
+    assert by_name["ACCT-BALANCE"].sign_separate is True
+    assert picture_size("S9(7)V99", sign_separate=True) == 10
+    assert by_name["ACCT-SAVINGS"].level == "88"
+    assert by_name["ACCT-SAVINGS"].parent == "ACCT-TYPE"
+    assert by_name["ACCT-SAVINGS"].value == '"S"'
+    assert by_name["ACCT-ACTIVE"].parent == "ACCT-STATUS"
 
 
 def test_continuation_dash_merges_onto_previous_line() -> None:
