@@ -142,7 +142,11 @@ class Field(BaseModel):
 
 
 class Paragraph(BaseModel):
-    """A PROCEDURE DIVISION paragraph and its body text."""
+    """A PROCEDURE DIVISION paragraph (name in column 8, ends before the next).
+
+    ``body`` is the source between the header and the next paragraph (optional
+    for callers that only need ``name`` / ``start_line`` / ``end_line``).
+    """
 
     name: str
     start_line: int
@@ -494,39 +498,61 @@ def _extract_fields_from_lines(lines: list[SourceLine]) -> list[Field]:
     return fields
 
 
+def _is_paragraph_header(line: SourceLine) -> str | None:
+    """Return the paragraph name if ``line`` is a header in column 8.
+
+    A paragraph name begins in column 8 (first character of the code area)
+    and is a single word ending with a period, e.g. ``MAIN-LOGIC.``.
+    """
+    text = line.text
+    # Column 8 == index 0 of the code area; Area B (indented) is not a header.
+    if not text or text[0] in " \t":
+        return None
+    match = _PARAGRAPH_RE.match(text.rstrip())
+    if not match:
+        return None
+    name = match.group(1).upper()
+    if name in _SKIP_PARAGRAPH_NAMES:
+        return None
+    if name.endswith("-DIVISION") or name.endswith("-SECTION"):
+        return None
+    return name
+
+
 def _extract_paragraphs(procedure: Division | None) -> list[Paragraph]:
+    """List PROCEDURE DIVISION paragraphs with start/end file line numbers.
+
+    Each paragraph starts on its header line and ends on the line before the
+    next paragraph header (or at the end of the PROCEDURE DIVISION).
+    """
     if procedure is None:
         return []
 
+    # Drop the PROCEDURE DIVISION header line itself
     body_lines = procedure.lines[1:] if procedure.lines else []
     headers: list[tuple[int, str]] = []
     for i, line in enumerate(body_lines):
-        stripped = line.text.strip()
-        match = _PARAGRAPH_RE.match(stripped)
-        if not match:
-            continue
-        name = match.group(1).upper()
-        if name in _SKIP_PARAGRAPH_NAMES:
-            continue
-        if name.endswith("-DIVISION") or name.endswith("-SECTION"):
-            continue
-        # Area A is code-area columns 0–3 (physical 8–11). Area B statements
-        # like ``GOBACK.`` / ``END-PERFORM.`` start at column 4+.
-        leading = len(line.text) - len(line.text.lstrip(" "))
-        if leading > 3:
-            continue
-        headers.append((i, name))
+        name = _is_paragraph_header(line)
+        if name is not None:
+            headers.append((i, name))
 
     paragraphs: list[Paragraph] = []
     for i, (start_i, name) in enumerate(headers):
-        end_i = headers[i + 1][0] - 1 if i + 1 < len(headers) else len(body_lines) - 1
+        start_line = body_lines[start_i].number
+        if i + 1 < len(headers):
+            # Ends where the next paragraph starts
+            end_line = body_lines[headers[i + 1][0]].number - 1
+            end_i = headers[i + 1][0] - 1
+        else:
+            end_line = procedure.end_line
+            end_i = len(body_lines) - 1
         chunk = body_lines[start_i : end_i + 1]
         body = "\n".join(sl.text.rstrip() for sl in chunk[1:]).strip()
         paragraphs.append(
             Paragraph(
                 name=name,
-                start_line=chunk[0].number,
-                end_line=chunk[-1].number,
+                start_line=start_line,
+                end_line=end_line,
                 body=body,
             )
         )

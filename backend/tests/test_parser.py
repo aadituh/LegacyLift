@@ -66,18 +66,55 @@ def test_bankmain_copies_calls_paragraphs() -> None:
         ("TXNPOST", 116),
         ("INTCALC", 156),
     ]
-    para_names = [p.name for p in parsed.paragraphs]
-    assert para_names == [
-        "MAIN-LOGIC",
-        "LOAD-ACCOUNTS",
-        "POST-TRANSACTIONS",
-        "POST-ONE-TRANSACTION",
-        "FIND-ACCOUNT",
-        "PRINT-STATEMENT",
+
+
+def test_bankmain_every_paragraph_with_start_and_end_lines() -> None:
+    """Every PROCEDURE paragraph in BANKMAIN: name in col 8, contiguous spans."""
+    name, text = _load("BANKMAIN.cbl")
+    raw = text.splitlines()
+    parsed = parse_program(name, text)
+
+    expected = [
+        ("MAIN-LOGIC", 72, 78),
+        ("LOAD-ACCOUNTS", 79, 92),
+        ("POST-TRANSACTIONS", 93, 110),
+        ("POST-ONE-TRANSACTION", 111, 141),
+        ("FIND-ACCOUNT", 142, 150),
+        ("PRINT-STATEMENT", 151, 172),
     ]
-    main = parsed.paragraphs[0]
-    assert main.start_line == 72
-    assert "PERFORM LOAD-ACCOUNTS" in main.body
+    assert [(p.name, p.start_line, p.end_line) for p in parsed.paragraphs] == expected
+
+    for para in parsed.paragraphs:
+        header = raw[para.start_line - 1]
+        # Name begins in column 8 (1-based) and ends with a period
+        assert header[7] not in " \t"
+        assert header[7:].strip() == f"{para.name}."
+        assert para.end_line >= para.start_line
+
+    # Each paragraph ends where the next one starts
+    for prev, nxt in zip(parsed.paragraphs, parsed.paragraphs[1:]):
+        assert prev.end_line + 1 == nxt.start_line
+
+    assert "PERFORM LOAD-ACCOUNTS" in parsed.paragraphs[0].body
+
+
+def test_paragraph_requires_column_8() -> None:
+    text = (
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. P.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       REAL-PARA.\n"
+        "           DISPLAY \"HI\".\n"
+        "           FAKE-PARA.\n"
+        "           DISPLAY \"NO\".\n"
+        "       NEXT-PARA.\n"
+        "           STOP RUN.\n"
+    )
+    parsed = parse_program("P.cbl", text)
+    assert [(p.name, p.start_line, p.end_line) for p in parsed.paragraphs] == [
+        ("REAL-PARA", 4, 7),
+        ("NEXT-PARA", 8, 9),
+    ]
 
 
 def test_fields_keep_picture_value_occurs_and_line() -> None:
