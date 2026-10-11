@@ -92,7 +92,9 @@ def test_bankmain_every_paragraph_with_start_and_end_lines() -> None:
         assert para.end_line >= para.start_line
 
     # Each paragraph ends where the next one starts
-    for prev, nxt in zip(parsed.paragraphs, parsed.paragraphs[1:]):
+    for prev, nxt in zip(
+        parsed.paragraphs, parsed.paragraphs[1:], strict=False
+    ):
         assert prev.end_line + 1 == nxt.start_line
 
     assert "PERFORM LOAD-ACCOUNTS" in parsed.paragraphs[0].body

@@ -396,7 +396,7 @@ def picture_size(picture: str, *, sign_separate: bool = False) -> int:
             size += match.start() - pos
         pos = match.end()
         token = match.group(0)
-        if token.startswith("V") or token.startswith("P"):
+        if token.startswith(("V", "P")):
             continue
         if match.group(1):
             count = int(match.group(2)) if match.group(2) else 1
@@ -533,7 +533,7 @@ def _is_paragraph_header(line: SourceLine) -> str | None:
     name = match.group(1).upper()
     if name in _SKIP_PARAGRAPH_NAMES:
         return None
-    if name.endswith("-DIVISION") or name.endswith("-SECTION"):
+    if name.endswith(("-DIVISION", "-SECTION")):
         return None
     return name
 
@@ -665,10 +665,7 @@ def parse_program(name: str, text: str) -> ParsedProgram:
     procedure = _division_by_name(divisions, "PROCEDURE")
 
     # Programs: fields live in DATA DIVISION. Copybooks: whole file is data.
-    if data is not None:
-        field_lines = data.lines
-    else:
-        field_lines = lines
+    field_lines = data.lines if data is not None else lines
 
     paragraphs = _extract_paragraphs(procedure)
     return ParsedProgram(

@@ -133,9 +133,9 @@ def test_missing_copybook_is_unresolved() -> None:
     deps, unresolved = find_dependencies(programs, catalog)
 
     file_deps = [d for d in deps if d.kind != DependencyKind.PERFORM]
-    assert [("copy", "ACCTDEF.cpy"), ("call", "TXNPOST.cbl"), ("call", "INTCALC.cbl")] == [
+    assert [
         (d.kind.value, d.target) for d in file_deps
-    ]
+    ] == [("copy", "ACCTDEF.cpy"), ("call", "TXNPOST.cbl"), ("call", "INTCALC.cbl")]
     copy_unresolved = [u for u in unresolved if u.kind == DependencyKind.COPY]
     assert len(copy_unresolved) == 1
     assert copy_unresolved[0].source == "BANKMAIN.cbl"
