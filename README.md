@@ -6,11 +6,11 @@ LegacyLift analyzes legacy COBOL programs and converts them to Python for human 
 
 | Pipeline step | Today |
 | --- | --- |
-| Upload programs, copybooks, and data files | Working; saved as JSON on the API's disk |
+| Upload programs, copybooks, and data files | Working; saved in PostgreSQL (Neon) when `DATABASE_URL` is set, otherwise as JSON on the API's disk |
 | Convert COBOL to Python | Working for a small subset; other lines become `TODO` review notes. Each run is saved |
 | Dependency analysis (`COPY`, `CALL`, `PERFORM`) | Placeholder: counts files |
 | Verify against COBOL (GnuCOBOL) | Placeholder: `not_verified` |
-| PostgreSQL, Gemini + RAG | Not started |
+| Gemini + RAG | Not started |
 
 Generated Python is a draft; review it before use.
 
@@ -55,6 +55,10 @@ In the browser: on **Upload**, click **Load demo project**; on **Convert**, clic
 | `frontend/app/` | `npm run lint`, `npm run build` (Windows PowerShell: `npm.cmd`) |
 
 GitHub Actions runs the backend checks on every change under `backend/`.
+
+## Merge rule
+
+Nothing is pushed straight to `main`. Every change has an issue, its own branch, and a pull request that one other team member approves before the author merges it. The checks must pass first. Steps: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Hosting
 
