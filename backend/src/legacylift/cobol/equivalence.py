@@ -135,11 +135,7 @@ def check_functional_equivalence(
             equivalent=False,
             cobol_stdout=cobol.stdout,
             python_stdout=python_stdout,
-            error=(
-                "Output mismatch.\n"
-                f"COBOL:  {cobol.stdout!r}\n"
-                f"Python: {python_stdout!r}"
-            ),
+            error=(f"Output mismatch.\nCOBOL:  {cobol.stdout!r}\nPython: {python_stdout!r}"),
             cobc_available=True,
         )
     return EquivalenceResult(

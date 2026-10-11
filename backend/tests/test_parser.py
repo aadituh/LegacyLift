@@ -92,9 +92,7 @@ def test_bankmain_every_paragraph_with_start_and_end_lines() -> None:
         assert para.end_line >= para.start_line
 
     # Each paragraph ends where the next one starts
-    for prev, nxt in zip(
-        parsed.paragraphs, parsed.paragraphs[1:], strict=False
-    ):
+    for prev, nxt in zip(parsed.paragraphs, parsed.paragraphs[1:], strict=False):
         assert prev.end_line + 1 == nxt.start_line
 
     assert "PERFORM LOAD-ACCOUNTS" in parsed.paragraphs[0].body
@@ -106,9 +104,9 @@ def test_paragraph_requires_column_8() -> None:
         "       PROGRAM-ID. P.\n"
         "       PROCEDURE DIVISION.\n"
         "       REAL-PARA.\n"
-        "           DISPLAY \"HI\".\n"
+        '           DISPLAY "HI".\n'
         "           FAKE-PARA.\n"
-        "           DISPLAY \"NO\".\n"
+        '           DISPLAY "NO".\n'
         "       NEXT-PARA.\n"
         "           STOP RUN.\n"
     )
@@ -172,7 +170,7 @@ def test_continuation_dash_merges_onto_previous_line() -> None:
         "       PROGRAM-ID. CONTDEMO.\n"
         "       DATA DIVISION.\n"
         "       WORKING-STORAGE SECTION.\n"
-        '       01  MSG PIC X(20) VALUE\n'
+        "       01  MSG PIC X(20) VALUE\n"
         '      -    "HELLO".\n'
         "       PROCEDURE DIVISION.\n"
         "       MAIN.\n"
@@ -194,7 +192,7 @@ def test_comment_indicator_never_becomes_code() -> None:
     text = (
         "       IDENTIFICATION DIVISION.\n"
         "       PROGRAM-ID. CMT.\n"
-        "      *THIS IS A COMMENT WITH CALL \"FAKE\" AND COPY BOGUS.\n"
+        '      *THIS IS A COMMENT WITH CALL "FAKE" AND COPY BOGUS.\n'
         "       DATA DIVISION.\n"
         "       WORKING-STORAGE SECTION.\n"
         "       01  X PIC 9.\n"

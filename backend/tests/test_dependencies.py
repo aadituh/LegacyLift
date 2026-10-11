@@ -32,9 +32,7 @@ def test_bank_sample_copy_and_call_links() -> None:
     file_deps = [d for d in deps if d.kind != DependencyKind.PERFORM]
     by_source: dict[str, list[tuple[str, str, int]]] = {}
     for dep in file_deps:
-        by_source.setdefault(dep.source, []).append(
-            (dep.kind.value, dep.target, dep.line)
-        )
+        by_source.setdefault(dep.source, []).append((dep.kind.value, dep.target, dep.line))
 
     assert by_source["BANKMAIN.cbl"] == [
         ("copy", "ACCTDEF.cpy", 41),
@@ -54,9 +52,7 @@ def test_bank_sample_copy_and_call_links() -> None:
 def test_bankmain_perform_links() -> None:
     programs = _parse("BANKMAIN.cbl")
     deps, unresolved = find_dependencies(programs, ["BANKMAIN.cbl"])
-    performs = [
-        (d.source, d.target, d.line) for d in _by_kind(deps, DependencyKind.PERFORM)
-    ]
+    performs = [(d.source, d.target, d.line) for d in _by_kind(deps, DependencyKind.PERFORM)]
     assert performs == [
         ("BANKMAIN.cbl:MAIN-LOGIC", "LOAD-ACCOUNTS", 74),
         ("BANKMAIN.cbl:MAIN-LOGIC", "POST-TRANSACTIONS", 75),
@@ -76,17 +72,15 @@ def test_perform_thru_expands_paragraph_range() -> None:
         "           PERFORM ALPHA THRU GAMMA.\n"
         "           STOP RUN.\n"
         "       ALPHA.\n"
-        "           DISPLAY \"A\".\n"
+        '           DISPLAY "A".\n'
         "       BETA.\n"
-        "           DISPLAY \"B\".\n"
+        '           DISPLAY "B".\n'
         "       GAMMA.\n"
-        "           DISPLAY \"C\".\n"
+        '           DISPLAY "C".\n'
     )
     programs = [parse_program("P.cbl", text)]
     deps, unresolved = find_dependencies(programs, ["P.cbl"])
-    performs = [
-        (d.source, d.target, d.line) for d in _by_kind(deps, DependencyKind.PERFORM)
-    ]
+    performs = [(d.source, d.target, d.line) for d in _by_kind(deps, DependencyKind.PERFORM)]
     assert performs == [
         ("P.cbl:START-PARA", "ALPHA", 5),
         ("P.cbl:START-PARA", "BETA", 5),
@@ -133,9 +127,11 @@ def test_missing_copybook_is_unresolved() -> None:
     deps, unresolved = find_dependencies(programs, catalog)
 
     file_deps = [d for d in deps if d.kind != DependencyKind.PERFORM]
-    assert [
-        (d.kind.value, d.target) for d in file_deps
-    ] == [("copy", "ACCTDEF.cpy"), ("call", "TXNPOST.cbl"), ("call", "INTCALC.cbl")]
+    assert [(d.kind.value, d.target) for d in file_deps] == [
+        ("copy", "ACCTDEF.cpy"),
+        ("call", "TXNPOST.cbl"),
+        ("call", "INTCALC.cbl"),
+    ]
     copy_unresolved = [u for u in unresolved if u.kind == DependencyKind.COPY]
     assert len(copy_unresolved) == 1
     assert copy_unresolved[0].source == "BANKMAIN.cbl"

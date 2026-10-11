@@ -287,9 +287,7 @@ def _extract_program_id(lines: list[SourceLine], fallback: str) -> str:
     return stem.upper() if stem else "UNKNOWN"
 
 
-def _division_by_name(
-    divisions: list[Division], name: DivisionName
-) -> Division | None:
+def _division_by_name(divisions: list[Division], name: DivisionName) -> Division | None:
     for division in divisions:
         if division.name == name:
             return division
@@ -494,11 +492,7 @@ def _extract_fields_from_lines(lines: list[SourceLine]) -> list[Field]:
             if not nxt:
                 i += 1
                 continue
-            if (
-                _is_field_start(nxt)
-                or _SECTION_HEADER_RE.match(nxt)
-                or _match_division(nxt)
-            ):
+            if _is_field_start(nxt) or _SECTION_HEADER_RE.match(nxt) or _match_division(nxt):
                 break
             clause = f"{clause} {nxt}"
             i += 1
@@ -616,9 +610,7 @@ def _paragraph_at(paragraphs: list[Paragraph], line_no: int) -> str | None:
     return None
 
 
-def _extract_performs(
-    lines: list[SourceLine], paragraphs: list[Paragraph]
-) -> list[PerformRef]:
+def _extract_performs(lines: list[SourceLine], paragraphs: list[Paragraph]) -> list[PerformRef]:
     """Collect ``PERFORM name`` / ``PERFORM a THRU b`` (skip loop forms)."""
     refs: list[PerformRef] = []
     seen: set[tuple[str, str | None, int]] = set()

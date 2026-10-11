@@ -96,9 +96,7 @@ def _perform_source(program_name: str, caller: str | None) -> str:
     return program_name
 
 
-def _paragraphs_through(
-    paragraphs: Sequence[Paragraph], start: str, end: str
-) -> list[str] | None:
+def _paragraphs_through(paragraphs: Sequence[Paragraph], start: str, end: str) -> list[str] | None:
     """Paragraph names from ``start`` through ``end`` in PROCEDURE order.
 
     Returns ``None`` if either endpoint is missing.

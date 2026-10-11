@@ -36,6 +36,7 @@ class ProjectRepository(Protocol):
     def save(self, project: Project) -> None:
         """Write a changed project."""
 
+
 # Uvicorn already prints this logger, so messages appear in the server console.
 logger = logging.getLogger("uvicorn.error")
 LAST_ID_FILE = "last_id.txt"
