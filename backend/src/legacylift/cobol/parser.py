@@ -88,6 +88,15 @@ _CALL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Paragraph PERFORM (not PERFORM UNTIL / VARYING / n TIMES loops).
+_PERFORM_RE = re.compile(
+    r"\bPERFORM\s+([A-Z0-9][A-Z0-9-]*)"
+    r"(?:\s+(?:THRU|THROUGH)\s+([A-Z0-9][A-Z0-9-]*))?",
+    re.IGNORECASE,
+)
+
+_PERFORM_LOOP_STARTERS = frozenset({"UNTIL", "VARYING", "WITH", "TEST"})
+
 _SKIP_PARAGRAPH_NAMES = frozenset(
     {
         "IDENTIFICATION",
@@ -168,6 +177,15 @@ class CallRef(BaseModel):
     line: int
 
 
+class PerformRef(BaseModel):
+    """A paragraph ``PERFORM`` (optional ``THRU``) inside PROCEDURE DIVISION."""
+
+    caller: str | None
+    name: str
+    thru: str | None = None
+    line: int
+
+
 class ParsedProgram(BaseModel):
     """Structured view of one COBOL program or copybook for the API / analyzer."""
 
@@ -178,6 +196,7 @@ class ParsedProgram(BaseModel):
     paragraphs: list[Paragraph] = PydanticField(default_factory=list)
     copies: list[CopyRef] = PydanticField(default_factory=list)
     calls: list[CallRef] = PydanticField(default_factory=list)
+    performs: list[PerformRef] = PydanticField(default_factory=list)
 
 
 def _code_area(raw: str) -> tuple[str, str] | None:
@@ -589,6 +608,41 @@ def _extract_calls(lines: list[SourceLine]) -> list[CallRef]:
     return refs
 
 
+def _paragraph_at(paragraphs: list[Paragraph], line_no: int) -> str | None:
+    """Return the paragraph that contains ``line_no``, if any."""
+    for paragraph in paragraphs:
+        if paragraph.start_line <= line_no <= paragraph.end_line:
+            return paragraph.name
+    return None
+
+
+def _extract_performs(
+    lines: list[SourceLine], paragraphs: list[Paragraph]
+) -> list[PerformRef]:
+    """Collect ``PERFORM name`` / ``PERFORM a THRU b`` (skip loop forms)."""
+    refs: list[PerformRef] = []
+    seen: set[tuple[str, str | None, int]] = set()
+    for line in lines:
+        for match in _PERFORM_RE.finditer(line.text):
+            name = match.group(1).upper()
+            if name in _PERFORM_LOOP_STARTERS or name.isdigit():
+                continue
+            thru = match.group(2).upper() if match.group(2) else None
+            key = (name, thru, line.number)
+            if key in seen:
+                continue
+            seen.add(key)
+            refs.append(
+                PerformRef(
+                    caller=_paragraph_at(paragraphs, line.number),
+                    name=name,
+                    thru=thru,
+                    line=line.number,
+                )
+            )
+    return refs
+
+
 def parse_program(name: str, text: str) -> ParsedProgram:
     """Parse fixed-format COBOL text into a ``ParsedProgram``.
 
@@ -601,8 +655,8 @@ def parse_program(name: str, text: str) -> ParsedProgram:
         text: Full source text. Never executed.
 
     Returns:
-        Structured divisions, fields, paragraphs, COPY and CALL references
-        with original file line numbers.
+        Structured divisions, fields, paragraphs, COPY, CALL, and PERFORM
+        references with original file line numbers.
     """
     lines = _physical_lines(text)
     divisions = _split_divisions(lines)
@@ -616,12 +670,14 @@ def parse_program(name: str, text: str) -> ParsedProgram:
     else:
         field_lines = lines
 
+    paragraphs = _extract_paragraphs(procedure)
     return ParsedProgram(
         name=name,
         program_id=program_id,
         divisions=divisions,
         fields=_extract_fields_from_lines(field_lines),
-        paragraphs=_extract_paragraphs(procedure),
+        paragraphs=paragraphs,
         copies=_extract_copies(lines),
         calls=_extract_calls(lines),
+        performs=_extract_performs(lines, paragraphs),
     )

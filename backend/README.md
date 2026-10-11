@@ -30,7 +30,7 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `DELETE /api/projects/{id}` | none | Deletes the project, its files, and its runs (204) |
 | `POST /api/projects/{id}/files` | files in multipart field `files` | The files that were added |
 | `DELETE /api/projects/{id}/files/{file_id}` | none | Removes one file (204); saved runs keep their results |
-| `POST /api/projects/{id}/analyze` | none | File counts plus COPY/CALL `dependencies` and `unresolved` (status `analyzed`) |
+| `POST /api/projects/{id}/analyze` | none | File counts plus COPY/CALL/PERFORM `dependencies` and `unresolved` (status `analyzed`) |
 | `POST /api/projects/{id}/convert` | none | Python for each program, saved as a run |
 | `POST /api/projects/{id}/verify` | none | Run each program with GnuCOBOL and compare stdout to Python: `verified` / `mismatch` / `not_verified` (no `cobc`) |
 | `GET /api/projects/{id}/runs` | none | All runs, oldest first, without their Python |

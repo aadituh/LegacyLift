@@ -151,20 +151,20 @@ class FileCounts(BaseModel):
 
 
 class DependencyLink(BaseModel):
-    """A resolved COPY or CALL from one project file to another (analyze run)."""
+    """A resolved COPY, CALL, or PERFORM link from an analyze run."""
 
     source: str
     target: str
-    kind: str  # "copy" | "call"
+    kind: str  # "copy" | "call" | "perform"
     line: int
 
 
 class UnresolvedDependency(BaseModel):
-    """A COPY or CALL whose target is not among the project's files."""
+    """A COPY, CALL, or PERFORM whose target could not be resolved."""
 
     source: str
     name: str
-    kind: str  # "copy" | "call"
+    kind: str  # "copy" | "call" | "perform"
     line: int
 
 

@@ -1,12 +1,15 @@
-"""COPY and CALL dependency links between parsed COBOL programs and project files.
+"""COPY, CALL, and PERFORM dependency links from parsed COBOL programs.
 
 Hand-off for the API::
 
     find_dependencies(programs, catalog) -> (list[Dependency], list[UnresolvedRef])
 
-``catalog`` is the project's file names. Matching ignores case and extension
-(``ACCTDEF`` ↔ ``ACCTDEF.cpy``, ``TXNPOST`` ↔ ``TXNPOST.cbl``). References with
-no matching file are returned in ``unresolved``.
+* ``copy`` / ``call`` — match names to project files (case/extension ignored);
+  unmatched names go in ``unresolved``.
+* ``perform`` — paragraph-to-paragraph links inside a program
+  (``source`` = ``file:CALLER``, ``target`` = performed paragraph).
+  ``PERFORM a THRU b`` expands to every paragraph from ``a`` through ``b``.
+  Unknown paragraph names go in ``unresolved``.
 """
 
 from __future__ import annotations
@@ -17,18 +20,19 @@ from pathlib import PurePosixPath
 
 from pydantic import BaseModel
 
-from legacylift.cobol.parser import ParsedProgram
+from legacylift.cobol.parser import Paragraph, ParsedProgram, PerformRef
 
 
 class DependencyKind(StrEnum):
-    """How one program refers to another file."""
+    """How one program unit refers to another."""
 
     COPY = "copy"
     CALL = "call"
+    PERFORM = "perform"
 
 
 class Dependency(BaseModel):
-    """A resolved link from a program to a project file."""
+    """A resolved link (file-to-file for COPY/CALL, paragraph-to-paragraph for PERFORM)."""
 
     source: str
     target: str
@@ -37,7 +41,7 @@ class Dependency(BaseModel):
 
 
 class UnresolvedRef(BaseModel):
-    """A COPY or CALL whose name does not match any project file."""
+    """A COPY, CALL, or PERFORM whose target could not be resolved."""
 
     source: str
     name: str
@@ -73,7 +77,7 @@ def _prefer_target(candidates: list[str], kind: DependencyKind) -> str:
     return preferred[0] if preferred else candidates[0]
 
 
-def _resolve(
+def _resolve_file(
     name: str,
     kind: DependencyKind,
     index: dict[str, list[str]],
@@ -85,19 +89,92 @@ def _resolve(
     return _prefer_target(candidates, kind)
 
 
+def _perform_source(program_name: str, caller: str | None) -> str:
+    """Qualify the calling paragraph with its program file name."""
+    if caller:
+        return f"{program_name}:{caller}"
+    return program_name
+
+
+def _paragraphs_through(
+    paragraphs: Sequence[Paragraph], start: str, end: str
+) -> list[str] | None:
+    """Paragraph names from ``start`` through ``end`` in PROCEDURE order.
+
+    Returns ``None`` if either endpoint is missing.
+    """
+    names = [p.name for p in paragraphs]
+    try:
+        i = names.index(start)
+        j = names.index(end)
+    except ValueError:
+        return None
+    if i > j:
+        i, j = j, i
+    return names[i : j + 1]
+
+
+def _add_perform_links(
+    program: ParsedProgram,
+    perform: PerformRef,
+    dependencies: list[Dependency],
+    unresolved: list[UnresolvedRef],
+) -> None:
+    """Resolve one PERFORM (and optional THRU range) against local paragraphs."""
+    source = _perform_source(program.name, perform.caller)
+    known = {p.name for p in program.paragraphs}
+
+    if perform.thru:
+        span = _paragraphs_through(program.paragraphs, perform.name, perform.thru)
+        if span is None:
+            for name in (perform.name, perform.thru):
+                if name not in known:
+                    unresolved.append(
+                        UnresolvedRef(
+                            source=source,
+                            name=name,
+                            kind=DependencyKind.PERFORM,
+                            line=perform.line,
+                        )
+                    )
+            return
+        targets = span
+    elif perform.name not in known:
+        unresolved.append(
+            UnresolvedRef(
+                source=source,
+                name=perform.name,
+                kind=DependencyKind.PERFORM,
+                line=perform.line,
+            )
+        )
+        return
+    else:
+        targets = [perform.name]
+
+    for target in targets:
+        dependencies.append(
+            Dependency(
+                source=source,
+                target=target,
+                kind=DependencyKind.PERFORM,
+                line=perform.line,
+            )
+        )
+
+
 def find_dependencies(
     programs: Sequence[ParsedProgram],
     catalog: Sequence[str],
 ) -> tuple[list[Dependency], list[UnresolvedRef]]:
-    """Build COPY/CALL links from parsed programs against project file names.
+    """Build COPY/CALL/PERFORM links from parsed programs.
 
     Args:
-        programs: Parsed COBOL programs (``ParsedProgram.copies`` / ``.calls``).
-        catalog: All project file names used for matching (programs, copybooks, …).
+        programs: Parsed COBOL programs.
+        catalog: Project file names for COPY/CALL matching.
 
     Returns:
-        ``(dependencies, unresolved)`` — resolved edges use the matched file
-        name as ``target``; unresolved entries keep the COBOL reference ``name``.
+        ``(dependencies, unresolved)``.
     """
     index = _catalog_index(catalog)
     dependencies: list[Dependency] = []
@@ -106,7 +183,7 @@ def find_dependencies(
     for program in programs:
         source = program.name
         for copy in program.copies:
-            target = _resolve(copy.name, DependencyKind.COPY, index)
+            target = _resolve_file(copy.name, DependencyKind.COPY, index)
             if target is None:
                 unresolved.append(
                     UnresolvedRef(
@@ -126,7 +203,7 @@ def find_dependencies(
                     )
                 )
         for call in program.calls:
-            target = _resolve(call.name, DependencyKind.CALL, index)
+            target = _resolve_file(call.name, DependencyKind.CALL, index)
             if target is None:
                 unresolved.append(
                     UnresolvedRef(
@@ -145,5 +222,7 @@ def find_dependencies(
                         line=call.line,
                     )
                 )
+        for perform in program.performs:
+            _add_perform_links(program, perform, dependencies, unresolved)
 
     return dependencies, unresolved
