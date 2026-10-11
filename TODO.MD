@@ -12,7 +12,7 @@ Upload `BANKMAIN`, `INTCALC`, `TXNPOST`, `ACCTDEF`, and test data as one project
 - [x] List projects (`GET /api/projects`) so the page can reopen one.
 - [x] Delete a project or one of its files.
 - [x] Parse fixed-format COBOL: divisions, fields, paragraphs, and copybooks, keeping line numbers.
-- [ ] Analyze files together: return `COPY`, `CALL`, and `PERFORM` links and unresolved references.
+- [x] Analyze files together: return `COPY` and `CALL` links and unresolved references (`PERFORM` later).
 - [ ] Make Python behave like COBOL: number padding, overflow, unsigned fields, text length, and `Decimal` arithmetic with `ROUNDED`.
 - [ ] Convert the sample's groups, level 88 fields, `OCCURS`, paragraphs, loops, conditions, and calls.
 - [x] Verify: run COBOL (GnuCOBOL) and Python on the same input; return pass/fail and per-file stdout diff (`POST /api/projects/{id}/verify`).

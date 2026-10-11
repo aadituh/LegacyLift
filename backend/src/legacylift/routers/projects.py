@@ -125,7 +125,7 @@ def delete_file(project: ProjectDep, service: ProjectServiceDep, file_id: str) -
 
 @router.post("/{project_id}/analyze")
 def analyze_project(project: ProjectDep, service: ProjectServiceDep) -> AnalyzeResponse:
-    """Count the project's files by kind. Dependency analysis is not built yet.
+    """Count files and resolve COPY/CALL links between programs and project files.
 
     \f
     Raises:
@@ -137,7 +137,8 @@ def analyze_project(project: ProjectDep, service: ProjectServiceDep) -> AnalyzeR
         run_id=run.id,
         status=run.status,
         **counts.model_dump(),
-        note="File inventory only; dependency analysis is not implemented yet.",
+        dependencies=run.dependencies,
+        unresolved=run.unresolved,
     )
 
 

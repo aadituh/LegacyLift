@@ -8,7 +8,7 @@ Every change follows the same pattern: change the ``Project``, then
 FastAPI runs routes on several threads. New files and runs get the project's
 next number as their ID (``"1"``, ``"2"``, ...).
 
-Analyze only counts files for now (``inventory_only``). Verify compiles each
+Analyze parses programs for COPY/CALL links (``analyzed``). Verify compiles each
 program with GnuCOBOL, runs it beside the generated Python, and records whether
 stdout matches (``verified`` / ``mismatch`` / ``not_verified`` if ``cobc`` is
 missing).
@@ -16,10 +16,13 @@ missing).
 
 import threading
 
+from legacylift.cobol.dependencies import find_dependencies
 from legacylift.cobol.equivalence import check_functional_equivalence
+from legacylift.cobol.parser import parse_program
 from legacylift.errors import InvalidInputError, NotFoundError, ProjectStateError
 from legacylift.models import (
     ConvertedProjectFile,
+    DependencyLink,
     EquivalenceCheck,
     FileCounts,
     FileKind,
@@ -28,6 +31,7 @@ from legacylift.models import (
     RunKind,
     RunStatus,
     SourceFile,
+    UnresolvedDependency,
 )
 from legacylift.sample_data import DEMO_FILES
 from legacylift.services.conversion import conversion_status, convert_file, python_file_name
@@ -330,16 +334,16 @@ class ProjectService:
         return new_files
 
     def analyze(self, project: Project) -> tuple[Run, FileCounts]:
-        """Count a project's files by kind and save an analyze run.
+        """Parse programs for COPY/CALL links, count files, and save an analyze run.
 
-        A placeholder until dependency analysis is built, which is why the run
-        status is ``INVENTORY_ONLY``.
+        Matches reference names to project files ignoring case and extension.
+        Unmatched names are stored on the run as ``unresolved``.
 
         Args:
             project: The project to analyze.
 
         Returns:
-            The saved run, and the file counts.
+            The saved run (status ``ANALYZED``), and the file counts.
 
         Raises:
             ProjectStateError: If the project has no files.
@@ -348,11 +352,41 @@ class ProjectService:
             >>> service = ProjectService(ProjectStore(data_dir=None, max_projects=10))
             >>> run, counts = service.analyze(service.create_demo_project())
             >>> run.status, counts.program_count, counts.copybook_count, counts.data_file_count
-            (<RunStatus.INVENTORY_ONLY: 'inventory_only'>, 1, 1, 1)
+            (<RunStatus.ANALYZED: 'analyzed'>, 1, 1, 1)
         """
         if not project.files:
             raise ProjectStateError("Upload files before analyzing.")
-        run = self._save_run(project, RunKind.ANALYZE, RunStatus.INVENTORY_ONLY)
+
+        parsed = [
+            parse_program(file.name, file.content)
+            for file in project.files
+            if file.kind == FileKind.PROGRAM
+        ]
+        catalog = [file.name for file in project.files]
+        deps, unresolved = find_dependencies(parsed, catalog)
+        run = self._save_run(
+            project,
+            RunKind.ANALYZE,
+            RunStatus.ANALYZED,
+            dependencies=[
+                DependencyLink(
+                    source=d.source,
+                    target=d.target,
+                    kind=d.kind.value,
+                    line=d.line,
+                )
+                for d in deps
+            ],
+            unresolved=[
+                UnresolvedDependency(
+                    source=u.source,
+                    name=u.name,
+                    kind=u.kind.value,
+                    line=u.line,
+                )
+                for u in unresolved
+            ],
+        )
         return run, file_counts(project)
 
     def convert(self, project: Project) -> Run:
@@ -481,6 +515,8 @@ class ProjectService:
         status: RunStatus,
         files: list[ConvertedProjectFile] | None = None,
         checks: list[EquivalenceCheck] | None = None,
+        dependencies: list[DependencyLink] | None = None,
+        unresolved: list[UnresolvedDependency] | None = None,
     ) -> Run:
         """Record a step as the project's next run (IDs ``"1"``, ``"2"``, ...) and save.
 
@@ -494,6 +530,8 @@ class ProjectService:
                 status=status,
                 files=files or [],
                 checks=checks or [],
+                dependencies=dependencies or [],
+                unresolved=unresolved or [],
             )
             project.runs.append(run)
             self.store.save(project)

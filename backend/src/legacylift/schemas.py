@@ -18,10 +18,12 @@ from pydantic import BaseModel, Field
 from legacylift.models import (
     ConvertedFile,
     ConvertedProjectFile,
+    DependencyLink,
     FileCounts,
     RunStatus,
     RunSummary,
     SourceFile,
+    UnresolvedDependency,
 )
 
 
@@ -122,21 +124,23 @@ class ConvertResponse(BaseModel):
 
 
 class AnalyzeResponse(FileCounts):
-    """Response from ``POST /api/projects/{id}/analyze`` (placeholder).
+    """Response from ``POST /api/projects/{id}/analyze``.
 
     Has the ``FileCounts`` fields plus:
 
     Attributes:
         project_id: The analyzed project.
         run_id: ID of the saved analyze run.
-        status: Always ``inventory_only`` for now.
-        note: Says that dependency analysis is not built yet.
+        status: ``analyzed`` after COPY/CALL dependency discovery.
+        dependencies: Resolved COPY/CALL links (matched project file names).
+        unresolved: COPY/CALL names with no matching project file.
     """
 
     project_id: str
     run_id: str
     status: RunStatus
-    note: str
+    dependencies: list[DependencyLink] = Field(default_factory=list)
+    unresolved: list[UnresolvedDependency] = Field(default_factory=list)
 
 
 class FileEquivalenceResponse(BaseModel):
