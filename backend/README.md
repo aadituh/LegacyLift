@@ -30,9 +30,9 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `DELETE /api/projects/{id}` | none | Deletes the project, its files, and its runs (204) |
 | `POST /api/projects/{id}/files` | files in multipart field `files` | The files that were added |
 | `DELETE /api/projects/{id}/files/{file_id}` | none | Removes one file (204); saved runs keep their results |
-| `POST /api/projects/{id}/analyze` | none | File counts. Placeholder: status `inventory_only` |
+| `POST /api/projects/{id}/analyze` | none | File counts plus COPY/CALL/PERFORM `dependencies` and `unresolved` (status `analyzed`) |
 | `POST /api/projects/{id}/convert` | none | Python for each program, saved as a run |
-| `POST /api/projects/{id}/verify` | none | Placeholder: status `not_verified`, `passed: null` |
+| `POST /api/projects/{id}/verify` | none | Run each program with GnuCOBOL and compare stdout to Python: `verified` / `mismatch` / `not_verified` (no `cobc`) |
 | `GET /api/projects/{id}/runs` | none | All runs, oldest first, without their Python |
 | `GET /api/projects/{id}/runs/{run_id}` | none | One run; a convert run includes its Python |
 | `GET /api/projects/{id}/runs/{run_id}/files/{name}` | none | One saved `.py` file (`Content-Disposition: attachment`) |
@@ -70,6 +70,7 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_DATA_DIR` | `data/projects` | Used when `DATABASE_URL` is unset: projects are saved as `<id>.json` (plus `last_id.txt`, the ID counter), relative to where uvicorn starts. Git ignores `backend/data/`. Render resets it on redeploy. |
 | `LEGACYLIFT_MAX_PROJECTS` | `100` | Projects kept; the oldest is deleted first. |
 | `LEGACYLIFT_MAX_REQUEST_BYTES` | `1200000` | Largest request body. |
+| `LEGACYLIFT_COBC_PATH` | unset | Optional path to GnuCOBOL `cobc` for verify. Otherwise `cobc` must be on PATH. |
 
 ## Code layout
 
@@ -91,8 +92,23 @@ src/legacylift/
 ├── responses.py      `.py` download responses
 ├── services/         rules: uploads.py, conversion.py, projects.py, batch_downloads.py
 └── cobol/
-    └── converter.py  translate_program(): COBOL subset → Python
+    ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
+    ├── dependencies.py  find_dependencies(): COPY/CALL links + unresolved
+    ├── converter.py     translate_program(): COBOL subset → Python
+    ├── gnucobol.py      compile/run programs with cobc
+    └── equivalence.py   compare GnuCOBOL stdout to generated Python
 ```
+
+### Verify / GnuCOBOL
+
+`POST /api/projects/{id}/verify` (after convert) compiles each `.cbl`/`.cob` with [GnuCOBOL](https://gnucobol.sourceforge.io/) (`cobc -x -free`), runs it, runs the matching Python draft, and requires **exact** stdout equality. Copybooks in the project are placed beside the program for `COPY`.
+
+| Status | Meaning |
+| --- | --- |
+| `verified` | Every program matched (`passed: true`) |
+| `mismatch` | At least one differed or failed (`passed: false`) |
+| `not_verified` | `cobc` not found (`passed: null`) |
+
 
 Tests are in [`tests/`](tests/); pytest also runs the examples in docstrings.
 

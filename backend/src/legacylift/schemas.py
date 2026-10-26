@@ -18,10 +18,12 @@ from pydantic import BaseModel, Field
 from legacylift.models import (
     ConvertedFile,
     ConvertedProjectFile,
+    DependencyLink,
     FileCounts,
     RunStatus,
     RunSummary,
     SourceFile,
+    UnresolvedDependency,
 )
 
 
@@ -122,32 +124,47 @@ class ConvertResponse(BaseModel):
 
 
 class AnalyzeResponse(FileCounts):
-    """Response from ``POST /api/projects/{id}/analyze`` (placeholder).
+    """Response from ``POST /api/projects/{id}/analyze``.
 
     Has the ``FileCounts`` fields plus:
 
     Attributes:
         project_id: The analyzed project.
         run_id: ID of the saved analyze run.
-        status: Always ``inventory_only`` for now.
-        note: Says that dependency analysis is not built yet.
+        status: ``analyzed`` after COPY/CALL dependency discovery.
+        dependencies: Resolved COPY/CALL links (matched project file names).
+        unresolved: COPY/CALL names with no matching project file.
     """
 
     project_id: str
     run_id: str
     status: RunStatus
-    note: str
+    dependencies: list[DependencyLink] = Field(default_factory=list)
+    unresolved: list[UnresolvedDependency] = Field(default_factory=list)
+
+
+class FileEquivalenceResponse(BaseModel):
+    """One program's COBOL-versus-Python comparison in a verify response."""
+
+    source_name: str
+    python_name: str
+    equivalent: bool
+    cobol_stdout: str = ""
+    python_stdout: str = ""
+    error: str | None = None
 
 
 class VerifyResponse(BaseModel):
-    """Response from ``POST /api/projects/{id}/verify`` (placeholder).
+    """Response from ``POST /api/projects/{id}/verify``.
 
     Attributes:
         project_id: The project.
         run_id: ID of the saved verify run.
-        status: Always ``not_verified`` for now.
-        passed: Always ``None`` until outputs are compared.
-        note: Says that no comparison was made.
+        status: ``verified``, ``mismatch``, or ``not_verified`` (no GnuCOBOL).
+        passed: ``True`` if every program matched, ``False`` on mismatch,
+            ``None`` if GnuCOBOL was unavailable.
+        note: Short human-readable summary.
+        files: Per-program equivalence details.
     """
 
     project_id: str
@@ -155,6 +172,7 @@ class VerifyResponse(BaseModel):
     status: RunStatus
     passed: bool | None
     note: str
+    files: list[FileEquivalenceResponse] = []
 
 
 class RunsResponse(BaseModel):

@@ -10,8 +10,8 @@ Upload `BANKMAIN`, `INTCALC`, `TXNPOST`, `ACCTDEF`, and test data as one project
 
 ### Conversion engine (Spencer)
 
-- [ ] #19 Parser: read fixed-format COBOL: divisions, fields, paragraphs, and copybooks, keeping line numbers.
-- [ ] #24 Dependency analysis: `COPY`, `CALL`, and `PERFORM` links and unresolved references.
+- [x] #19 Parser: read fixed-format COBOL: divisions, fields, paragraphs, and copybooks, keeping line numbers.
+- [x] #24 Dependency analysis: `POST /api/projects/{id}/analyze` returns `COPY`, `CALL`, and `PERFORM` links and unresolved references.
 - [ ] #20 Converter: translate the sample bank's groups, level 88 fields, `OCCURS`, paragraphs, loops, conditions, and calls.
 - [ ] #21 Converter: Python prints like COBOL: number padding, overflow, unsigned fields, text length, and `Decimal` arithmetic with `ROUNDED`.
 - [ ] #22 Converter: uploaded programs other than the sample convert to Python and show on the page.
@@ -20,7 +20,7 @@ Upload `BANKMAIN`, `INTCALC`, `TXNPOST`, `ACCTDEF`, and test data as one project
 
 - [ ] #23 GnuCOBOL runner container that compiles and runs `BANKMAIN` (with Spencer).
 - [ ] #36 Record real GnuCOBOL output for normal, overdraft, and closed-account inputs; the tests use it.
-- [ ] #37 Run the generated Python on the same `.dat` inputs; `POST /api/projects/{id}/verify` returns `verified` or `mismatch` with a diff.
+- [ ] #37 Verify runs the generated Python in its own process with a time limit, gives both programs the project's `.dat` files, and runs in the runner container.
 - [ ] #34 `docker compose up` starts the web app, API, database, and runner from a fresh clone (with Jordan).
 - [ ] #39 COBOL and `.dat` files for the accountant walkthrough.
 - [ ] #38 Decide whether the web app moves from GitHub Pages to Vercel.
@@ -57,6 +57,8 @@ Upload `BANKMAIN`, `INTCALC`, `TXNPOST`, `ACCTDEF`, and test data as one project
 - [x] Project API: create, upload, read back, convert, list runs, list projects, and delete a project or one of its files.
 - [x] Backend v2: Pydantic models, saved translations, size and project limits, pytest/ruff/mypy in CI.
 - [x] Unsupported code stays visible as review notes.
+- [x] Verify: `POST /api/projects/{id}/verify` compiles each program with GnuCOBOL, runs it and the generated Python, and compares stdout (`verified` / `mismatch` / `not_verified`).
+- [x] Parser, dependency, and COBOL-versus-Python equivalence tests.
 - [x] PostgreSQL (Neon) for projects, files, and runs; JSON files remain the fallback.
 - [x] Web app: create a project, upload `.cbl`, `.cob`, `.cpy`, and `.dat` files, show source beside Python with review notes, reopen a project, and show the last translation after a reload.
 - [x] Clear upload and conversion errors, including 413 (file too large).

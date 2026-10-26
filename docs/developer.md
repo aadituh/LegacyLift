@@ -15,7 +15,8 @@ App.jsx ──api.js──▶ FastAPI router ──▶ service ──▶ cobol/c
 3. **Batch:** on Upload → **Batch files**, **Choose COBOL files** or **Load small sample**; on Convert, **Convert files** calls `POST /api/convert`. Nothing is saved.
 4. **Project:** on Upload → **Project**, **Create project** or **Load demo project** creates a project and **Upload project files** adds files; on Convert, **Convert project** calls `POST /api/projects/{id}/convert`. The result is saved.
 5. Convert shows COBOL and Python side by side with review notes. Export **Download .py** fetches that file from the API.
-6. Errors come back as `{"detail": "message"}`, and `api.js` shows the message.
+6. **Verify (projects):** `POST /api/projects/{id}/verify` compiles each program with GnuCOBOL (`cobol/gnucobol.py`), runs it beside the generated Python (`cobol/equivalence.py`), and returns per-file stdout comparison (`verified` / `mismatch` / `not_verified` if `cobc` is missing).
+7. Errors come back as `{"detail": "message"}`, and `api.js` shows the message.
 
 The browser checks files for quick feedback; the backend checks everything again.
 

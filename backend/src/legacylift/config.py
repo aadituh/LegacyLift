@@ -36,6 +36,7 @@ class Settings(BaseSettings):
             Postgres instead of ``data_dir``.
         max_projects: How many projects to keep; the oldest is deleted first.
         max_request_bytes: Largest request body accepted; bigger ones get 413.
+        cobc_path: Optional path to GnuCOBOL's ``cobc`` for verify runs.
     """
 
     model_config = SettingsConfigDict(env_prefix="LEGACYLIFT_", env_file=".env", extra="ignore")
@@ -48,6 +49,7 @@ class Settings(BaseSettings):
     )
     max_projects: int = 100
     max_request_bytes: int = 1_200_000  # 10 files x 100 KB, plus form overhead
+    cobc_path: str | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod
