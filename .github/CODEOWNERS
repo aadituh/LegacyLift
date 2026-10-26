@@ -1,2 +1,3 @@
-# Default reviewer: GitHub requests a review from this owner on every pull request.
-* @aadituh
+# Every team member is asked to review each pull request (GitHub skips the author).
+# One review from anyone is enough.
+* @aadituh @terrasky064 @PizzaGuy665 @jtend-002 @dariusI001
