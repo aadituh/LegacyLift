@@ -7,6 +7,8 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 ### Added
 
 - `POST /api/projects/{id}/verify` compiles each program with GnuCOBOL (`cobc`), runs it, compares stdout to the generated Python, and returns per-file results (`verified` / `mismatch` / `not_verified` if `cobc` is missing). Optional `LEGACYLIFT_COBC_PATH`.
+- PostgreSQL storage: when `DATABASE_URL` is set, projects, files, and runs are stored in Neon (`neon_store.py`, tables in `database/schema.sql`). Without it, projects are saved as JSON files as before.
+- `run_and_verify_python` and `translate_and_verify` in the converter: run a generated draft and compare what it prints with the expected text.
 - `GET /api/projects/{id}/runs/{run_id}/files/{name}` downloads one saved `.py` file.
 - `POST /api/convert` returns `download_id`. `GET /api/convert/{download_id}/files/{name}` downloads that batch file until the API restarts.
 - `GET /api/projects`: every project, newest first, with file counts and its last run.
