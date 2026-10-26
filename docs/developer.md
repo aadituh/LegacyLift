@@ -43,7 +43,7 @@ If you change a route's JSON, update `api.js` and `App.jsx` in the same pull req
 | --- | --- | --- |
 | Web app | GitHub Pages | [`pages.yml`](../.github/workflows/pages.yml) builds it on every push to `main` and copies `docs/` to `/course/`. In GitHub, **Settings → Pages → Source** must be **GitHub Actions**. |
 | API address used by the web app | Actions variable `VITE_API_URL` | The API's HTTPS origin, without `/api`. Default: `https://legacylift-api.onrender.com`. |
-| API | Render | Set up in the Render dashboard. Saved projects are lost on every redeploy or restart. |
+| API | Render | Set up in the Render dashboard. With `DATABASE_URL` set to the Neon connection string, projects are stored in PostgreSQL; without it, saved projects are lost on every redeploy or restart. |
 | Allowed frontend origins | `LEGACYLIFT_CORS_ORIGINS` on the API | Local Vite and `https://aadituh.github.io` are always allowed. |
 
 Locally, Vite forwards `/api` and `/health` to `http://127.0.0.1:8000` ([`vite.config.js`](../frontend/app/vite.config.js)), so no address or CORS setup is needed.

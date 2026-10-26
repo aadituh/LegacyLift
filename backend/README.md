@@ -66,7 +66,8 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `LEGACYLIFT_CORS_ORIGINS` | none | Extra frontend origins, comma-separated. Local Vite and `https://aadituh.github.io` are always allowed. |
-| `LEGACYLIFT_DATA_DIR` | `data/projects` | Where projects are saved as `<id>.json` (plus `last_id.txt`, the ID counter), relative to where uvicorn starts. Git ignores `backend/data/`. Render resets it on redeploy. |
+| `DATABASE_URL` | none | Neon PostgreSQL connection string. When set, projects, files, and runs are stored in the database, and [`database/schema.sql`](../database/schema.sql) (repo root) is applied at startup. |
+| `LEGACYLIFT_DATA_DIR` | `data/projects` | Used when `DATABASE_URL` is unset: projects are saved as `<id>.json` (plus `last_id.txt`, the ID counter), relative to where uvicorn starts. Git ignores `backend/data/`. Render resets it on redeploy. |
 | `LEGACYLIFT_MAX_PROJECTS` | `100` | Projects kept; the oldest is deleted first. |
 | `LEGACYLIFT_MAX_REQUEST_BYTES` | `1200000` | Largest request body. |
 
@@ -82,6 +83,7 @@ src/legacylift/
 ├── models.py         stored data: Project, SourceFile, Run, enums
 ├── schemas.py        request and response bodies
 ├── storage.py        ProjectStore: memory + one JSON file per project, project IDs
+├── neon_store.py     NeonProjectStore: the same methods on Neon PostgreSQL
 ├── dependencies.py   ProjectServiceDep; ProjectDep (loads the project or 404)
 ├── sample_data.py    files for the demo project
 ├── data/             sample COBOL bank (programs, copybooks, .dat files)
@@ -102,6 +104,6 @@ Tests are in [`tests/`](tests/); pytest also runs the examples in docstrings.
 | Dependency analysis | New modules in `cobol/`, called from `ProjectService.analyze()` |
 | A route | `routers/`, with bodies in `schemas.py` and logic in `services/` |
 | An error | Subclass `LegacyLiftError`; set `status_code` if it isn't 400 |
-| PostgreSQL | A store with `ProjectStore`'s methods (`get`, `add`, `save`) |
+| A table or column | [`database/schema.sql`](../database/schema.sql) and the SQL in `neon_store.py` |
 
 See also: [changelog](docs/CHANGELOG.md), [developer guide](../docs/developer.md), [`prototype/`](prototype/README.md) (research code the API doesn't use).
