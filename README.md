@@ -1,6 +1,6 @@
 # LegacyLift
 
-LegacyLift analyzes legacy COBOL programs and converts them to Python for human review. It is the ODU CS 411W team project; the full design is in [the design presentation](docs/Formal%20Design%20Presentation%20Final.pdf).
+LegacyLift analyzes legacy COBOL programs and converts them to Python for human review. It is the ODU CS 411W team project; the full design is in [the design presentation](docs/presentations/cs410-formal-design.pdf).
 
 ## Status
 
