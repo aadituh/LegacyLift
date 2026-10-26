@@ -1,6 +1,6 @@
 # LegacyLift — Demo 2 work
 
-Demo 2 is due November 1. Every open item has a GitHub issue in the [Demo 2 milestone](https://github.com/aadituh/LegacyLift/milestone/1); work it through the steps in [CONTRIBUTING.md](CONTRIBUTING.md) and write `Closes #<number>` in the pull request.
+Demo 2 is due November 2 and Demo 3 is due December 2. Every open item has a GitHub issue in the [Demo 2 milestone](https://github.com/aadituh/LegacyLift/milestone/1); work it through the steps in [CONTRIBUTING.md](CONTRIBUTING.md) and write `Closes #<number>` in the pull request.
 
 ## Demo goal
 

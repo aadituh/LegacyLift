@@ -58,7 +58,9 @@ GitHub Actions runs the backend checks on every change under `backend/`.
 
 ## Merge rule
 
-Nothing is pushed straight to `main`. Every change has an issue, its own branch, and a pull request that one other team member approves before the author merges it. The checks must pass first. Steps: [CONTRIBUTING.md](CONTRIBUTING.md).
+Nothing is pushed straight to `main`. Every change has an issue, its own branch, and a pull request that a teammate reviews before the author merges it; Aaditya is the default reviewer. The checks must pass first. GitHub enforces this on `main`. Steps: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Work is tracked on the [project board](https://github.com/users/aadituh/projects/3): every issue is a user story, grouped by epic, milestone (Demo 1, Demo 2, Demo 3), and sprint.
 
 ## Hosting
 
