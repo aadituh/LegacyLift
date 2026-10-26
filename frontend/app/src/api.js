@@ -135,6 +135,24 @@ export async function convertProject(projectId) {
   return data
 }
 
+/**
+ * Count files and return COPY, CALL, and PERFORM Links
+ * (POST /api/projects/{id}/analyze).
+ */
+export async function analyzeProject(projectId) {
+  const data = await request(`/api/projects/${projectId}/analyze`, { method: 'POST' })
+  return data
+}
+
+/**
+ * Compare each program's COBOL and Python output
+ * (POST /api/projects/{id}/verify).
+ */
+export async function verifyProject(projectId) {
+  const data = await request(`/api/projects/${projectId}/verify`, { method: 'POST' })
+  return data
+}
+
 /** GET /api/projects. Newest first, with file counts and the last run, without file contents. */
 export async function listProjects() {
   return request('/api/projects', { method: 'GET' })
