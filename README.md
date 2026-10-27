@@ -16,6 +16,18 @@ Generated Python is a draft; review it before use.
 
 ## Quick start
 
+### With Docker
+
+You need [Docker](https://docs.docker.com/get-docker/) with Compose. From the repository root:
+
+```bash
+docker compose up --build
+```
+
+This starts PostgreSQL, the API, and the web app. Open <http://localhost:8080> for the web app and <http://localhost:8000/docs> for the API. Projects are kept in the `db-data` volume; `docker compose down -v` deletes them. Stop with `Ctrl+C` or `docker compose down`.
+
+### Without Docker
+
 You need [uv](https://docs.astral.sh/uv/) and Node.js 24. Open two terminals at the repository root.
 
 **Terminal 1: API** on <http://127.0.0.1:8000>
@@ -45,6 +57,7 @@ In the browser: on **Upload**, click **Load demo project**; on **Convert**, clic
 | [`backend/prototype/`](backend/prototype/) | Earlier research scripts shown in the design deck. The API does not use them. [README](backend/prototype/README.md) |
 | [`docs/`](docs/) | Course website, design deck, and the [developer guide](docs/developer.md) |
 | [`TODO.MD`](TODO.MD) | Work planned for Demo 2 |
+| [`docker-compose.yml`](docker-compose.yml) | Starts the database, API, and web app together; images from `backend/Dockerfile` and `frontend/app/Dockerfile` |
 | [`.github/workflows/`](.github/workflows/) | Backend checks, and the GitHub Pages deployment |
 
 ## Checks

@@ -1,0 +1,9 @@
+# Docker builds from the repository root see only what the images need.
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/.python-version
+!backend/README.md
+!backend/src
+!database/schema.sql
+**/__pycache__
