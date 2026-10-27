@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS project_id_counter (
 );
 
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS owner_id uuid;
+-- Idempotent: NeonProjectStore re-runs this file on every API startup.
+ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_owner_fk;
 ALTER TABLE projects
   ADD CONSTRAINT projects_owner_fk
   FOREIGN KEY (owner_id) REFERENCES neon_auth."user" (id);
