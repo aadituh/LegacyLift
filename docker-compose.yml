@@ -1,0 +1,46 @@
+# Start LegacyLift locally: docker compose up --build
+# Web app http://localhost:8080 · API http://localhost:8000/docs
+name: legacylift
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: legacylift
+      POSTGRES_PASSWORD: legacylift
+      POSTGRES_DB: legacylift
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legacylift -d legacylift"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://legacylift:legacylift@db:5432/legacylift
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build: frontend/app
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  db-data:
