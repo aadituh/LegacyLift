@@ -6,6 +6,7 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Added
 
+- Converter (issue #22): programs beyond the sample bank — group/`05` fields, `PIC …V…` decimals, paragraphs/`PERFORM`/`PERFORM … THRU`, `COMPUTE`, `MULTIPLY`/`DIVIDE`. Unsupported lines stay as review notes; drafts still run. Covered by `tests/test_converter.py` (`employee_payroll`, `simple_account`).
 - `backend/Dockerfile` and `docker-compose.yml`: `docker compose up --build` starts PostgreSQL, the API (waits for the database), and the web app on port 8080.
 - `POST /api/projects/{id}/verify` compiles each program with GnuCOBOL (`cobc`), runs it, compares stdout to the generated Python, and returns per-file results (`verified` / `mismatch` / `not_verified` if `cobc` is missing). Optional `LEGACYLIFT_COBC_PATH`.
 - PostgreSQL storage: when `DATABASE_URL` is set, projects, files, and runs are stored in Neon (`neon_store.py`, tables in `database/schema.sql`). Without it, projects are saved as JSON files as before.

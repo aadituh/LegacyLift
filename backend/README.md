@@ -45,7 +45,7 @@ Convert status: `review_required` (some lines became `# TODO` notes) or `draft` 
 ## Rules
 
 - **Files:** up to 10 per project (`.cbl`/`.cob`, `.cpy`, `.dat`), UTF-8 text, at most 100 KB each, names unique ignoring case and at most 255 printable characters. If one file fails, none are added.
-- **Converter:** `01`/`77` `WORKING-STORAGE` fields with `PIC X`, `XX`, `X(n)` or `PIC 9`, `99`, `9(n)`, plus `DISPLAY`, `MOVE … TO`, `ADD … TO`, `SUBTRACT … FROM`, `STOP RUN`. Other lines become review notes. Review all output before use.
+- **Converter:** Elementary `WORKING-STORAGE` fields (levels `01`–`49`/`77`) with `PIC X`/`9` (optional `S`, `V` decimals as float), group headers skipped, plus `DISPLAY`, `MOVE`/`ADD`/`SUBTRACT`, `MULTIPLY`/`DIVIDE`, simple `COMPUTE`, paragraph `PERFORM` / `PERFORM … THRU`, and `STOP RUN`. Other lines become review notes in the draft (and on the project page). Review all output before use.
 - **Limits:** requests over 1.2 MB get `413`; the newest 100 projects are kept.
 
 ## Errors

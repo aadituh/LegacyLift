@@ -64,14 +64,20 @@ def test_supported_code_converts_and_runs(storage, procedure, printed):
             ['Line 3: 01 N PIC 9 VALUE "ten"', "Line 5: DISPLAY N"],
         ),
         (
-            "01 ACCOUNT.\n   05 BALANCE PIC 9(5).\n88 IS-OPEN VALUE 'Y'.",  # group and level 88
+            # Group header is skipped; elementary 05 converts; level 88 stays a note.
+            "01 ACCOUNT.\n   05 BALANCE PIC 9(5).\n88 IS-OPEN VALUE 'Y'.",
             "DISPLAY 1.",
-            ["Line 3: 01 ACCOUNT", "Line 4: 05 BALANCE PIC 9(5)", "Line 5: 88 IS-OPEN VALUE 'Y'"],
+            ["Line 5: 88 IS-OPEN VALUE 'Y'"],
         ),
         (
             "01 WS-DAYS PIC 999 VALUE 30.\nLINKAGE SECTION.\n01 LS-DAYS PIC 999.",  # parameters
             "",
             ["Line 4: LINKAGE SECTION", "Line 5: 01 LS-DAYS PIC 999"],
+        ),
+        (
+            "01 N PIC 9.",
+            "PERFORM MISSING-PARA.",  # no such paragraph in the program
+            ["Line 5: PERFORM MISSING-PARA"],
         ),
     ],
 )
@@ -145,3 +151,118 @@ def test_translate_and_verify_fails_when_logic_output_differs():
 def test_translate_and_verify_raises_when_cobol_cannot_convert():
     with pytest.raises(ConversionError, match="PROGRAM-ID"):
         translate_and_verify("DISPLAY 1.", "1\n")
+
+
+# --- Programs outside the sample bank (issue #22) ---------------------------------
+
+
+BEYOND_SAMPLE = [
+    BACKEND / "prototype" / "data" / "employee_payroll.cbl",
+    BACKEND / "prototype" / "data" / "simple_account.cbl",
+]
+
+
+@pytest.mark.parametrize("path", BEYOND_SAMPLE, ids=lambda path: path.name)
+def test_beyond_sample_programs_convert_with_no_review_notes_and_run(path: Path):
+    """Uploaded non-bank programs convert to Python that executes cleanly."""
+    draft = translate_program(path.read_text(encoding="utf-8"))
+    assert draft.notes == [], f"unexpected review notes: {draft.notes}"
+    run_python(draft.python)
+
+
+def test_employee_payroll_compute_and_perform_output():
+    """Payroll: group/05 fields, COMPUTE multiply, PERFORM paragraphs, DISPLAY."""
+    source = (BACKEND / "prototype" / "data" / "employee_payroll.cbl").read_text(encoding="utf-8")
+    draft = translate_program(source)
+    assert draft.program_name == "PAYROLL"
+    assert draft.notes == []
+    assert "def calculate_pay():" in draft.python
+    assert "total_pay = hours_worked*hourly_rate" in draft.python
+    assert run_python(draft.python) == "Employee  earned 0.0\n"
+
+
+def test_simple_account_add_subtract_across_paragraphs():
+    """Account: signed decimals, ADD/SUBTRACT between fields, PERFORM chain."""
+    source = (BACKEND / "prototype" / "data" / "simple_account.cbl").read_text(encoding="utf-8")
+    draft = translate_program(source)
+    assert draft.program_name == "ACCOUNT-PROC"
+    assert draft.notes == []
+    assert "account_balance += transaction_amount" in draft.python
+    assert "account_balance -= transaction_amount" in draft.python
+    out = run_python(draft.python)
+    assert "Deposit processed for account 0" in out
+    assert "Withdrawal processed for account 0" in out
+    assert "Account Balance Report: 0.0" in out
+
+
+def test_paragraph_perform_thru_calls_each_paragraph_in_range():
+    source = """PROGRAM-ID. THRUDEMO.
+WORKING-STORAGE SECTION.
+01 WS-MSG PIC X(5) VALUE "x".
+PROCEDURE DIVISION.
+START-PARA.
+    PERFORM ALPHA THRU GAMMA.
+    STOP RUN.
+ALPHA.
+    DISPLAY "A".
+BETA.
+    DISPLAY "B".
+GAMMA.
+    DISPLAY "C".
+"""
+    draft = translate_program(source)
+    assert draft.notes == []
+    assert run_python(draft.python) == "A\nB\nC\n"
+
+
+def test_multiply_and_divide_statements():
+    source = program(
+        "01 A PIC 99 VALUE 3.\n01 B PIC 99 VALUE 4.\n01 C PIC 99 VALUE 8.",
+        "MULTIPLY A BY B.\nDIVIDE 2 INTO C.\nDISPLAY B.\nDISPLAY C.",
+    )
+    draft = translate_program(source)
+    assert draft.notes == []
+    assert run_python(draft.python) == "12\n4.0\n"  # DIVIDE uses true division
+
+
+def test_decimal_picture_uses_float_and_runs():
+    source = program(
+        "01 RATE PIC 99V99 VALUE 2.5.\n01 HOURS PIC 99V99 VALUE 4.0.\n01 PAY PIC 9(5)V99.",
+        "COMPUTE PAY = HOURS * RATE.\nDISPLAY PAY.",
+    )
+    draft = translate_program(source)
+    assert draft.notes == []
+    assert run_python(draft.python) == "10.0\n"
+
+
+def test_unsupported_lines_remain_visible_as_review_notes_on_draft():
+    """Acceptance: lines that still cannot convert stay visible as review notes."""
+    source = program(
+        "01 N PIC 9 VALUE 1.",
+        "IF N = 1\nDISPLAY N\nEND-IF\nPERFORM NO-SUCH.",
+    )
+    draft = translate_program(source)
+    assert any("IF N = 1" in note for note in draft.notes)
+    assert any("PERFORM NO-SUCH" in note for note in draft.notes)
+    assert "# TODO: COBOL line" in draft.python
+    run_python(draft.python)  # draft still runs despite TODOs
+
+
+def test_project_convert_endpoint_returns_python_and_notes_for_beyond_sample(client):
+    """API hand-off: convert result (python + notes) is what the project page shows."""
+    payroll = (BACKEND / "prototype" / "data" / "employee_payroll.cbl").read_text(encoding="utf-8")
+    created = client.post("/api/projects", json={"name": "Beyond sample"}).json()
+    base = f"/api/projects/{created['id']}"
+    upload = client.post(
+        f"{base}/files",
+        files=[("files", ("employee_payroll.cbl", payroll))],
+    )
+    assert upload.status_code == 200
+    result = client.post(f"{base}/convert").json()
+    assert result["status"] == "draft"
+    assert len(result["files"]) == 1
+    file_result = result["files"][0]
+    assert file_result["program_name"] == "PAYROLL"
+    assert file_result["notes"] == []
+    assert "def main():" in file_result["python"]
+    assert run_python(file_result["python"]) == "Employee  earned 0.0\n"
