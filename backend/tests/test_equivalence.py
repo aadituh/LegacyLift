@@ -124,7 +124,7 @@ def test_project_verify_reports_verified_when_outputs_match(client):
     base = f"/api/projects/{created['id']}"
     client.post(f"{base}/files", files=[("files", ("hello.cbl", HELLO))])
     converted = client.post(f"{base}/convert").json()
-    python_out = "Hello, LegacyLift\nDemo count: 2\n"
+    python_out = "Hello, LegacyLift          \nDemo count: 002\n"
     fake_cobol = CobolRunResult(ok=True, stdout=python_out, stderr="", returncode=0)
     with (
         patch("legacylift.cobol.equivalence.cobc_available", return_value=True),

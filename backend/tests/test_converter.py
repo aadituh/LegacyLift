@@ -30,16 +30,24 @@ def program(storage: str, procedure: str) -> str:
 @pytest.mark.parametrize(
     ("storage", "procedure", "printed"),
     [
-        ('01 PRINT PIC X(5) VALUE "hi".', "DISPLAY PRINT.", "hi\n"),  # name of a built-in
-        ("01 N PIC 9(3) VALUE 007.", "DISPLAY N.", "7\n"),  # leading zeros
-        ("01 S PIC X(3).\n01 N PIC 9.", "MOVE SPACES TO S.\nMOVE ZERO TO N.\nDISPLAY S N.", "0\n"),
-        ("01 N PIC 99 VALUE 5.", "ADD 1 TO N.\nDISPLAY N.", "6\n"),
-        ("01 N PIC 999 VALUE 10.", "SUBTRACT 3 FROM N.\nDISPLAY N.", "7\n"),
+        (
+            '01 PRINT PIC X(5) VALUE "hi".',
+            "DISPLAY PRINT.",
+            "hi   \n",
+        ),  # name of a built-in; X(5) pads
+        ("01 N PIC 9(3) VALUE 007.", "DISPLAY N.", "007\n"),  # leading zeros kept
+        (
+            "01 S PIC X(3).\n01 N PIC 9.",
+            "MOVE SPACES TO S.\nMOVE ZERO TO N.\nDISPLAY S N.",
+            "   0\n",
+        ),
+        ("01 N PIC 99 VALUE 5.", "ADD 1 TO N.\nDISPLAY N.", "06\n"),
+        ("01 N PIC 999 VALUE 10.", "SUBTRACT 3 FROM N.\nDISPLAY N.", "007\n"),
         ('01 S PIC XX VALUE "AB".', "DISPLAY S.", "AB\n"),
-        ("01 S PIC X(20).", 'MOVE "GO  TO IT" TO S.\nDISPLAY S.', "GO  TO IT\n"),
+        ("01 S PIC X(20).", 'MOVE "GO  TO IT" TO S.\nDISPLAY S.', "GO  TO IT           \n"),
         ("01 S PIC X(9).", 'DISPLAY "It""s".', 'It"s\n'),  # a doubled quote is one quote
         ("01 S PIC X(9).", "DISPLAY 'It''s'.", "It's\n"),
-        ("01 S PIC X(9).", 'MOVE "It""s" TO S.\nDISPLAY S.', 'It"s\n'),
+        ("01 S PIC X(9).", 'MOVE "It""s" TO S.\nDISPLAY S.', 'It"s     \n'),
     ],
 )
 def test_supported_code_converts_and_runs(storage, procedure, printed):
@@ -102,7 +110,7 @@ def test_sample_programs_convert_to_python_that_runs(path):
 
 def test_run_and_verify_python_passes_on_exact_expected_output():
     draft = translate_program(HELLO)
-    expected = "Hello, LegacyLift\nDemo count: 2\n"
+    expected = "Hello, LegacyLift          \nDemo count: 002\n"
     result = run_and_verify_python(draft.python, expected)
     assert result.passed is True
     assert result.stdout == expected
@@ -135,16 +143,16 @@ def test_run_and_verify_python_rejects_wrong_output():
 
 def test_translate_and_verify_checks_converted_cobol_output():
     source = program('01 MSG PIC X(5) VALUE "ok".', "DISPLAY MSG.")
-    result = translate_and_verify(source, "ok\n")
+    result = translate_and_verify(source, "ok   \n")
     assert result.passed is True
-    assert result.stdout == "ok\n"
+    assert result.stdout == "ok   \n"
 
 
 def test_translate_and_verify_fails_when_logic_output_differs():
     source = program("01 N PIC 99 VALUE 5.", "ADD 1 TO N.\nDISPLAY N.")
-    result = translate_and_verify(source, "5\n")  # real output is 6
+    result = translate_and_verify(source, "05\n")  # real padded output is 06
     assert result.passed is False
-    assert result.stdout == "6\n"
+    assert result.stdout == "06\n"
     assert "Output mismatch" in (result.error or "")
 
 
@@ -177,8 +185,11 @@ def test_employee_payroll_compute_and_perform_output():
     assert draft.program_name == "PAYROLL"
     assert draft.notes == []
     assert "def calculate_pay():" in draft.python
-    assert "total_pay = hours_worked*hourly_rate" in draft.python
-    assert run_python(draft.python) == "Employee  earned 0.0\n"
+    assert "cobol_number(hours_worked*hourly_rate" in draft.python.replace(" ", "")
+    out = run_python(draft.python)
+    assert out.startswith("Employee ")
+    assert out.endswith("earned 00000000.00\n")
+    assert len(out) == len("Employee ") + 30 + len(" earned 00000000.00\n")
 
 
 def test_simple_account_add_subtract_across_paragraphs():
@@ -187,12 +198,12 @@ def test_simple_account_add_subtract_across_paragraphs():
     draft = translate_program(source)
     assert draft.program_name == "ACCOUNT-PROC"
     assert draft.notes == []
-    assert "account_balance += transaction_amount" in draft.python
-    assert "account_balance -= transaction_amount" in draft.python
+    assert "cobol_number(account_balance+transaction_amount" in draft.python.replace(" ", "")
+    assert "cobol_number(account_balance-transaction_amount" in draft.python.replace(" ", "")
     out = run_python(draft.python)
-    assert "Deposit processed for account 0" in out
-    assert "Withdrawal processed for account 0" in out
-    assert "Account Balance Report: 0.0" in out
+    assert "Deposit processed for account 0000000000" in out
+    assert "Withdrawal processed for account 0000000000" in out
+    assert "Account Balance Report: 0000000000.00" in out
 
 
 def test_paragraph_perform_thru_calls_each_paragraph_in_range():
@@ -222,17 +233,17 @@ def test_multiply_and_divide_statements():
     )
     draft = translate_program(source)
     assert draft.notes == []
-    assert run_python(draft.python) == "12\n4.0\n"  # DIVIDE uses true division
+    assert run_python(draft.python) == "12\n04\n"
 
 
-def test_decimal_picture_uses_float_and_runs():
+def test_decimal_picture_uses_decimal_and_runs():
     source = program(
         "01 RATE PIC 99V99 VALUE 2.5.\n01 HOURS PIC 99V99 VALUE 4.0.\n01 PAY PIC 9(5)V99.",
         "COMPUTE PAY = HOURS * RATE.\nDISPLAY PAY.",
     )
     draft = translate_program(source)
     assert draft.notes == []
-    assert run_python(draft.python) == "10.0\n"
+    assert run_python(draft.python) == "00010.00\n"
 
 
 def test_unsupported_lines_remain_visible_as_review_notes_on_draft():
@@ -265,4 +276,5 @@ def test_project_convert_endpoint_returns_python_and_notes_for_beyond_sample(cli
     assert file_result["program_name"] == "PAYROLL"
     assert file_result["notes"] == []
     assert "def main():" in file_result["python"]
-    assert run_python(file_result["python"]) == "Employee  earned 0.0\n"
+    out = run_python(file_result["python"])
+    assert out.startswith("Employee ") and out.endswith("earned 00000000.00\n")

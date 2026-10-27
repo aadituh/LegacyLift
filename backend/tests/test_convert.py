@@ -31,7 +31,7 @@ def test_two_files_return_runnable_python(client):
     files = response.json()["files"]
     assert [file["python_name"] for file in files] == ["hello.py", "second.py"]
     assert files[0]["notes"] == []
-    assert run_python(files[0]["python"]) == "Hello, LegacyLift\nDemo count: 2\n"
+    assert run_python(files[0]["python"]) == "Hello, LegacyLift          \nDemo count: 002\n"
 
 
 def test_unsupported_line_is_marked_for_review(client):
