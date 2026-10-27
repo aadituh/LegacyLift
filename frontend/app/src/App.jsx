@@ -4,6 +4,7 @@ import {
   checkBackend,
   convertFiles,
   convertProject,
+  analyzeProject,
   createDemoProject,
   createProject,
   downloadPythonFile,
@@ -132,6 +133,7 @@ export default function App() {
   const [status, setStatus] = useState(() => savedBatch?.status ?? '')
   const [isConverting, setIsConverting] = useState(false)
   const [conversionProgress, setConversionProgress] = useState(0)
+  const [analysis, setAnalysis] = useState(null)
  
   const [viewMode, setViewMode] = useState(() => {
     const saved = sessionStorage.getItem(savedViewKey)
@@ -254,6 +256,29 @@ export default function App() {
       cancelled = true
     }
   }, [screen, project, backendReady])
+
+  useEffect(() => {
+    if (!project?.id || !backendReady || project.files.length === 0) return
+    let cancelled = false
+    async function loadAnalysis() {
+      try {
+        const result = await analyzeProject(project.id)
+        if (!cancelled) {
+          setAnalysis(result)
+          setError('')
+        }
+      } catch (cause) {
+        if (!cancelled) {
+          setAnalysis(null)
+          setError(cause.message)
+        }
+      }
+    }
+    loadAnalysis()
+    return () => {
+      cancelled = true
+    }
+  }, [project, backendReady])
 
   useEffect(() => {
     if (screen !== 'upload' || uploadMode !== 'project' || !backendReady) return
@@ -611,6 +636,13 @@ export default function App() {
         label: program.name,
         onSelect: () => showProjectProgram(program, index),
       }))
+  
+  const selectedProgramName = showingBatch ? '' : (projectPrograms[selectedFile]?.name || '')
+  const programLinks = (analysis?.dependencies || []).filter((link) =>
+    link.source === selectedProgramName || link.source.startsWith(`${selectedProgramName}:`)
+  )
+  const programUnresolved = (analysis?.unresolved || []).filter((item) =>
+    item.source === selectedProgramName || item.source.startsWith(`${selectedProgramName}:`))
 
 
   const modeReady = showingBatch ? files.length > 0 : projectPrograms.length > 0
@@ -995,6 +1027,35 @@ export default function App() {
                   </section>
                 )}
               </div>
+              
+              {!showingBatch && analysis && selectedProgramName && (
+                <section className="review-notes" aria-labelledby="dependencies-title">
+                  <h2 id="dependencies-title">Dependencies for {selectedProgramName}</h2>
+                  {programLinks.length > 0 ? (
+                    <ul>
+                      {programLinks.map((link) => (
+                        <li key={`${link.source}-${link.target}-${link.kind}-${link.line}`}>
+                          {link.kind} {link.target} (line {link.line})
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No links for this program.</p>
+                  )}
+                  <h2>Unresolved</h2>
+                  {programUnresolved.length > 0 ? (
+                    <ul>
+                      {programUnresolved.map((item) => (
+                        <li key={`${item.source}-${item.name}-${item.kind}-${item.line}`}>
+                          {item.kind} {item.name} (line {item.line})
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No unresolved references.</p>
+                  )}
+                </section>
+              )}
 
               {currentResult?.notes?.length > 0 && (
                 <section className="review-notes">
