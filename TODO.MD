@@ -12,7 +12,7 @@ Upload `BANKMAIN`, `INTCALC`, `TXNPOST`, `ACCTDEF`, and test data as one project
 
 - [x] #19 Parser: read fixed-format COBOL: divisions, fields, paragraphs, and copybooks, keeping line numbers.
 - [x] #24 Dependency analysis: `POST /api/projects/{id}/analyze` returns `COPY`, `CALL`, and `PERFORM` links and unresolved references.
-- [ ] #20 Converter: translate the sample bank's groups, level 88 fields, `OCCURS`, paragraphs, loops, conditions, and calls.
+- [x] #20 Converter: translate the sample bank's groups, level 88 fields, `OCCURS`, paragraphs, loops, conditions, and calls.
 - [ ] #21 Converter: Python prints like COBOL: number padding, overflow, unsigned fields, text length, and `Decimal` arithmetic with `ROUNDED`.
 - [ ] #22 Converter: uploaded programs other than the sample convert to Python and show on the page.
 

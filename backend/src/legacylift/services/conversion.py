@@ -51,12 +51,17 @@ def python_file_name(source_name: str) -> str:
     return f"{PurePosixPath(source_name).stem}.py"
 
 
-def convert_file(file_name: str, source: str) -> ConvertedFile:
+def convert_file(
+    file_name: str,
+    source: str,
+    copybooks: dict[str, str] | None = None,
+) -> ConvertedFile:
     """Translate one COBOL program and name its output file.
 
     Args:
         file_name: The COBOL file name, used for the output name and in errors.
         source: The program's text.
+        copybooks: Optional copybook name/stem → text map for ``COPY`` expansion.
 
     Returns:
         The converter's draft plus ``source_name`` and ``python_name``.
@@ -79,7 +84,7 @@ def convert_file(file_name: str, source: str) -> ConvertedFile:
         legacylift.errors.ConversionError: bad.cbl: File needs PROGRAM-ID and PROCEDURE DIVISION.
     """
     try:
-        draft = translate_program(source)
+        draft = translate_program(source, copybooks=copybooks)
     except ConversionError as error:
         raise ConversionError(f"{file_name}: {error}") from error
     return ConvertedFile(
