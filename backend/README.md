@@ -93,7 +93,8 @@ src/legacylift/
 ├── services/         rules: uploads.py, conversion.py, projects.py, batch_downloads.py
 └── cobol/
     ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
-    ├── dependencies.py  find_dependencies(): COPY/CALL links + unresolved
+    ├── dependencies.py  find_dependencies(): COPY/CALL/PERFORM links + unresolved
+    ├── runtime.py       cobol_number / cobol_text / display_number (DISPLAY semantics)
     ├── converter.py     translate_program(): COBOL subset → Python
     ├── gnucobol.py      compile/run programs with cobc
     └── equivalence.py   compare GnuCOBOL stdout to generated Python

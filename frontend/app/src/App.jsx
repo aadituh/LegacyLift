@@ -5,6 +5,7 @@ import {
   convertFiles,
   convertProject,
   analyzeProject,
+  verifyProject,
   createDemoProject,
   createProject,
   downloadPythonFile,
@@ -134,7 +135,9 @@ export default function App() {
   const [isConverting, setIsConverting] = useState(false)
   const [conversionProgress, setConversionProgress] = useState(0)
   const [analysis, setAnalysis] = useState(null)
- 
+  const [verification, setVerification] = useState(null)
+  const [isVerifying, setIsVerifying] = useState(false)
+
   const [viewMode, setViewMode] = useState(() => {
     const saved = sessionStorage.getItem(savedViewKey)
     if (saved === 'split' || saved === 'cobol' || saved === 'python') return saved
@@ -426,6 +429,18 @@ export default function App() {
       )
       setSelectedFile(0)
       setSourceText(projectPrograms[0].content || '')
+      
+      setVerification(null)
+      setIsVerifying(true)
+      try {
+        const verified = await verifyProject(project.id)
+        setVerification(verified)
+      } catch (cause) {
+        setVerification(null)
+        setError(cause.message)
+      } finally {
+        setIsVerifying(false)
+      }
     } catch (cause) {
       setResults([])
       setDownloadRunId('')
@@ -644,6 +659,24 @@ export default function App() {
   const programUnresolved = (analysis?.unresolved || []).filter((item) =>
     item.source === selectedProgramName || item.source.startsWith(`${selectedProgramName}:`))
 
+  const programCheck = (verification?.files || []).find(
+    (file) => file.source_name === selectedProgramName,
+  )
+  const programBadge = verification?.status === 'not_verified'
+    ? 'not_verified'
+    : programCheck?.equivalent
+      ? 'verified'
+      : programCheck
+        ? 'mismatch'
+        : ''
+  
+  const cobolLines = programCheck?.cobol_stdout
+    ? programCheck.cobol_stdout.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n')
+    : []
+  const pythonLines = programCheck?.python_stdout
+    ? programCheck.python_stdout.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n')
+    : [] 
+  const outputLineCount = Math.max(cobolLines.length, pythonLines.length)
 
   const modeReady = showingBatch ? files.length > 0 : projectPrograms.length > 0
   const modeConverted = shownResults.length > 0
@@ -652,23 +685,30 @@ export default function App() {
   const progressStep = modeConverted ? 2 : modeReady ? 1 : 0
   const ringRadius = 32
   const ringLength = 2 * Math.PI * ringRadius
-  const progressNote = 
-    progressStep === 0
-      ? hasOnlyOtherFiles
-        ? 'Upload a COBOL program before converting.'
-        : 'Add files before converting.'
-      : progressStep === 1
-        ? showingBatch
-          ? 'Convert these files before verification.'
-          : 'Convert this project before verification.'
-        : 'Converted. Verification is coming soon.'
+  const progressNote = isVerifying
+    ? 'Verification is running.'
+    : verification
+      ? `Verification ${verification.status}.`
+      : progressStep === 0
+        ? hasOnlyOtherFiles
+          ? 'Upload a COBOL program before converting.'
+          : 'Add files before converting.'
+        : progressStep === 1
+          ? showingBatch
+            ? 'Convert these files before verification.'
+            : 'Convert this project before verification.'
+          : 'Converted. Verification is coming soon.'
+  const shownProgress = verification ? 3 : progressStep
   const progressSteps = [
     { name: 'Upload', state: progressStep > 0 ? 'done' : 'current' },
     {
       name: 'Convert',
       state: progressStep > 1 ? 'done' : progressStep === 1 ? 'current' : 'waiting',
     },
-    { name: 'Verify', state: progressStep > 1 ? 'soon' : 'locked' },
+    {
+      name: 'Verify',
+      state: isVerifying ? 'current' : verification ? 'done' : progressStep > 1 ? 'soon' : 'locked',
+    },
   ]
 
   return (
@@ -714,21 +754,21 @@ export default function App() {
           )}
         </header>
 
-        <section className="progress-status" aria-label={`Progress ${progressStep} of 3. ${progressNote}`}>
+        <section className="progress-status" aria-label={`Progress ${shownProgress} of 3. ${progressNote}`}>
           <div className="status-ring-wrap">
             <svg className="status-ring" viewBox="0 0 88 88" aria-hidden="true">
               <circle className="status-ring-track" cx="44" cy="44" r={ringRadius} />
-              {progressStep > 0 && (
+              {shownProgress > 0 && (
                 <circle
                   className="status-ring-value"
                   cx="44"
                   cy="44"
                   r={ringRadius}
-                  strokeDasharray={`${(progressStep / 3) * ringLength} ${ringLength}`}
+                  strokeDasharray={`${(shownProgress / 3) * ringLength} ${ringLength}`}
                 />
               )}
             </svg>
-            <span className="status-ring-count">{progressStep}/3</span>
+            <span className="status-ring-count">{shownProgress}/3</span>
           </div>
           <div className="progress-steps">
             {progressSteps.map((step) => (
@@ -1057,6 +1097,42 @@ export default function App() {
                 </section>
               )}
 
+              {!showingBatch && selectedProgramName && (isVerifying || verification) && (
+                <section className="review-notes" aria-labelledby="verification-title">
+                  <h2 id="verification-title">Verification for {selectedProgramName}</h2>
+                  {isVerifying ? (
+                    <p>Verification is running.</p>
+                  ) : (
+                    <>
+                      <p className="run-status">{programBadge}</p>
+                      {programCheck?.error && <p>{programCheck.error}</p>}
+                      {outputLineCount > 0 && (
+                      <div className="diff-lines" aria-label="COBOL and Python output lines">
+                        <div className="diff-row diff-heading">
+                          <span>COBOL line</span>
+                          <span>Python line</span>
+                        </div>
+                        {Array.from({ length: outputLineCount }, (_, index) => {
+                          const cobolLine = cobolLines[index] ?? ''
+                          const pythonLine = pythonLines[index] ?? ''
+                          const same = cobolLine === pythonLine
+                          return (
+                            <div
+                              className={same ? 'diff-row' : 'diff-row mismatch'}
+                              key={index}
+                            >
+                              <span>{`${index + 1}. ${cobolLine}`}</span>
+                              <span>{`${index + 1}. ${pythonLine}`}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                     )}
+                    </>
+                  )}
+                </section>
+              )}
+
               {currentResult?.notes?.length > 0 && (
                 <section className="review-notes">
                   <h2>Lines to review</h2>
@@ -1069,9 +1145,9 @@ export default function App() {
               )}
               <p className="footnote">
                 Conversion runs on the Python backend (`legacylift.cobol.converter`). Supported: elementary
-                fields (including decimals and group children), DISPLAY, MOVE, ADD, SUBTRACT, MULTIPLY,
-                DIVIDE, simple COMPUTE, paragraph PERFORM / PERFORM THRU, STOP RUN. Other lines stay
-                visible as review notes and `# TODO` in the draft.
+                fields (including decimals and group children), DISPLAY with COBOL padding via
+                `cobol_number`/`cobol_text`, MOVE, ADD, SUBTRACT, MULTIPLY, DIVIDE, COMPUTE ROUNDED,
+                paragraph PERFORM / PERFORM THRU, STOP RUN. Other lines stay visible as review notes.
               </p>
             </>
           )}

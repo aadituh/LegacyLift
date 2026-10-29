@@ -362,6 +362,42 @@
   max-height: 70vh;
 }
 
+.diff-lines {
+  margin-top: 12px;
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid #dce6dc;
+  border-radius: 12px;
+}
+
+.diff-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.diff-row span {
+  margin: 0;
+  padding: 2px 12px;
+  background: #a5a5a5;
+  color: #263b2c;
+  font: 12px/1.6 Consolas, 'Courier New', monospace;
+  white-space: pre;
+}
+
+.diff-row span + span {
+  border-left: 1px solid #dce6dc;
+}
+
+.diff-heading span {
+  background: #3b3b3b;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.diff-row.mismatch span {
+  background: #eadbad;
+}
+
 .export-list {
   margin: 0;
   padding: 0;
