@@ -6,6 +6,7 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Added
 
+- Converter (issue #21): `cobol/runtime.py` helpers (`cobol_number`, `cobol_text`, `display_number`) so generated Python pads/truncates like GnuCOBOL; `Decimal` + `ROUNDED`; documented cases in `docs/cobol_display_cases.md`; recorded FEESCHED/INTCALC fixtures under `tests/data/recorded/`.
 - Converter (issue #22): programs beyond the sample bank — group/`05` fields, `PIC …V…` decimals, paragraphs/`PERFORM`/`PERFORM … THRU`, `COMPUTE`, `MULTIPLY`/`DIVIDE`. Unsupported lines stay as review notes; drafts still run. Covered by `tests/test_converter.py` (`employee_payroll`, `simple_account`).
 - `backend/Dockerfile` and `docker-compose.yml`: `docker compose up --build` starts PostgreSQL, the API (waits for the database), and the web app on port 8080.
 - `POST /api/projects/{id}/verify` compiles each program with GnuCOBOL (`cobc`), runs it, compares stdout to the generated Python, and returns per-file results (`verified` / `mismatch` / `not_verified` if `cobc` is missing). Optional `LEGACYLIFT_COBC_PATH`.

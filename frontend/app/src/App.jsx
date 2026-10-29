@@ -1069,9 +1069,9 @@ export default function App() {
               )}
               <p className="footnote">
                 Conversion runs on the Python backend (`legacylift.cobol.converter`). Supported: elementary
-                fields (including decimals and group children), DISPLAY, MOVE, ADD, SUBTRACT, MULTIPLY,
-                DIVIDE, simple COMPUTE, paragraph PERFORM / PERFORM THRU, STOP RUN. Other lines stay
-                visible as review notes and `# TODO` in the draft.
+                fields (including decimals and group children), DISPLAY with COBOL padding via
+                `cobol_number`/`cobol_text`, MOVE, ADD, SUBTRACT, MULTIPLY, DIVIDE, COMPUTE ROUNDED,
+                paragraph PERFORM / PERFORM THRU, STOP RUN. Other lines stay visible as review notes.
               </p>
             </>
           )}

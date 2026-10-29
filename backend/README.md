@@ -45,7 +45,7 @@ Convert status: `review_required` (some lines became `# TODO` notes) or `draft` 
 ## Rules
 
 - **Files:** up to 10 per project (`.cbl`/`.cob`, `.cpy`, `.dat`), UTF-8 text, at most 100 KB each, names unique ignoring case and at most 255 printable characters. If one file fails, none are added.
-- **Converter:** Elementary `WORKING-STORAGE` fields (levels `01`–`49`/`77`) with `PIC X`/`9` (optional `S`, `V` decimals as float), group headers skipped, plus `DISPLAY`, `MOVE`/`ADD`/`SUBTRACT`, `MULTIPLY`/`DIVIDE`, simple `COMPUTE`, paragraph `PERFORM` / `PERFORM … THRU`, and `STOP RUN`. Other lines become review notes in the draft (and on the project page). Review all output before use.
+- **Converter:** Elementary `WORKING-STORAGE` fields (levels `01`–`49`/`77`) with `PIC X`/`9` (optional `S`, `V` decimals via `Decimal`), group headers skipped, plus `DISPLAY`, `MOVE`/`ADD`/`SUBTRACT`, `MULTIPLY`/`DIVIDE`, `COMPUTE [ROUNDED]`, paragraph `PERFORM` / `PERFORM … THRU`, and `STOP RUN`. Generated Python imports `cobol_number` / `cobol_text` / `display_number` from `cobol/runtime.py` so prints match GnuCOBOL padding (see `docs/cobol_display_cases.md`). Other lines become review notes. Review all output before use.
 - **Limits:** requests over 1.2 MB get `413`; the newest 100 projects are kept.
 
 ## Errors
@@ -93,7 +93,8 @@ src/legacylift/
 ├── services/         rules: uploads.py, conversion.py, projects.py, batch_downloads.py
 └── cobol/
     ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
-    ├── dependencies.py  find_dependencies(): COPY/CALL links + unresolved
+    ├── dependencies.py  find_dependencies(): COPY/CALL/PERFORM links + unresolved
+    ├── runtime.py       cobol_number / cobol_text / display_number (DISPLAY semantics)
     ├── converter.py     translate_program(): COBOL subset → Python
     ├── gnucobol.py      compile/run programs with cobc
     └── equivalence.py   compare GnuCOBOL stdout to generated Python

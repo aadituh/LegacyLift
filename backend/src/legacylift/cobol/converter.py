@@ -7,17 +7,19 @@ Supported (WORKING-STORAGE and PROCEDURE DIVISION)
 - Elementary fields at levels ``01``–``49`` and ``77`` with:
   - text: ``PIC X``, ``XX``, ``X(n)``
   - whole numbers: ``PIC 9``, ``99``, ``9(n)``, optional leading ``S``
-  - decimals: ``PIC …V…`` (e.g. ``99V99``, ``S9(10)V99``) as Python ``float``
+  - decimals: ``PIC …V…`` (e.g. ``99V99``, ``S9(10)V99``) via ``Decimal``
+    and ``cobol_number`` (issue #21)
 - Optional ``VALUE`` (literals, ``ZERO``/``ZEROS``, ``SPACE``/``SPACES``).
 - Text literals may use doubled quotes (``"It""s"``).
 - Group headers (level + name, no ``PIC``) are skipped (structure only).
 
 **Procedure**
 
-- ``DISPLAY`` items (literals and declared fields)
+- ``DISPLAY`` items (literals and declared fields) using ``display_number`` /
+  stored ``cobol_text`` so padding matches GnuCOBOL
 - ``MOVE … TO …``, ``ADD … TO …``, ``SUBTRACT … FROM …``
 - ``MULTIPLY … BY …``, ``DIVIDE … INTO …`` (no ``GIVING``)
-- ``COMPUTE name =`` expression with ``+ - * /``, numbers, field names, ``( )``
+- ``COMPUTE [ROUNDED] name =`` expression with ``+ - * /``, numbers, fields
 - Paragraph headers (``NAME.``) become nested functions inside ``main()``
 - ``PERFORM name`` / ``PERFORM a THRU b`` call those functions
 - ``STOP RUN`` → ``return`` (exits the current paragraph or ``main``)
@@ -25,14 +27,8 @@ Supported (WORKING-STORAGE and PROCEDURE DIVISION)
 Unsupported lines become ``# TODO`` comments and review notes so the draft
 still runs. ``LINKAGE`` and other post-storage data sections stay as notes.
 
-How it works: ``translate_program`` (called from ``services.conversion``)
-cleans each line, classifies storage vs procedure, builds fields and
-paragraph bodies, then ``build_script`` wraps them in ``main()``. After
-conversion, ``run_and_verify_python`` can check stdout.
-
-Outside the sample bank, typical gaps before this expansion were group
-``05`` fields, ``PIC …V…``, paragraphs/``PERFORM``, and ``COMPUTE`` — those
-are what ``employee_payroll.cbl`` and ``simple_account.cbl`` needed.
+Generated scripts import ``cobol_number``, ``cobol_text``, and
+``display_number`` from ``legacylift.cobol.runtime``.
 """
 
 from __future__ import annotations
@@ -45,6 +41,7 @@ import re
 import traceback
 from typing import NamedTuple
 
+from legacylift.cobol.runtime import analyze_numeric_picture, analyze_text_length
 from legacylift.errors import ConversionError
 from legacylift.models import PythonDraft
 
@@ -72,7 +69,7 @@ WHOLE_NUMBER = re.compile(r"[-+]?\d+")
 DECIMAL_NUMBER = re.compile(r"[-+]?\d+\.\d+")
 FIELD_NAME = re.compile(r"[A-Z][A-Z0-9-]*", re.IGNORECASE)
 COMPUTE_STMT = re.compile(
-    r"^COMPUTE\s+([A-Z][A-Z0-9-]*)\s*=\s*(.+)$",
+    r"^COMPUTE\s+([A-Z][A-Z0-9-]*)\s+(?:(ROUNDED)\s+)?=\s*(.+)$",
     re.IGNORECASE,
 )
 # Safe COMPUTE right-hand side tokens only.
@@ -108,13 +105,21 @@ class Value(NamedTuple):
 
     Attributes:
         code: Python source, such as ``'Hi'``, ``5``, or ``ws_total``.
-        is_number: ``True`` for int/float numerics, ``False`` for text.
-        is_float: ``True`` when the picture (or literal) is decimal.
+        is_number: ``True`` for numerics, ``False`` for text.
+        is_float: ``True`` when the picture has ``V`` (decimal places).
+        integers: ``9`` digits left of ``V`` (0 for text).
+        decimals: ``9`` digits right of ``V``.
+        signed: ``True`` for ``S9…`` pictures.
+        length: ``PIC X(n)`` length (0 for numbers).
     """
 
     code: str
     is_number: bool
     is_float: bool = False
+    integers: int = 0
+    decimals: int = 0
+    signed: bool = False
+    length: int = 0
 
 
 class VerificationResult(NamedTuple):
@@ -159,8 +164,10 @@ def clean_line(raw_line: str) -> str:
             return ""
         if raw_line[6] == " ":
             raw_line = raw_line[7:]
-    line = raw_line.strip()
-    return "" if line.startswith("*>") else line
+    # Keep leading spaces so Area A (paragraph names) vs Area B stays visible.
+    line = raw_line.rstrip()
+    stripped = line.lstrip()
+    return "" if stripped.startswith("*>") else line
 
 
 def variable_name(cobol_name: str) -> str:
@@ -190,6 +197,30 @@ def picture_is_float(picture: str) -> bool:
     return "V" in picture.upper()
 
 
+def _store_number(expr: str, target: Value, *, rounded: bool = False) -> str:
+    """Emit ``name = cobol_number(expr, …)`` for a numeric target field."""
+    rounded_arg = ", rounded=True" if rounded else ""
+    return (
+        f"{target.code} = cobol_number({expr}, integers={target.integers}, "
+        f"decimals={target.decimals}, signed={target.signed}{rounded_arg})"
+    )
+
+
+def _store_text(expr: str, target: Value) -> str:
+    """Emit ``name = cobol_text(expr, length)`` for a text target field."""
+    return f"{target.code} = cobol_text({expr}, {target.length})"
+
+
+def _display_expr(value: Value) -> str:
+    """Python expression that prints a field with COBOL DISPLAY formatting."""
+    if value.is_number:
+        return (
+            f"display_number({value.code}, integers={value.integers}, "
+            f"decimals={value.decimals}, signed={value.signed})"
+        )
+    return value.code
+
+
 def translate_value(text: str, fields: dict[str, Value]) -> Value | None:
     """Translate one COBOL value: a literal, ``ZERO``/``SPACES``, or a field name.
 
@@ -203,16 +234,16 @@ def translate_value(text: str, fields: dict[str, Value]) -> Value | None:
 
     Example:
         >>> fields = {"WS-TOTAL": Value("ws_total", is_number=True)}
-        >>> translate_value('"Hi"', fields)
-        Value(code="'Hi'", is_number=False, is_float=False)
+        >>> translate_value('"Hi"', fields).code
+        "'Hi'"
         >>> print(translate_value('"It""s"', fields).code)
         'It"s'
-        >>> translate_value("007", fields)
-        Value(code='7', is_number=True, is_float=False)
-        >>> translate_value("1.5", fields)
-        Value(code='1.5', is_number=True, is_float=True)
-        >>> translate_value("ws-total", fields)
-        Value(code='ws_total', is_number=True, is_float=False)
+        >>> translate_value("007", fields).code
+        '7'
+        >>> translate_value("1.5", fields).is_float
+        True
+        >>> translate_value("ws-total", fields).code
+        'ws_total'
     """
     text = text.strip()
     upper = text.upper()
@@ -254,11 +285,11 @@ def translate_field(line: str, fields: dict[str, Value]) -> str | None:
     Example:
         >>> fields = {}
         >>> translate_field("01 WS-TOTAL PIC 9(4) VALUE 10", fields)
-        'ws_total = 10'
+        'ws_total = cobol_number(10, integers=4, decimals=0, signed=False)'
         >>> translate_field("01 WS-NAME PIC X(10)", fields)
-        "ws_name = ''"
+        "ws_name = cobol_text('', 10)"
         >>> translate_field("05 HOURS-WORKED PIC 99V99", fields)
-        'hours_worked = 0.0'
+        'hours_worked = cobol_number(0, integers=2, decimals=2, signed=False)'
         >>> translate_field("01 EMPLOYEE", fields)
         ''
         >>> translate_field('01 WS-COUNT PIC 9 VALUE "ten"', fields) is None
@@ -274,32 +305,46 @@ def translate_field(line: str, fields: dict[str, Value]) -> str | None:
     if match is None:
         return None
     _level, cobol_name, picture, initial_text = match.groups()
+    text_len = analyze_text_length(picture)
+    numeric = analyze_numeric_picture(picture)
     is_float = picture_is_float(picture)
-    is_number = picture.upper().lstrip("S")[0] == "9"
+    is_number = numeric is not None
     initial: Value | None
     if initial_text is None:
-        if is_number:
-            initial = Value("0.0" if is_float else "0", True, is_float)
-        else:
-            initial = Value("''", False)
+        initial = Value("0" if is_number else "''", is_number, is_float)
     else:
         initial = translate_value(initial_text, fields)
     if initial is None or initial.is_number != is_number:
         return None
-    # Whole-number PIC must not take a decimal VALUE.
     if is_number and not is_float and initial.is_float:
         return None
+
     variable = variable_name(cobol_name)
-    fields[cobol_name.upper()] = Value(variable, is_number, is_float)
-    code = initial.code
-    if is_float and initial.is_number and not initial.is_float:
-        code = "0.0" if initial.code == "0" else str(float(initial.code))
-    return f"{variable} = {code}"
+    if is_number and numeric is not None:
+        fields[cobol_name.upper()] = Value(
+            variable,
+            True,
+            is_float,
+            integers=numeric.integers,
+            decimals=numeric.decimals,
+            signed=numeric.signed,
+        )
+        return _store_number(initial.code, fields[cobol_name.upper()])
+    length = text_len or 1
+    fields[cobol_name.upper()] = Value(variable, False, length=length)
+    return _store_text(initial.code, fields[cobol_name.upper()])
 
 
 def is_paragraph_header(line: str) -> bool:
-    """True when the procedure line is a paragraph name (single word)."""
-    return bool(FIELD_NAME.fullmatch(line))
+    """True when the procedure line is a paragraph name in Area A.
+
+    After ``clean_line``, Area A starts at column 0 (no leading spaces). Area B
+    statements are indented, so ``END-PERFORM`` / ``USING`` continuations are
+    not treated as headers.
+    """
+    if not line or line[0] in " \t":
+        return False
+    return bool(FIELD_NAME.fullmatch(line.strip()))
 
 
 def translate_perform(line: str, paragraph_order: list[str]) -> str | None:
@@ -329,7 +374,7 @@ def translate_perform(line: str, paragraph_order: list[str]) -> str | None:
 
 
 def translate_compute(line: str, fields: dict[str, Value]) -> str | None:
-    """Translate a simple ``COMPUTE name = expression``.
+    """Translate ``COMPUTE [ROUNDED] name = expression`` via ``cobol_number``.
 
     Only ``+ - * /``, parentheses, numbers, and declared field names are
     allowed on the right-hand side.
@@ -337,7 +382,8 @@ def translate_compute(line: str, fields: dict[str, Value]) -> str | None:
     match = COMPUTE_STMT.fullmatch(line.strip())
     if match is None:
         return None
-    target_name, expression = match.group(1), match.group(2).strip()
+    target_name, rounded_word, expression = match.group(1), match.group(2), match.group(3)
+    expression = expression.strip()
     target = fields.get(target_name.upper())
     if target is None or not target.is_number:
         return None
@@ -355,25 +401,25 @@ def translate_compute(line: str, fields: dict[str, Value]) -> str | None:
         if not value.is_number:
             return None
         parts.append(value.code)
-    return f"{target.code} = {''.join(parts)}"
+    return _store_number("".join(parts), target, rounded=bool(rounded_word))
 
 
 def translate_multiply_divide(line: str, fields: dict[str, Value]) -> str | None:
-    """Translate ``MULTIPLY x BY y`` (``y *= x``) or ``DIVIDE x INTO y`` (``y /= x``)."""
+    """Translate ``MULTIPLY x BY y`` or ``DIVIDE x INTO y`` through ``cobol_number``."""
     multiply = MULTIPLY_STMT.fullmatch(line.strip())
     if multiply:
         value = translate_value(multiply.group(1), fields)
         target = fields.get(multiply.group(2).upper())
         if value is None or target is None or not value.is_number or not target.is_number:
             return None
-        return f"{target.code} *= {value.code}"
+        return _store_number(f"{target.code} * {value.code}", target)
     divide = DIVIDE_STMT.fullmatch(line.strip())
     if divide:
         value = translate_value(divide.group(1), fields)
         target = fields.get(divide.group(2).upper())
         if value is None or target is None or not value.is_number or not target.is_number:
             return None
-        return f"{target.code} /= {value.code}"
+        return _store_number(f"{target.code} / {value.code}", target)
     return None
 
 
@@ -393,18 +439,18 @@ def translate_statement(
         One line of Python, or ``None`` if the statement is not supported.
 
     Example:
-        >>> fields = {"WS-TOTAL": Value("ws_total", True)}
+        >>> fields = {"WS-TOTAL": Value("ws_total", True, integers=4)}
         >>> translate_statement("ADD 5 TO WS-TOTAL", fields)
-        'ws_total += 5'
+        'ws_total = cobol_number(ws_total + 5, integers=4, decimals=0, signed=False)'
         >>> translate_statement("STOP RUN", fields)
         'return'
         >>> translate_statement("PERFORM PRINT-TOTAL", fields, ["PRINT-TOTAL"])
         'print_total()'
         >>> translate_statement(
         ...     "COMPUTE WS-TOTAL = WS-TOTAL * 2",
-        ...     {"WS-TOTAL": Value("ws_total", True)},
+        ...     {"WS-TOTAL": Value("ws_total", True, integers=4)},
         ... )
-        'ws_total = ws_total*2'
+        'ws_total = cobol_number(ws_total*2, integers=4, decimals=0, signed=False)'
     """
     upper = line.upper()
     if upper == "STOP RUN":
@@ -433,9 +479,9 @@ def translate_display(items_text: str, fields: dict[str, Value]) -> str | None:
         or a declared field (an expression, for example).
 
     Example:
-        >>> fields = {"WS-TOTAL": Value("ws_total", True)}
+        >>> fields = {"WS-TOTAL": Value("ws_total", True, integers=4)}
         >>> translate_display('"Total: " WS-TOTAL', fields)
-        "print('Total: ', ws_total, sep='')"
+        "print('Total: ', display_number(ws_total, integers=4, decimals=0, signed=False), sep='')"
         >>> translate_display("WS-TOTAL + 1", fields) is None
         True
     """
@@ -448,7 +494,11 @@ def translate_display(items_text: str, fields: dict[str, Value]) -> str | None:
         value = translate_value(item, fields)
         if value is None:
             return None
-        codes.append(value.code)
+        # Literals print as-is; fields use DISPLAY formatting helpers.
+        if FIELD_NAME.fullmatch(item) and item.upper() in fields:
+            codes.append(_display_expr(fields[item.upper()]))
+        else:
+            codes.append(value.code)
     return f"print({', '.join(codes)}, sep='')"
 
 
@@ -466,11 +516,14 @@ def translate_assignment(line: str, fields: dict[str, Value]) -> str | None:
         A Python assignment such as ``ws_total += 5``, or ``None``.
 
     Example:
-        >>> fields = {"WS-TOTAL": Value("ws_total", True), "WS-NAME": Value("ws_name", False)}
+        >>> fields = {
+        ...     "WS-TOTAL": Value("ws_total", True, integers=4),
+        ...     "WS-NAME": Value("ws_name", False, length=10),
+        ... }
         >>> translate_assignment("SUBTRACT 2 FROM WS-TOTAL", fields)
-        'ws_total -= 2'
+        'ws_total = cobol_number(ws_total - 2, integers=4, decimals=0, signed=False)'
         >>> translate_assignment('MOVE "GO  TO IT" TO WS-NAME', fields)
-        "ws_name = 'GO  TO IT'"
+        "ws_name = cobol_text('GO  TO IT', 10)"
         >>> translate_assignment('MOVE "abc" TO WS-TOTAL', fields) is None
         True
     """
@@ -488,7 +541,13 @@ def translate_assignment(line: str, fields: dict[str, Value]) -> str | None:
         return None
     if operator != "=" and not target.is_number:
         return None
-    return f"{target.code} {operator} {value.code}"
+    if not target.is_number:
+        return _store_text(value.code, target)
+    if operator == "=":
+        return _store_number(value.code, target)
+    if operator == "+=":
+        return _store_number(f"{target.code} + {value.code}", target)
+    return _store_number(f"{target.code} - {value.code}", target)
 
 
 def translate_line(
@@ -510,7 +569,7 @@ def translate_line(
 
     Example:
         >>> translate_line("storage", "01 N PIC 9 VALUE 1", {})
-        'n = 1'
+        'n = cobol_number(1, integers=1, decimals=0, signed=False)'
         >>> translate_line("other", "01 LS-DAYS PIC 999", {}) is None
         True
     """
@@ -548,6 +607,8 @@ def build_script(
     Example:
         >>> print(build_script("EMPTY", [], [], [], []))
         # Draft conversion of EMPTY. Review TODO lines before use.
+        from legacylift.cobol.runtime import cobol_number, cobol_text, display_number
+        <BLANKLINE>
         def main():
             pass
         <BLANKLINE>
@@ -586,6 +647,8 @@ def build_script(
     return "\n".join(
         [
             f"# Draft conversion of {program_name}. Review TODO lines before use.",
+            "from legacylift.cobol.runtime import cobol_number, cobol_text, display_number",
+            "",
             "def main():",
             *(f"    {line}" for line in body),
             "",
@@ -625,14 +688,14 @@ def translate_program(source: str) -> PythonDraft:
         'TAX'
         >>> any('PERFORM PRINT-TOTAL' in note for note in draft.notes)
         True
-        >>> 'ws_total += 5' in draft.python
+        >>> 'cobol_number(ws_total + 5' in draft.python
         True
     """
     numbered_lines = [
-        (number, clean_line(raw_line).removesuffix("."))
+        (number, clean_line(raw_line).removesuffix(".").rstrip())
         for number, raw_line in enumerate(source.splitlines(), start=1)
     ]
-    all_code = "\n".join(line for _, line in numbered_lines)
+    all_code = "\n".join(line.strip() for _, line in numbered_lines if line.strip())
     program_id = PROGRAM_ID.search(all_code)
     if program_id is None or not PROCEDURE_DIVISION.search(all_code):
         raise ConversionError("File needs PROGRAM-ID and PROCEDURE DIVISION.")
@@ -649,22 +712,23 @@ def translate_program(source: str) -> PythonDraft:
     paragraph_order: list[str] = []
     in_procedure = False
     for _, line in numbered_lines:
-        upper = line.upper()
+        upper = line.strip().upper()
         if upper.startswith("PROCEDURE DIVISION"):
             in_procedure = True
             continue
-        if in_procedure and line and is_paragraph_header(line):
+        if in_procedure and line.strip() and is_paragraph_header(line):
             paragraph_order.append(upper)
 
     for number, line in numbered_lines:
-        upper = line.upper()
+        stripped = line.strip()
+        upper = stripped.upper()
         if upper == "WORKING-STORAGE SECTION":
             section = "storage"
             continue
         if upper.startswith("PROCEDURE DIVISION"):
             section = "procedure"
             continue
-        if not line or not section:
+        if not stripped or not section:
             continue
         if section == "storage" and upper.endswith(" SECTION"):
             section = "other"
@@ -674,10 +738,10 @@ def translate_program(source: str) -> PythonDraft:
             paragraphs.append((upper, current_body))
             continue
 
-        translated = translate_line(section, line, fields, paragraph_order)
+        translated = translate_line(section, stripped, fields, paragraph_order)
         if translated is None:
-            todo = f"# TODO: COBOL line {number}: {line}"
-            notes.append(f"Line {number}: {line}")
+            todo = f"# TODO: COBOL line {number}: {stripped}"
+            notes.append(f"Line {number}: {stripped}")
             if section == "storage" or section == "other":
                 storage.append(todo)
             elif current_body is not None:

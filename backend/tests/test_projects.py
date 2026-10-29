@@ -38,7 +38,9 @@ def test_full_project_flow(client, base):
     assert counts["program_count"] == counts["copybook_count"] == counts["data_file_count"] == 1
     conversion = client.post(f"{base}/convert").json()
     assert (conversion["run_id"], conversion["status"]) == ("2", "draft")
-    assert run_python(conversion["files"][0]["python"]) == "Hello, LegacyLift\nDemo count: 2\n"
+    assert run_python(conversion["files"][0]["python"]) == (
+        "Hello, LegacyLift          \nDemo count: 002\n"
+    )
     # Without GnuCOBOL: not_verified. With working cobc + matching stdout: verified.
     with patch("legacylift.cobol.equivalence.cobc_available", return_value=False):
         verify = client.post(f"{base}/verify").json()
@@ -84,7 +86,7 @@ def test_demo_project_converts_with_no_review_notes(client):
     assert [file["id"] for file in demo["files"]] == ["1", "2", "3"]
     result = client.post(f"/api/projects/{demo['id']}/convert").json()
     assert result["status"] == "draft"
-    assert "Amount due: $14" in run_python(result["files"][0]["python"])
+    assert "Amount due: $0014" in run_python(result["files"][0]["python"])
 
 
 def test_projects_are_listed_newest_first(client):
