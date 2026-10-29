@@ -45,7 +45,7 @@ Convert status: `review_required` (some lines became `# TODO` notes) or `draft` 
 ## Rules
 
 - **Files:** up to 10 per project (`.cbl`/`.cob`, `.cpy`, `.dat`), UTF-8 text, at most 100 KB each, names unique ignoring case and at most 255 printable characters. If one file fails, none are added.
-- **Converter:** Elementary `WORKING-STORAGE` fields (levels `01`–`49`/`77`) with `PIC X`/`9` (optional `S`, `V` decimals via `Decimal`), group headers skipped, plus `DISPLAY`, `MOVE`/`ADD`/`SUBTRACT`, `MULTIPLY`/`DIVIDE`, `COMPUTE [ROUNDED]`, paragraph `PERFORM` / `PERFORM … THRU`, and `STOP RUN`. Generated Python imports `cobol_number` / `cobol_text` / `display_number` from `cobol/runtime.py` so prints match GnuCOBOL padding (see `docs/cobol_display_cases.md`). Other lines become review notes. Review all output before use.
+- **Converter:** Elementary `WORKING-STORAGE` / `LINKAGE` fields (levels `01`–`49`/`77`) with `PIC X`/`9` (optional `S`, `V` decimals as float); groups as dicts; `OCCURS` as lists with 1-based subscripts; level `88` conditions and `SET … TO TRUE`; `COPY` expansion when project copybooks are present; `DISPLAY`, `MOVE`/`ADD`/`SUBTRACT`, `MULTIPLY`/`DIVIDE`, simple `COMPUTE` (no `ROUNDED`); paragraphs and `PERFORM` / `PERFORM … THRU` / `UNTIL` / `VARYING`; `IF`/`EVALUATE`; `CALL "X" USING …`; `STOP RUN`/`GOBACK`. Other lines (file I/O, edited PICs, etc.) become review notes. Review all output before use.
 - **Limits:** requests over 1.2 MB get `413`; the newest 100 projects are kept.
 
 ## Errors
