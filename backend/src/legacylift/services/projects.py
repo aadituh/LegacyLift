@@ -1,7 +1,8 @@
 """Project workflow: ``ProjectService`` and its helpers.
 
 Create, list, and delete projects; add and remove files; record analyze,
-convert, and verify runs.
+convert, and verify runs. Describe asks Gemini for a plain-language map of
+the analyze links and does not save a run.
 
 Every change follows the same pattern: change the ``Project``, then
 ``store.save(project)``. A lock makes changes happen one at a time, because
@@ -17,6 +18,7 @@ missing).
 import threading
 
 from legacylift.cobol.dependencies import find_dependencies
+from legacylift.cobol.describe import DependencyMap, describe_map
 from legacylift.cobol.equivalence import check_functional_equivalence
 from legacylift.cobol.parser import parse_program
 from legacylift.errors import InvalidInputError, NotFoundError, ProjectStateError
@@ -82,7 +84,7 @@ def file_counts(project: Project) -> FileCounts:
 
 
 class ProjectService:
-    """The project workflow: create, list, upload, analyze, convert, verify, delete.
+    """The project workflow: create, list, upload, analyze, describe, convert, verify, delete.
 
     Routes call these methods. Each step is saved as a ``Run`` on the project;
     a convert run also keeps the generated Python.
@@ -97,15 +99,23 @@ class ProjectService:
         True
     """
 
-    def __init__(self, store: ProjectRepository, *, cobc_path: str | None = None) -> None:
+    def __init__(
+        self,
+        store: ProjectRepository,
+        *,
+        cobc_path: str | None = None,
+        gemini_api_key: str | None = None,
+    ) -> None:
         """Create the service.
 
         Args:
             store: Where projects are kept and saved.
             cobc_path: Optional path to GnuCOBOL ``cobc`` for verify runs.
+            gemini_api_key: Gemini key for ``describe``. Never commit it.
         """
         self.store = store
         self.cobc_path = cobc_path
+        self.gemini_api_key = gemini_api_key
         self._lock = threading.Lock()
 
     def create_project(self, name: str) -> Project:
@@ -388,6 +398,28 @@ class ProjectService:
             ],
         )
         return run, file_counts(project)
+
+    def describe(self, project: Project) -> DependencyMap:
+        """Describe each program and the data they share.
+
+        Args:
+            project: The project to describe.
+
+        Returns:
+            The plain-language map.
+
+        Raises:
+            ProjectStateError: The project has no files or no programs, or the
+                Gemini key is unset.
+        """
+        if not project.files:
+            raise ProjectStateError("Upload files before analyzing.")
+        programs = [file for file in project.files if file.kind == FileKind.PROGRAM]
+        if not programs:
+            raise ProjectStateError("Upload a .cbl or .cob program before describing it.")
+        parsed = [parse_program(file.name, file.content) for file in programs]
+        catalog = [file.name for file in project.files]
+        return describe_map(parsed, catalog, api_key=self.gemini_api_key)
 
     def convert(self, project: Project) -> Run:
         """Convert every program in a project and save the results in a convert run.

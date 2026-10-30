@@ -31,6 +31,7 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `POST /api/projects/{id}/files` | files in multipart field `files` | The files that were added |
 | `DELETE /api/projects/{id}/files/{file_id}` | none | Removes one file (204); saved runs keep their results |
 | `POST /api/projects/{id}/analyze` | none | File counts plus COPY/CALL/PERFORM `dependencies` and `unresolved` (status `analyzed`) |
+| `POST /api/projects/{id}/describe` | none | What each program does and which data they share. Needs `LEGACYLIFT_GEMINI_API_KEY`. |
 | `POST /api/projects/{id}/convert` | none | Python for each program, saved as a run |
 | `POST /api/projects/{id}/verify` | none | Run each program with GnuCOBOL and compare stdout to Python: `verified` / `mismatch` / `not_verified` (no `cobc`) |
 | `GET /api/projects/{id}/runs` | none | All runs, oldest first, without their Python |
@@ -71,6 +72,7 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_MAX_PROJECTS` | `100` | Projects kept; the oldest is deleted first. |
 | `LEGACYLIFT_MAX_REQUEST_BYTES` | `1200000` | Largest request body. |
 | `LEGACYLIFT_COBC_PATH` | unset | Optional path to GnuCOBOL `cobc` for verify. Otherwise `cobc` must be on PATH. |
+| `LEGACYLIFT_GEMINI_API_KEY` | unset | Gemini API key for the dependency description. Keep it in `backend/.env`. |
 
 ## Code layout
 
@@ -94,6 +96,7 @@ src/legacylift/
 └── cobol/
     ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
     ├── dependencies.py  find_dependencies(): COPY/CALL/PERFORM links + unresolved
+    ├── describe.py      build_prompt() / describe_map(): plain-language dependency map
     ├── runtime.py       cobol_number / cobol_text / display_number (DISPLAY semantics)
     ├── converter.py     translate_program(): COBOL subset → Python
     ├── gnucobol.py      compile/run programs with cobc
