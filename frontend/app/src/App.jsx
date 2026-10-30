@@ -132,7 +132,9 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState(0)
   const [results, setResults] = useState(() => savedBatch?.results ?? [])
   const [error, setError] = useState('')
-  const [user, setUser] = useState(null)
+  const { data: session, isPending } = authClient.useSession()
+  const user = session?.user ?? null
+  const [authMode, setAuthMode] = useState('sign-in')
   const [accountName, setAccountName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -555,19 +557,41 @@ export default function App() {
     }
   }
 
+  async function handleSignIn(event) {
+    event.preventDefault()
+    setError('')
+    try {
+      const { error: signInError } = await authClient.signIn.email({
+        email,
+        password,
+      })
+      if (signInError) setError(signInError.message)
+    } catch (cause) {
+      setError(cause.message || 'Sign in failed.')
+    }
+  }
+
   async function handleSignUp(event) {
     event.preventDefault()
     setError('')
-    const { data, error: signUpError } = await authClient.signUp.email({
-      name: accountName,
-      email,
-      password,
-    })
-    if (signUpError) {
-      setError(signUpError.message)
-      return
+    try {
+      const { error: signUpError } = await authClient.signUp.email({
+        name: accountName,
+        email,
+        password,
+      })
+      if (signUpError) {
+        setError(signUpError.message)
+        return
+      }
+      const { data: sessionData } = await authClient.getSession()
+      if (!sessionData?.user) {
+        setAuthMode('sign-in')
+        setError('Account created. Sign in with that email and password.')
+      }
+    } catch (cause) {
+      setError(cause.message || 'Could not create the account.')
     }
-    setUser(data.user)
   }
 
   async function handleLoadDemoProject() {
@@ -731,32 +755,58 @@ export default function App() {
     },
   ]
 
-  if (!user) {
+  if (isPending) {
     return (
-      <form onSubmit={handleSignUp}>
-        <input
-          value={accountName}
-          onChange={(event) => setAccountName(event.target.value)}
-          placeholder="Name"
-          required
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="Email"
-          required
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="Password"
-          required
-        />
-        <button type="submit">Create account</button>
-        {error ? <p>{error}</p> : null}
-      </form>
+      <div className="auth-gate">
+        <p>Checking session…</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    const signingIn = authMode === 'sign-in'
+    return (
+      <div className="auth-gate">
+        <form className="auth-card" onSubmit={signingIn ? handleSignIn : handleSignUp}>
+          <h1>LegacyLift</h1>
+          {!signingIn && (
+            <input
+              value={accountName}
+              onChange={(event) => setAccountName(event.target.value)}
+              placeholder="Name"
+              required
+            />
+          )}
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="Email"
+            required
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Password"
+            required
+          />
+          <button className="button primary" type="submit">
+            {signingIn ? 'Sign in' : 'Create account'}
+          </button>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => {
+              setError('')
+              setAuthMode(signingIn ? 'sign-up' : 'sign-in')
+            }}
+          >
+            {signingIn ? 'Need an account? Create one' : 'Already have an account? Sign in'}
+          </button>
+          {error ? <p>{error}</p> : null}
+        </form>
+      </div>
     )
   }
 
@@ -796,11 +846,16 @@ export default function App() {
           <strong>
             {showingBatch ? 'Batch conversion' : project ? project.name : 'No project yet'}
           </strong>
-          {backendChecked && (
-            <span className={backendReady ? 'api-badge ok' : 'api-badge down'} role="status">
-              {backendReady ? 'API connected' : 'API offline'}
-            </span>
-          )}
+          <div className="header-actions">
+            {backendChecked && (
+              <span className={backendReady ? 'api-badge ok' : 'api-badge down'} role="status">
+                {backendReady ? 'API connected' : 'API offline'}
+              </span>
+            )}
+            <button className="button secondary" type="button" onClick={() => authClient.signOut()}>
+              Sign out
+            </button>
+          </div>
         </header>
 
         <section className="progress-status" aria-label={`Progress ${shownProgress} of 3. ${progressNote}`}>
