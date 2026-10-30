@@ -16,6 +16,7 @@ import {
   getRuns,
   listProjects,
 } from './api'
+import { authClient } from './auth'
 import './App.css'
 import BackgroundFx from './BackgroundFx'
 
@@ -131,6 +132,10 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState(0)
   const [results, setResults] = useState(() => savedBatch?.results ?? [])
   const [error, setError] = useState('')
+  const [user, setUser] = useState(null)
+  const [accountName, setAccountName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [status, setStatus] = useState(() => savedBatch?.status ?? '')
   const [isConverting, setIsConverting] = useState(false)
   const [conversionProgress, setConversionProgress] = useState(0)
@@ -569,6 +574,21 @@ export default function App() {
     }
   }
 
+  async function handleSignUp(event) {
+    event.preventDefault()
+    setError('')
+    const { data, error: signUpError } = await authClient.signUp.email({
+      name: accountName,
+      email,
+      password,
+    })
+    if (signUpError) {
+      setError(signUpError.message)
+      return
+    }
+    setUser(data.user)
+  }
+
   async function handleLoadDemoProject() {
     if (!backendReady) return
     setError('')
@@ -764,6 +784,35 @@ export default function App() {
       state: isVerifying ? 'current' : verification ? 'done' : progressStep > 1 ? 'soon' : 'locked',
     },
   ]
+
+  if (!user) {
+    return (
+      <form onSubmit={handleSignUp}>
+        <input
+          value={accountName}
+          onChange={(event) => setAccountName(event.target.value)}
+          placeholder="Name"
+          required
+        />
+        <input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="Email"
+          required
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder="Password"
+          required
+        />
+        <button type="submit">Create account</button>
+        {error ? <p>{error}</p> : null}
+      </form>
+    )
+  }
 
   return (
     <div className="page app-shell">

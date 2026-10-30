@@ -441,9 +441,12 @@ class ProjectService:
         if not programs:
             raise ProjectStateError("Upload a .cbl or .cob program before converting.")
 
+        copybooks = {
+            file.name: file.content for file in project.files if file.kind == FileKind.COPYBOOK
+        }
         converted_files = []
         for program in programs:
-            converted = convert_file(program.name, program.content)
+            converted = convert_file(program.name, program.content, copybooks=copybooks)
             converted_files.append(
                 ConvertedProjectFile(
                     **converted.model_dump(),
