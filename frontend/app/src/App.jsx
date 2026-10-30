@@ -140,7 +140,7 @@ export default function App() {
 
   const [viewMode, setViewMode] = useState(() => {
     const saved = sessionStorage.getItem(savedViewKey)
-    if (saved === 'split' || saved === 'cobol' || saved === 'python') return saved
+    if (saved === 'split' || saved === 'cobol' || saved === 'python' || saved === 'report') return saved
     return 'split'
   })
   
@@ -231,6 +231,15 @@ export default function App() {
         setDownloadRunId(convertRun.id)
         setBatchDownloadId('')
         setResults(run.files || [])
+        const verifySummary = [...runs.runs].reverse().find((item) => item.kind === 'verify')
+        if (verifySummary && Number(verifySummary.id) > Number(convertRun.id)) {
+          const savedVerify = await getRun(id, verifySummary.id)
+          if (cancelled) return
+          setVerification({
+            status: savedVerify.status,
+            files: savedVerify.checks || [],
+          })
+        }
         setStatus(`Opened "${saved.name}" with the saved Python. `)
       } catch (cause) {
         sessionStorage.removeItem(savedProjectKey)
@@ -465,6 +474,7 @@ export default function App() {
     setResults([])
     setSelectedFile(0)
     setSourceText(programFilesFromProject(nextProject)[0]?.content || '')
+    setVerification(null)
   }
 
   function closeProjectIfDeleted(projectId) {
@@ -475,6 +485,7 @@ export default function App() {
     setDownloadRunId('')
     setSourceText('')
     setSelectedFile(0)
+    setVerification(null)
   }
 
   async function handleOpenSavedProject(projectId) {
@@ -492,6 +503,14 @@ export default function App() {
       const run = await getRun(projectId, convertRun.id)
       setDownloadRunId(convertRun.id)
       setResults(run.files || [])
+      const verifySummary = [...runs.runs].reverse().find((item) => item.kind === 'verify')
+      if (verifySummary && Number(verifySummary.id) > Number(convertRun.id)) {
+        const savedVerify = await getRun(projectId, verifySummary.id)
+        setVerification({
+          status: savedVerify.status,
+          files: savedVerify.checks || [],
+        })
+      } 
       setScreen('convert')
       setStatus(`Opened "${saved.name}" with the saved Python.`)
     } catch (cause) {
@@ -635,6 +654,41 @@ export default function App() {
     } catch (cause) {
       setError(cause.message)
     }
+  }
+
+  function verificationStatus(file) {
+    if (verification?.status === 'not_verified') return 'not_verified'
+    if (file?.equivalent) return 'verified'
+    return 'mismatch'
+  }
+
+  function outputLines(text) {
+    if (!text) return []
+    const normalized = text.replace(/\r\n/g, '\n').replace(/\n$/, '')
+    return normalized ? normalized.split('\n') : []
+  }
+
+  function downloadAuditReport() {
+    if (!verification) return
+    const lines = [`Verification ${verification.status}.`, '']
+    for (const file of verification.files || []) {
+      lines.push(`${file.source_name}: ${verificationStatus(file)}`)
+      if (file.error) lines.push(file.error)
+      const cobol = outputLines(file.cobol_stdout)
+      const python = outputLines(file.python_stdout)
+      const count = Math.max(cobol.length, python.length)
+      for (let index = 0; index < count; index += 1) {
+        lines.push(`${index + 1}. ${cobol[index] ?? ''} ${index + 1}. ${python[index] ?? ''}`)
+      }
+      lines.push('')
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'audit-report.txt'
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const showingBatch = uploadMode === 'batch'
@@ -973,10 +1027,17 @@ export default function App() {
                 </button>
                 <button
                   className={viewMode === 'python' ? 'button dark' : 'button secondary'}
-                  type = "button"
+                  type ="button"
                   onClick={() => setViewMode('python')}
                 >
                   Python only
+                </button>
+                <button
+                  className={viewMode === 'report' ? 'button dark' : 'button secondary'}
+                  type="button"
+                  onClick={() => setViewMode('report')}
+                >
+                  View report
                 </button>
                 <button
                   className="button dark"
@@ -1017,7 +1078,7 @@ export default function App() {
                 </section>
               )}
 
-              {sourceTabs.length > 0 && (
+              {viewMode !== 'report' && sourceTabs.length > 0 && (
                 <div className="file-tabs">
                   {sourceTabs.map((tab, index) => (
                     <button
@@ -1031,7 +1092,8 @@ export default function App() {
                   ))}
                 </div>
               )}
-                    
+
+              {viewMode !== 'report' && (     
               <div className={viewMode === 'split' ? 'panels' : 'panels single'}>
                 {(viewMode === 'split' || viewMode === 'cobol') && (
                   <section className="panel" aria-labelledby="source-title">
@@ -1067,8 +1129,9 @@ export default function App() {
                   </section>
                 )}
               </div>
-              
-              {!showingBatch && analysis && selectedProgramName && (
+              )}
+      
+              {viewMode !== 'report' && !showingBatch && analysis && selectedProgramName && (
                 <section className="review-notes" aria-labelledby="dependencies-title">
                   <h2 id="dependencies-title">Dependencies for {selectedProgramName}</h2>
                   {programLinks.length > 0 ? (
@@ -1097,7 +1160,7 @@ export default function App() {
                 </section>
               )}
 
-              {!showingBatch && selectedProgramName && (isVerifying || verification) && (
+              {viewMode !== 'report' && !showingBatch && selectedProgramName && (isVerifying || verification) && (
                 <section className="review-notes" aria-labelledby="verification-title">
                   <h2 id="verification-title">Verification for {selectedProgramName}</h2>
                   {isVerifying ? (
@@ -1133,7 +1196,7 @@ export default function App() {
                 </section>
               )}
 
-              {currentResult?.notes?.length > 0 && (
+              {viewMode !== 'report' && currentResult?.notes?.length > 0 && (
                 <section className="review-notes">
                   <h2>Lines to review</h2>
                   <ul>
@@ -1141,6 +1204,50 @@ export default function App() {
                       <li key={note}>{note}</li>
                     ))}
                   </ul>
+                </section>
+              )}
+
+              {viewMode === 'report' && (
+                <section className="review-notes" aria-labelledby="audit-report-title">
+                  <h2 id="audit-report-title">Audit report</h2>
+                  {isVerifying ? (
+                    <p>Verification is running.</p>
+                  ) : !verification ? (
+                    <p>Convert this project before viewing the report.</p>
+                  ) : (
+                    (verification.files || []).map((file) => {
+                      const cobol = outputLines(file.cobol_stdout)
+                      const python = outputLines(file.python_stdout)
+                      const count = Math.max(cobol.length, python.length)
+                      return (
+                        <div className="report-program" key={`${file.source_name}-${file.python_name}`}>
+                          <h2>{file.source_name}</h2>
+                          <p className="run-status">{verificationStatus(file)}</p>
+                          {file.error && <p>{file.error}</p>}
+                          <div className="diff-lines" aria-label={`COBOL and Python output lines for ${file.source_name}`}>
+                            <div className="diff-row diff-heading">
+                              <span>COBOL line</span>
+                              <span>Python line</span>
+                            </div>
+                            {Array.from({ length: count}, (_, index) => {
+                              const cobolLine = cobol[index] ?? ''
+                              const pythonLine = python[index] ?? ''
+                              const same = cobolLine === pythonLine
+                              return (
+                                <div
+                                  className={same ? 'diff-row' : 'diff-row mismatch'}
+                                  key={index}
+                                >
+                                  <span>{`${index + 1}. ${cobolLine}`}</span>
+                                  <span>{`${index + 1}. ${pythonLine}`}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
                 </section>
               )}
               <p className="footnote">
@@ -1191,6 +1298,14 @@ export default function App() {
                     </button>
                   </li>
                 ))}
+                {!showingBatch && verification && (
+                  <li className="export-row">
+                    <span>audit-report.txt</span>
+                    <button className="download" type="button" onClick={downloadAuditReport}>
+                      Download report
+                    </button>
+                  </li>
+                )}
               </ul>
             )}
           </>
