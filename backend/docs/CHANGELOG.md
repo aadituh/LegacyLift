@@ -6,6 +6,7 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Added
 
+- `POST /api/projects/{id}/describe` (issue #31): a plain-language map of each program and the data they share. Needs `LEGACYLIFT_GEMINI_API_KEY`. Tests mock the Gemini call.
 - Converter (issue #21): `cobol/runtime.py` helpers (`cobol_number`, `cobol_text`, `display_number`) so generated Python pads/truncates like GnuCOBOL; `Decimal` + `ROUNDED`; documented cases in `docs/cobol_display_cases.md`; recorded FEESCHED/INTCALC fixtures under `tests/data/recorded/`.
 - Converter (issue #22): programs beyond the sample bank — group/`05` fields, `PIC …V…` decimals, paragraphs/`PERFORM`/`PERFORM … THRU`, `COMPUTE`, `MULTIPLY`/`DIVIDE`. Unsupported lines stay as review notes; drafts still run. Covered by `tests/test_converter.py` (`employee_payroll`, `simple_account`).
 - `backend/Dockerfile` and `docker-compose.yml`: `docker compose up --build` starts PostgreSQL, the API (waits for the database), and the web app on port 8080.
