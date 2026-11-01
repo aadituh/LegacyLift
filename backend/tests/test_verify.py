@@ -130,6 +130,33 @@ def test_verified_when_every_program_prints_the_same(client: TestClient):
     assert body["note"] == "COBOL and Python outputs matched for every program."
 
 
+def test_walkthrough_files_verify_monthend_and_feesched(client: TestClient):
+    """docs/walkthrough.md: upload every file in src/legacylift/data/ at once."""
+    names = sorted(
+        path.name for path in SAMPLE.iterdir() if path.suffix in {".cbl", ".cpy", ".dat"}
+    )
+    assert len(names) == 10  # the most one project holds
+    use_runner(
+        client,
+        FakeRunner(
+            {
+                "BANKMAIN.cbl": printed(
+                    (RECORDED / "bank" / "sample" / "BANKMAIN.out").read_text()
+                ),
+                "FEESCHED.cbl": printed((RECORDED / "FEESCHED.out").read_text()),
+                "MONTHEND.cbl": printed((RECORDED / "MONTHEND.out").read_text()),
+            }
+        ),
+    )
+    base = project_with(client, sample(*names))
+    body = client.post(f"{base}/verify").json()
+    assert {file["source_name"]: file["equivalent"] for file in body["files"]} == {
+        "BANKMAIN.cbl": False,
+        "FEESCHED.cbl": True,
+        "MONTHEND.cbl": True,
+    }
+
+
 def test_compile_error_is_a_mismatch_with_the_message(client: TestClient):
     failed = RunResult(False, "compile", 1, "", "hello.cbl:3: error: syntax error\n")
     use_runner(client, FakeRunner({"hello.cbl": failed}))
