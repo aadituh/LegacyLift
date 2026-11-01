@@ -40,12 +40,26 @@ export function clearToken() {
   localStorage.removeItem(tokenStorageKey)
 }
 
-function readToken() {
+export function readToken() {
   try {
     return localStorage.getItem(tokenStorageKey) || ''
   } catch {
     return ''
   }
+}
+
+let onUnauthorized = () => {}
+
+/** The page registers this so a 401 clears the session and shows the message. */
+export function setUnauthorizedHandler(handler) {
+  onUnauthorized = typeof handler === 'function' ? handler : () => {}
+}
+
+function failAuth(data) {
+  clearToken()
+  const message = detailMessage(data, 'Please log in again.')
+  onUnauthorized(message)
+  throw new Error(message)
 }
 
 function withAuth(options) {
@@ -67,7 +81,7 @@ async function request(path, options = {}) {
 
   if (response.status === 204) return null
   const data = await response.json().catch(() => ({}))
-  if (response.status === 401) clearToken()
+  if (response.status === 401) failAuth(data)
   if (!response.ok) {
     if (response.status === 413) {
       throw new Error(`That upload is too large. The API rejects a request over 1.2 MB.`)
@@ -118,6 +132,10 @@ export async function downloadPythonFile(path, fileName) {
     response = await fetch(endpoint(path), withAuth({}))
   } catch {
     throw new Error('Cannot reach the LegacyLift backend. Check the API connection and try again.')
+  }
+  if (response.status === 401) {
+    const data = await response.json().catch(() => ({}))
+    failAuth(data)
   }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}))

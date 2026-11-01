@@ -19,6 +19,7 @@ The side menu has three screens: **Upload**, **Convert**, and **Export**. A prog
 
 | Screen | Control | API call |
 | --- | --- | --- |
+| (logged out) | **Log in** | `POST /api/auth/login`, then `GET /api/auth/me`. A wrong password or other failed sign-in shows the API message. If the API is down, the form says the backend is not reachable. **Log out** clears the token and returns to this page. An expired token shows "Please log in again". |
 | (page load) | | `GET /health`; Convert stays disabled until the API answers |
 | Upload → **Project** | **Create project**, **Load demo project** | `POST /api/projects`, `POST /api/projects/demo` |
 | Upload → **Project** | **Upload project files** | `POST /api/projects/{id}/files` (`.cbl`, `.cob`, `.cpy`, `.dat`) |
