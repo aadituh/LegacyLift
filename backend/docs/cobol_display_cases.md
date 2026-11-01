@@ -35,6 +35,5 @@ See `tests/data/recorded/FEESCHED.out` (`LEGACYLIFT BANK` is exactly 15 characte
 
 ## BANKMAIN recorded cases
 
-Until full BANKMAIN stdout is re-recorded with GnuCOBOL (#36), the helper tests
-cover the same pictures BANKMAIN uses on the statement path (`PIC 9(3)` counters,
-`PIC X(20)` names, `S9(7)V99` money / INTCALC interest).
+`tests/data/recorded/bank/<case>/BANKMAIN.out` holds GnuCOBOL 3.1.2 output for the
+`sample`, `normal`, `overdraft`, and `closed` cases (`scripts/record_cobol_output.py`).
