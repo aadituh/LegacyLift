@@ -6,6 +6,7 @@ import {
   convertProject,
   analyzeProject,
   verifyProject,
+  reviewProject,
   createDemoProject,
   createProject,
   downloadPythonFile,
@@ -119,6 +120,11 @@ function runStatusLabel(status) {
     return status
 }
 
+function lineList(lines) {
+  if (!lines || lines.length === 0) return 'none'
+  return lines.join(', ')
+}
+
 function runTime(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
@@ -144,6 +150,8 @@ export default function App() {
   const [analysis, setAnalysis] = useState(null)
   const [verification, setVerification] = useState(null)
   const [isVerifying, setIsVerifying] = useState(false)
+  const [aiReview, setAiReview] = useState(null)
+  const [isReviewing, setIsReviewing] = useState(false)
 
   const [viewMode, setViewMode] = useState(() => {
     const saved = sessionStorage.getItem(savedViewKey)
@@ -245,6 +253,16 @@ export default function App() {
           setVerification({
             status: savedVerify.status,
             files: savedVerify.checks || [],
+          })
+        }
+        const aiSummary = [...runs.runs].reverse().find((item) => item.kind === 'ai_review')
+        if (aiSummary && Number(aiSummary.id) > Number(convertRun.id)) {
+          const savedReview = await getRun(id, aiSummary.id)
+          if (cancelled) return
+          setAiReview({
+            status: savedReview.status,
+            model: savedReview.model || '',
+            files: savedReview.reviews || [],
           })
         }
         setStatus(`Opened "${saved.name}" with the saved Python. `)
@@ -447,6 +465,7 @@ export default function App() {
       setSourceText(projectPrograms[0].content || '')
       
       setVerification(null)
+      setAiReview(null)
       setIsVerifying(true)
       try {
         const verified = await verifyProject(project.id)
@@ -482,6 +501,7 @@ export default function App() {
     setSelectedFile(0)
     setSourceText(programFilesFromProject(nextProject)[0]?.content || '')
     setVerification(null)
+    setAiReview(null)
   }
 
   function closeProjectIfDeleted(projectId) {
@@ -493,6 +513,42 @@ export default function App() {
     setSourceText('')
     setSelectedFile(0)
     setVerification(null)
+    setAiReview(null)
+  }
+
+  async function handleAiReview() {
+    if (!backendReady) {
+      setError('Backend is offline. Check the API connection, then try again.')
+      return
+    }
+    if (showingBatch) {
+      setError('AI review runs on a saved project. Switch to Project and convert it first.')
+      return
+    }
+    if (!project) {
+      setError('Create a project and convert it before requesting an AI review.')
+      return
+    }
+    setError('')
+    setIsReviewing(true)
+    try {
+      const review = await reviewProject(project.id)
+      setAiReview(review)
+      const concernCount = (review.files || []).reduce(
+        (total, file) => total + (file.concerns || []).length,
+        0,
+      )
+      setStatus(
+        review.status === 'clear'
+          ? `AI review of "${project.name}" is clear.`
+          : `AI review of "${project.name}" found ${concernCount} concern(s).`,
+      )
+    } catch (cause) {
+      setAiReview(null)
+      setError(cause.message)
+    } finally {
+      setIsReviewing(false)
+    }
   }
 
   async function handleOpenSavedProject(projectId) {
@@ -517,7 +573,16 @@ export default function App() {
           status: savedVerify.status,
           files: savedVerify.checks || [],
         })
-      } 
+      }
+      const aiSummary = [...runs.runs].reverse().find((item) => item.kind === 'ai_review')
+      if (aiSummary && Number(aiSummary.id) > Number(convertRun.id)) {
+        const savedReview = await getRun(projectId, aiSummary.id)
+        setAiReview({
+          status: savedReview.status,
+          model: savedReview.model || '',
+          files: savedReview.reviews || [],
+        })
+      }
       setScreen('convert')
       setStatus(`Opened "${saved.name}" with the saved Python.`)
     } catch (cause) {
@@ -682,7 +747,30 @@ export default function App() {
     }
   }
 
+  function updateCurrentPython(text) {
+    setResults((current) =>
+      current.map((item, index) => (index === selectedFile ? { ...item, python: text } : item)),
+    )
+  }
+
+  function saveTextFile(text, fileName) {
+    const blob = new Blob([text], { type: 'text/x-python' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   async function downloadPython(result) {
+    if (typeof result.python === 'string') {
+      setError('')
+      saveTextFile(result.python, result.python_name)
+      return
+    }
     const path = downloadRunId && project
       ? `/api/projects/${encodeURIComponent(project.id)}/runs/${encodeURIComponent(downloadRunId)}/files/${encodeURIComponent(result.python_name)}`
       : batchDownloadId
@@ -1144,6 +1232,14 @@ export default function App() {
                   View report
                 </button>
                 <button
+                  className="button secondary"
+                  type="button"
+                  onClick={handleAiReview}
+                  disabled={showingBatch || !project || isReviewing || isConverting || !backendReady}
+                >
+                  {isReviewing ? 'Reviewing...' : 'Review with AI'}
+                </button>
+                <button
                   className="button dark"
                   type="button"
                   onClick={handleConvert}
@@ -1229,7 +1325,17 @@ export default function App() {
                         </span>
                       </div>
                     )}
-                    <pre className="code">{currentResult?.python || 'Converted Python will appear here.'}</pre>
+                    {typeof currentResult?.python === 'string' ? (
+                      <textarea
+                        className="code code-editor"
+                        aria-label={`Edit ${currentResult.python_name}`}
+                        value={currentResult.python}
+                        onChange={(event) => updateCurrentPython(event.target.value)}
+                        spellCheck={false}
+                      />
+                    ) : (
+                      <pre className="code">Converted Python will appear here.</pre>
+                    )}
                   </section>
                 )}
               </div>
@@ -1295,6 +1401,44 @@ export default function App() {
                         })}
                       </div>
                      )}
+                    </>
+                  )}
+                </section>
+              )}
+
+              {viewMode !== 'report' && !showingBatch && (isReviewing || aiReview) && (
+                <section className="review-notes" aria-labelledby="ai-review-title" aria-busy={isReviewing}>
+                  <h2 id="ai-review-title">AI review</h2>
+                  {isReviewing ? (
+                    <p>AI review is running.</p>
+                  ) : (
+                    <>
+                      <p className="run-status">
+                        {aiReview.status === 'clear' ? 'clear' : 'concerns'}
+                        {aiReview.model ? ` · ${aiReview.model}` : ''}
+                      </p>
+                      {(aiReview.files || []).map((file) => {
+                        const concerns = file.concerns || []
+                        const fileResult = concerns.length === 0 ? 'clear' : 'concerns'
+                        return (
+                          <div className="report-program" key={`${file.source_name}-${file.python_name}`}>
+                            <h2>{file.source_name}</h2>
+                            <p className="run-status">{fileResult}</p>
+                            {concerns.length === 0 ? (
+                              <p>No concerns.</p>
+                            ) : (
+                              <ul>
+                                {concerns.map((concern, index) => (
+                                  <li key={`${file.source_name}-${index}`}>
+                                    COBOL lines {lineList(concern.cobol_lines)}; Python lines{' '}
+                                    {lineList(concern.python_lines)}. {concern.detail}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )
+                      })}
                     </>
                   )}
                 </section>
