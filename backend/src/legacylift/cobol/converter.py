@@ -682,15 +682,22 @@ def join_continued_lines(numbered: list[tuple[int, str]]) -> list[tuple[int, str
 
         # COMPUTE / DISPLAY with operands on the next line when the prior line
         # is incomplete or column-72 forced a wrap (issue #97).
+        # Do not pull paragraph headers (single name like BETA.) onto DISPLAY.
         incomplete_tail = prev.rstrip().endswith(("=", "+", "-", "*", "/", "(", ","))
         next_is_scope = upper_line.startswith("END-") or upper_line in {
             "ELSE",
             "WHEN",
             "OTHER",
         }
+        next_is_paragraph = bool(
+            FIELD_NAME.fullmatch(line)
+            and upper_line not in NOT_PARAGRAPH_NAMES
+            and not upper_line.startswith("END-")
+        )
         if (
             not _STMT_STARTERS.match(line)
             and not next_is_scope
+            and not next_is_paragraph
             and not section_header
             and (incomplete_tail or prev_upper.startswith(("COMPUTE ", "DISPLAY ")))
         ):
