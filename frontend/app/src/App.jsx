@@ -736,13 +736,20 @@ export default function App() {
   const programCheck = (verification?.files || []).find(
     (file) => file.source_name === selectedProgramName,
   )
+
+  const callerLink = (analysis?.dependencies || []).find(
+    (link) => link.kind === 'call' && link.target === selectedProgramName,
+  )
+  const callerName = callerLink?.source?.replace(/\.(cbl|cob)$/i, '')
   const programBadge = verification?.status === 'not_verified'
     ? 'not_verified'
     : programCheck?.equivalent
       ? 'verified'
       : programCheck
         ? 'mismatch'
-        : ''
+        : callerName
+          ? `runs inside ${callerName}`
+          : ''
   
   const cobolLines = programCheck?.cobol_stdout
     ? programCheck.cobol_stdout.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n')
@@ -762,7 +769,7 @@ export default function App() {
   const progressNote = isVerifying
     ? 'Verification is running.'
     : verification
-      ? `Verification ${verification.status}.`
+      ? (verification.note || `Verification ${verification.status}.`)
       : progressStep === 0
         ? hasOnlyOtherFiles
           ? 'Upload a COBOL program before converting.'
@@ -1217,6 +1224,7 @@ export default function App() {
                   ) : (
                     <>
                       <p className="run-status">{programBadge}</p>
+                      {verification?.note && <p>{verification.note}</p>}
                       {programCheck?.error && <p>{programCheck.error}</p>}
                       {outputLineCount > 0 && (
                       <div className="diff-lines" aria-label="COBOL and Python output lines">
