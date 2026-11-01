@@ -822,7 +822,7 @@ export default function App() {
   }
 
   function outputLines(text) {
-    if (!text) return []
+    if (typeof text !== 'string' || !text) return []
     const normalized = text.replace(/\r\n/g, '\n').replace(/\n$/, '')
     return normalized ? normalized.split('\n') : []
   }
@@ -1574,10 +1574,13 @@ export default function App() {
                 </section>
               )}
               <p className="footnote">
-                Conversion runs on the Python backend (`legacylift.cobol.converter`). Supported: elementary
-                fields (including decimals and group children), DISPLAY with COBOL padding via
-                `cobol_number`/`cobol_text`, MOVE, ADD, SUBTRACT, MULTIPLY, DIVIDE, COMPUTE ROUNDED,
-                paragraph PERFORM / PERFORM THRU, STOP RUN. Other lines stay visible as review notes.
+                Conversion runs on the Python backend (`legacylift.cobol.converter`). Supported:
+                elementary fields (text, whole numbers, decimals, and signed pictures), groups,
+                OCCURS with 1-based subscripts, level 88, COPY, DISPLAY with COBOL padding,
+                MOVE, ADD, SUBTRACT, MULTIPLY, DIVIDE, COMPUTE ROUNDED, IF/EVALUATE,
+                PERFORM / PERFORM THRU / UNTIL / VARYING, CALL USING, and STOP RUN.
+                Statements that continue on the next line are joined. File I/O and other lines
+                stay visible as review notes.
               </p>
             </>
           )}
