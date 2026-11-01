@@ -55,7 +55,7 @@ In the browser: on **Upload**, click **Load demo project**; on **Convert**, clic
 | [`backend/`](backend/) | FastAPI service: routes, project workflow, COBOL converter, tests. [README](backend/README.md), [changelog](backend/docs/CHANGELOG.md) |
 | [`frontend/app/`](frontend/app/) | React + Vite app for uploading, converting, and downloading. [README](frontend/app/README.md) |
 | [`backend/prototype/`](backend/prototype/) | Earlier research scripts shown in the design deck. The API does not use them. [README](backend/prototype/README.md) |
-| [`docs/`](docs/) | Course website, design deck, the [developer guide](docs/developer.md), and the [Demo 2 walkthrough](docs/walkthrough.md) |
+| [`docs/`](docs/) | Course website, design deck, the [developer guide](docs/developer.md), the [Demo 2 walkthrough](docs/walkthrough.md), and the [Demo 2 stress test](docs/demo2-stress-test.md) |
 | [`TODO.MD`](TODO.MD) | Work planned for Demo 2 |
 | [`docker-compose.yml`](docker-compose.yml) | Starts the database, API, runner, and web app together; images from `backend/Dockerfile`, `backend/runner.Dockerfile`, and `frontend/app/Dockerfile` |
 | [`.github/workflows/`](.github/workflows/) | Backend and frontend checks, CodeQL code scanning (security and quality), dependency review, and the GitHub Pages deployment; [`dependabot.yml`](.github/dependabot.yml) sets weekly dependency updates |
