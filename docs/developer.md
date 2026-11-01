@@ -47,4 +47,6 @@ If you change a route's JSON, update `api.js` and `App.jsx` in the same pull req
 | API | Render | Set up in the Render dashboard. With `DATABASE_URL` set to the Neon connection string, projects are stored in PostgreSQL; without it, saved projects are lost on every redeploy or restart. |
 | Allowed frontend origins | `LEGACYLIFT_CORS_ORIGINS` on the API | Local Vite and `https://aadituh.github.io` are always allowed. |
 
+The web app stays on GitHub Pages (decided in #38). Pages has no pull-request previews; check a frontend branch locally with `npm run dev` or `docker compose up --build`.
+
 Locally, Vite forwards `/api` and `/health` to `http://127.0.0.1:8000` ([`vite.config.js`](../frontend/app/vite.config.js)), so no address or CORS setup is needed.
