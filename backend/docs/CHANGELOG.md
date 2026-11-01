@@ -6,6 +6,8 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Added
 
+- `database/compose-init.sql`: Compose creates a local stand-in for Neon Auth's `neon_auth."user"` table, so `database/schema.sql` applies to the local database and the API starts.
+- Runner container (`backend/runner.Dockerfile`, `legacylift.runner`): GnuCOBOL and Python behind `POST /run/cobol` and `POST /run/python`, each run in its own temporary folder with a time limit and an output limit. Compose service `runner` on an internal network with only the API, read-only, no capabilities, non-root, memory and process limits.
 - Converter (issue #20): sample-bank constructs — groups as dicts, level `88` / `SET … TO TRUE`, `OCCURS` lists with 1-based indexes, `PERFORM UNTIL` / `VARYING`, `IF`/`EVALUATE`, `CALL "X" USING …`, `PROCEDURE DIVISION USING` callees, and `COPY` expansion from project copybooks. File I/O, edited PICs, and `COMPUTE ROUNDED` stay as review notes. Covered by `tests/test_converter.py` (issue #20 cases).
 - Converter (issue #22): programs beyond the sample bank — group/`05` fields, `PIC …V…` decimals, paragraphs/`PERFORM`/`PERFORM … THRU`, `COMPUTE`, `MULTIPLY`/`DIVIDE`. Unsupported lines stay as review notes; drafts still run. Covered by `tests/test_converter.py` (`employee_payroll`, `simple_account`).
 - `backend/Dockerfile` and `docker-compose.yml`: `docker compose up --build` starts PostgreSQL, the API (waits for the database), and the web app on port 8080.
