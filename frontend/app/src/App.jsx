@@ -15,8 +15,12 @@ import {
   getRun,
   getRuns,
   listProjects,
+  login,
+  logout,
+  getMe,
+  readToken,
+  setUnauthorizedHandler,
 } from './api'
-import { authClient } from './auth'
 import './App.css'
 import BackgroundFx from './BackgroundFx'
 
@@ -133,7 +137,6 @@ export default function App() {
   const [results, setResults] = useState(() => savedBatch?.results ?? [])
   const [error, setError] = useState('')
   const [user, setUser] = useState(null)
-  const [accountName, setAccountName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [status, setStatus] = useState(() => savedBatch?.status ?? '')
@@ -189,6 +192,30 @@ export default function App() {
   }, [viewMode]) 
 
   useEffect(() => {
+    setUnauthorizedHandler((message) => {
+      setUser(null)
+      setError(message || 'Please log in again.')
+    })
+    let cancelled = false
+    async function restoreSession() {
+      if (!readToken()) return
+      try {
+        const account = await getMe()
+        if (!cancelled) setUser(account)
+      } catch (cause) {
+        if (!cancelled) {
+          setUser(null)
+          setError(cause.message || 'Please log in again.')
+        }
+      }
+    }
+    restoreSession()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
     async function probe() {
       if (!apiConfigured) {
@@ -218,7 +245,7 @@ export default function App() {
   useEffect(() => {
     const id = sessionStorage.getItem(savedProjectKey)
     
-    if(!backendReady || !id) return
+    if (!user || !backendReady || !id) return
     let cancelled = false
     async function restore() {
       try {
@@ -255,10 +282,10 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [backendReady])
+  }, [backendReady, user])
 
   useEffect(() => {
-    if (screen !== 'export' || !project?.id || !backendReady) return
+    if (!user || screen !== 'export' || !project?.id || !backendReady) return
     let cancelled = false
     async function  loadRuns() {
       try {
@@ -272,10 +299,10 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [screen, project, backendReady])
+  }, [screen, project, backendReady, user])
 
   useEffect(() => {
-    if (!project?.id || !backendReady || project.files.length === 0) return
+    if (!user || !project?.id || !backendReady || project.files.length === 0) return
     let cancelled = false
     async function loadAnalysis() {
       try {
@@ -295,10 +322,10 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [project, backendReady])
+  }, [project, backendReady, user])
 
   useEffect(() => {
-    if (screen !== 'upload' || uploadMode !== 'project' || !backendReady) return
+    if (!user || screen !== 'upload' || uploadMode !== 'project' || !backendReady) return
     let cancelled = false
     async function loadSavedProjects() {
       try {
@@ -312,7 +339,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [screen, uploadMode, backendReady, project])
+  }, [screen, uploadMode, backendReady, project, user])
 
   async function showFile(file, index) {
     const readId = ++sourceRead.current
@@ -574,19 +601,35 @@ export default function App() {
     }
   }
 
-  async function handleSignUp(event) {
+  async function handleLogin(event) {
     event.preventDefault()
     setError('')
-    const { data, error: signUpError } = await authClient.signUp.email({
-      name: accountName,
-      email,
-      password,
-    })
-    if (signUpError) {
-      setError(signUpError.message)
-      return
+    try {
+      await login(email, password)
+      const account = await getMe()
+      setUser(account)
+      setPassword('')
+      setScreen('upload')
+      setUploadMode('project')
+      setStatus('')
+    } catch (cause) {
+      setUser(null)
+      setError(cause.message)
     }
-    setUser(data.user)
+  }
+
+  function handleLogout() {
+    logout()
+    sessionStorage.removeItem(savedProjectKey)
+    setUser(null)
+    setPassword('')
+    setError('')
+    setStatus('')
+    setProject(null)
+    setSavedProjects([])
+    setResults([])
+    setDownloadRunId('')
+    setSourceText('')
   }
 
   async function handleLoadDemoProject() {
@@ -787,30 +830,34 @@ export default function App() {
 
   if (!user) {
     return (
-      <form onSubmit={handleSignUp}>
-        <input
-          value={accountName}
-          onChange={(event) => setAccountName(event.target.value)}
-          placeholder="Name"
-          required
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="Email"
-          required
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="Password"
-          required
-        />
-        <button type="submit">Create account</button>
-        {error ? <p>{error}</p> : null}
-      </form>
+      <div className="page login-page">
+        <form className="login-card" onSubmit={handleLogin}>
+          <h1>Log in</h1>
+          <p>Sign in to see your projects.</p>
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="username"
+              required
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          <button className="button dark" type="submit">Log in</button>
+          {error ? <p className="message error" role="alert">{error}</p> : null}
+        </form>
+      </div>
     )
   }
 
@@ -850,6 +897,10 @@ export default function App() {
           <strong>
             {showingBatch ? 'Batch conversion' : project ? project.name : 'No project yet'}
           </strong>
+          <span className="signed-in">{user.display_name}</span>
+          <button className="button secondary" type="button" onClick={handleLogout}>
+            Log out
+          </button>
           {backendChecked && (
             <span className={backendReady ? 'api-badge ok' : 'api-badge down'} role="status">
               {backendReady ? 'API connected' : 'API offline'}
