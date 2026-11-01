@@ -36,7 +36,31 @@ class ConversionError(LegacyLiftError):
     """A COBOL program cannot be converted (400)."""
 
 
+class AIReviewError(LegacyLiftError):
+    """Gemini timed out or returned a body that was not the expected JSON (502)."""
+
+    status_code = 502
+
+
 class NotFoundError(LegacyLiftError):
     """The requested project does not exist (404)."""
 
     status_code = 404
+
+
+class UnauthenticatedError(LegacyLiftError):
+    """The login token is missing, wrong, or expired (401)."""
+
+    status_code = 401
+
+
+class ConflictError(LegacyLiftError):
+    """The email is already registered (409)."""
+
+    status_code = 409
+
+
+class InputError(LegacyLiftError):
+    """A sign-up field failed validation (422)."""
+
+    status_code = 422

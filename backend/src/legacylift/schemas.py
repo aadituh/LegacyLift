@@ -21,11 +21,68 @@ from legacylift.models import (
     ConvertedProjectFile,
     DependencyLink,
     FileCounts,
+    FileReview,
     RunStatus,
     RunSummary,
     SourceFile,
     UnresolvedDependency,
 )
+
+
+class RegisterRequest(BaseModel):
+    """Body of ``POST /api/auth/register``.
+
+    Attributes:
+        email: Stored lowercase. A second sign-up with the same email is 409.
+        password: 8 to 128 characters, with a letter and a number. Not stored.
+        display_name: 1 to 100 characters after spaces are removed.
+    """
+
+    email: str
+    password: str
+    display_name: str
+
+
+class LoginRequest(BaseModel):
+    """Body of ``POST /api/auth/login``.
+
+    Attributes:
+        email: The account email.
+        password: The account password. A mismatch is the same 401 as an unknown email.
+    """
+
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    """An account with no password and no password hash.
+
+    Attributes:
+        id: Account ID.
+        email: Lowercase email.
+        display_name: Name shown in the header.
+        created_at: When the account was created (UTC).
+    """
+
+    id: str
+    email: str
+    display_name: str
+    created_at: datetime
+
+
+class LoginResponse(BaseModel):
+    """Response from ``POST /api/auth/login``.
+
+    Attributes:
+        token: Signed JWT. Send it as ``Authorization: Bearer <token>``.
+        token_type: Always ``bearer``.
+        expires_in: Seconds until the token expires.
+    """
+
+    token: str
+    token_type: str = "bearer"
+    expires_in: int
 
 
 class CreateProjectRequest(BaseModel):
@@ -167,6 +224,7 @@ class FileEquivalenceResponse(BaseModel):
     cobol_stdout: str = ""
     python_stdout: str = ""
     error: str | None = None
+    diff: str = ""
 
 
 class VerifyResponse(BaseModel):
@@ -175,11 +233,12 @@ class VerifyResponse(BaseModel):
     Attributes:
         project_id: The project.
         run_id: ID of the saved verify run.
-        status: ``verified``, ``mismatch``, or ``not_verified`` (no GnuCOBOL).
+        status: ``verified``, ``mismatch``, or ``not_verified`` (runner off or unreachable).
         passed: ``True`` if every program matched, ``False`` on mismatch,
-            ``None`` if GnuCOBOL was unavailable.
+            ``None`` if nothing was compared.
         note: Short human-readable summary.
-        files: Per-program equivalence details.
+        files: Per-program equivalence details, one per main program (programs
+            that another program calls run as part of their caller).
     """
 
     project_id: str
@@ -188,6 +247,25 @@ class VerifyResponse(BaseModel):
     passed: bool | None
     note: str
     files: list[FileEquivalenceResponse] = []
+
+
+class AIReviewResponse(BaseModel):
+    """Response from ``POST /api/projects/{id}/ai-review``.
+
+    Attributes:
+        project_id: The project.
+        run_id: ID of the saved AI review run.
+        status: ``clear`` when every program has no concerns, otherwise ``concerns``.
+        model: The Gemini model that produced the review.
+        files: One comparison per program, each with ``matches`` and ``concerns``.
+            Every finding has ``cobol_lines``, ``python_lines``, and ``detail``.
+    """
+
+    project_id: str
+    run_id: str
+    status: RunStatus
+    model: str
+    files: list[FileReview] = []
 
 
 class RunsResponse(BaseModel):

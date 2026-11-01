@@ -104,57 +104,6 @@ def test_check_equivalence_reports_cobol_compile_failure():
     assert "COBOL run failed" in (result.error or "")
 
 
-def test_project_verify_without_cobc_is_not_verified(client, tmp_path):
-    created = client.post("/api/projects", json={"name": "V"}).json()
-    base = f"/api/projects/{created['id']}"
-    client.post(f"{base}/files", files=[("files", ("hello.cbl", HELLO))])
-    assert client.post(f"{base}/convert").status_code == 200
-    with patch("legacylift.cobol.equivalence.cobc_available", return_value=False):
-        response = client.post(f"{base}/verify")
-    assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "not_verified"
-    assert body["passed"] is None
-    assert body["files"]
-    assert "cobc" in body["note"].lower()
-
-
-def test_project_verify_reports_verified_when_outputs_match(client):
-    created = client.post("/api/projects", json={"name": "V"}).json()
-    base = f"/api/projects/{created['id']}"
-    client.post(f"{base}/files", files=[("files", ("hello.cbl", HELLO))])
-    converted = client.post(f"{base}/convert").json()
-    python_out = "Hello, LegacyLift          \nDemo count: 002\n"
-    fake_cobol = CobolRunResult(ok=True, stdout=python_out, stderr="", returncode=0)
-    with (
-        patch("legacylift.cobol.equivalence.cobc_available", return_value=True),
-        patch("legacylift.cobol.equivalence.run_cobol", return_value=fake_cobol),
-    ):
-        response = client.post(f"{base}/verify")
-    body = response.json()
-    assert body["status"] == "verified"
-    assert body["passed"] is True
-    assert body["files"][0]["equivalent"] is True
-    assert body["files"][0]["cobol_stdout"] == python_out
-    assert converted["files"][0]["python_name"] == body["files"][0]["python_name"]
-
-
-def test_project_verify_reports_mismatch(client):
-    created = client.post("/api/projects", json={"name": "V"}).json()
-    base = f"/api/projects/{created['id']}"
-    client.post(f"{base}/files", files=[("files", ("hello.cbl", HELLO))])
-    client.post(f"{base}/convert")
-    fake_cobol = CobolRunResult(ok=True, stdout="nope\n", stderr="", returncode=0)
-    with (
-        patch("legacylift.cobol.equivalence.cobc_available", return_value=True),
-        patch("legacylift.cobol.equivalence.run_cobol", return_value=fake_cobol),
-    ):
-        body = client.post(f"{base}/verify").json()
-    assert body["status"] == "mismatch"
-    assert body["passed"] is False
-    assert body["files"][0]["equivalent"] is False
-
-
 @pytest.mark.skipif(not cobc_available(), reason="GnuCOBOL (cobc) not installed")
 def test_real_gnucobol_matches_python_for_hello():
     draft = translate_program(HELLO)

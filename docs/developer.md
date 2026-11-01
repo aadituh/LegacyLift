@@ -15,7 +15,7 @@ App.jsx ──api.js──▶ FastAPI router ──▶ service ──▶ cobol/c
 3. **Batch:** on Upload → **Batch files**, **Choose COBOL files** or **Load small sample**; on Convert, **Convert files** calls `POST /api/convert`. Nothing is saved.
 4. **Project:** on Upload → **Project**, **Create project** or **Load demo project** creates a project and **Upload project files** adds files; on Convert, **Convert project** calls `POST /api/projects/{id}/convert`. The result is saved.
 5. Convert shows COBOL and Python side by side with review notes. Export **Download .py** fetches that file from the API.
-6. **Verify (projects):** `POST /api/projects/{id}/verify` compiles each program with GnuCOBOL (`cobol/gnucobol.py`), runs it beside the generated Python (`cobol/equivalence.py`), and returns per-file stdout comparison (`verified` / `mismatch` / `not_verified` if `cobc` is missing).
+6. **Verify (projects):** `POST /api/projects/{id}/verify` sends each main program and its generated Python to the runner container (`services/verification.py` → `runner/server.py`), runs both with the project's `.dat` files, and returns per-file outputs and a `diff` (`verified` / `mismatch` / `not_verified` when the runner is off or unreachable).
 7. Errors come back as `{"detail": "message"}`, and `api.js` shows the message.
 
 The browser checks files for quick feedback; the backend checks everything again.
@@ -36,7 +36,7 @@ If you change a route's JSON, update `api.js` and `App.jsx` in the same pull req
 2. Add or update a test in [`backend/tests/`](../backend/tests/) for any backend change.
 3. Run the checks: `pytest`, `ruff`, and `mypy` in `backend/`; `npm run lint` and `npm run build` in `frontend/app/`.
 4. Add a line to the [backend changelog](../backend/docs/CHANGELOG.md).
-5. Open a pull request. GitHub Actions runs the backend checks.
+5. Open a pull request. GitHub Actions runs the backend and frontend checks, CodeQL, and the dependency review.
 
 ## Configuration and hosting
 
@@ -44,7 +44,9 @@ If you change a route's JSON, update `api.js` and `App.jsx` in the same pull req
 | --- | --- | --- |
 | Web app | GitHub Pages | [`pages.yml`](../.github/workflows/pages.yml) builds it on every push to `main` and copies `docs/` to `/course/`. In GitHub, **Settings → Pages → Source** must be **GitHub Actions**. |
 | API address used by the web app | Actions variable `VITE_API_URL` | The API's HTTPS origin, without `/api`. Default: `https://legacylift-api.onrender.com`. |
-| API | Render | Set up in the Render dashboard. With `DATABASE_URL` set to the Neon connection string, projects are stored in PostgreSQL; without it, saved projects are lost on every redeploy or restart. |
+| API | Render | Set up in the Render dashboard. With `DATABASE_URL` set to the Neon connection string, projects are stored in PostgreSQL; without it, saved projects are lost on every redeploy or restart. Set `LEGACYLIFT_TOKEN_SECRET` on this service before anyone can log in. Leave `LEGACYLIFT_REQUIRE_LOGIN` unset until the login pages are ready. |
 | Allowed frontend origins | `LEGACYLIFT_CORS_ORIGINS` on the API | Local Vite and `https://aadituh.github.io` are always allowed. |
+
+The web app stays on GitHub Pages (decided in #38). Pages has no pull-request previews; check a frontend branch locally with `npm run dev` or `docker compose up --build`.
 
 Locally, Vite forwards `/api` and `/health` to `http://127.0.0.1:8000` ([`vite.config.js`](../frontend/app/vite.config.js)), so no address or CORS setup is needed.

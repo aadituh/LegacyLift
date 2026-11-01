@@ -48,9 +48,19 @@ CREATE TABLE IF NOT EXISTS project_id_counter (
     last_number integer NOT NULL
 );
 
+-- Accounts for POST /api/auth/register. Only the Argon2 hash is stored.
+CREATE TABLE IF NOT EXISTS users (
+    id uuid PRIMARY KEY,
+    email text NOT NULL UNIQUE,
+    password_hash text NOT NULL,
+    display_name text NOT NULL,
+    created_at timestamptz NOT NULL
+);
+
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS owner_id uuid;
 -- Idempotent: NeonProjectStore re-runs this file on every API startup.
+-- Older databases pointed owner_id at neon_auth."user". Accounts now live in users.
 ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_owner_fk;
 ALTER TABLE projects
   ADD CONSTRAINT projects_owner_fk
-  FOREIGN KEY (owner_id) REFERENCES neon_auth."user" (id);
+  FOREIGN KEY (owner_id) REFERENCES users (id);

@@ -11,6 +11,7 @@ services:
       POSTGRES_DB: legacylift
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./database/compose-init.sql:/docker-entrypoint-initdb.d/compose-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U legacylift -d legacylift"]
       interval: 2s
@@ -23,13 +24,38 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: postgresql://legacylift:legacylift@db:5432/legacylift
+      LEGACYLIFT_ENABLE_RUNNER: "true"
+      LEGACYLIFT_RUNNER_URL: http://runner:8001
     ports:
       - "8000:8000"
+    networks: [default, runner]
     depends_on:
       db:
         condition: service_healthy
+      runner:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Compiles and runs uploaded COBOL and generated Python. Only the API can reach it.
+  runner:
+    build:
+      context: .
+      dockerfile: backend/runner.Dockerfile
+    networks: [runner]
+    read_only: true
+    tmpfs:
+      - /tmp:exec,mode=1777,size=64m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    pids_limit: 64
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 3s
       timeout: 3s
       retries: 20
@@ -41,6 +67,11 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+networks:
+  # No internet: the runner talks only to the API.
+  runner:
+    internal: true
 
 volumes:
   db-data:

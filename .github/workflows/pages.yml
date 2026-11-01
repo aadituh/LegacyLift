@@ -43,6 +43,7 @@ jobs:
         env:
           GITHUB_PAGES: 'true'
           VITE_API_URL: ${{ vars.VITE_API_URL || 'https://legacylift-api.onrender.com' }}
+          VITE_NEON_AUTH_URL: ${{ vars.VITE_NEON_AUTH_URL }}
         run: npm run build
 
       - name: Include course website at /course/

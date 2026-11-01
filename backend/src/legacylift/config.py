@@ -36,8 +36,15 @@ class Settings(BaseSettings):
             Postgres instead of ``data_dir``.
         max_projects: How many projects to keep; the oldest is deleted first.
         max_request_bytes: Largest request body accepted; bigger ones get 413.
-        cobc_path: Optional path to GnuCOBOL's ``cobc`` for verify runs.
-        gemini_api_key: Gemini API key for dependency descriptions. Never commit it.
+        enable_runner: Let verify run COBOL and Python in the runner container.
+            Off by default, so uploaded code never runs unless this is turned on.
+        runner_url: The runner container's base URL.
+        token_secret: HMAC secret for login tokens. Never stored in the repo.
+        token_ttl_seconds: How long a login token stays valid.
+        require_login: When true, project routes require a login token.
+        gemini_api_key: Key for ``POST /api/projects/{id}/describe`` and
+            ``POST /api/projects/{id}/ai-review``. Unset means those routes answer 400.
+        gemini_timeout_seconds: How long one Gemini request may wait.
     """
 
     model_config = SettingsConfigDict(env_prefix="LEGACYLIFT_", env_file=".env", extra="ignore")
@@ -50,8 +57,13 @@ class Settings(BaseSettings):
     )
     max_projects: int = 100
     max_request_bytes: int = 1_200_000  # 10 files x 100 KB, plus form overhead
-    cobc_path: str | None = None
+    enable_runner: bool = False
+    runner_url: str = "http://runner:8001"
+    token_secret: str | None = None
+    token_ttl_seconds: int = Field(default=86_400, gt=0)
+    require_login: bool = False
     gemini_api_key: str | None = None
+    gemini_timeout_seconds: float = Field(default=30, gt=0)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

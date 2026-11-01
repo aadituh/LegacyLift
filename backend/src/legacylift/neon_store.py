@@ -12,10 +12,12 @@ from pathlib import Path
 from typing import Any, cast
 
 from psycopg import Connection
+from psycopg.errors import UniqueViolation
 from psycopg.rows import dict_row
 from psycopg.types.json import Json
 from psycopg_pool import ConnectionPool
 
+from legacylift.errors import ConflictError
 from legacylift.models import (
     ConvertedProjectFile,
     FileKind,
@@ -24,6 +26,7 @@ from legacylift.models import (
     RunKind,
     RunStatus,
     SourceFile,
+    User,
 )
 
 
@@ -59,6 +62,17 @@ def _int(value: object) -> int:
     if isinstance(value, int):
         return value
     raise TypeError("expected an int from Postgres")
+
+
+def _user(row: dict[str, Any]) -> User:
+    """Build a ``User`` from a ``users`` row."""
+    return User(
+        id=str(row["id"]),
+        email=str(row["email"]),
+        password_hash=str(row["password_hash"]),
+        display_name=str(row["display_name"]),
+        created_at=_datetime(row["created_at"]),
+    )
 
 
 def _notes(value: object) -> list[str]:
@@ -116,11 +130,13 @@ def project_from_parts(
                 status=RunStatus(str(row["status"])),
             )
         )
+    owner = project_row.get("owner_id")
     return Project(
         id=str(project_row["id"]),
         name=str(project_row["name"]),
         created_at=_datetime(project_row["created_at"]),
         files_added=_int(project_row["files_added"]),
+        owner_id=None if owner is None else str(owner),
         files=[
             SourceFile(
                 id=str(row["id"]),
@@ -220,6 +236,69 @@ class NeonProjectStore:
                 if (project := self._load(connection, str(row["id"]))) is not None
             ]
 
+    def add_user(self, user: User) -> None:
+        """Insert an account. The email column is unique.
+
+        Args:
+            user: The account, including its password hash.
+
+        Raises:
+            ConflictError: An account with this email already exists.
+        """
+        with self._rows() as connection:
+            try:
+                connection.execute(
+                    """
+                    INSERT INTO users (id, email, password_hash, display_name, created_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (user.id, user.email, user.password_hash, user.display_name, user.created_at),
+                )
+                connection.commit()
+            except UniqueViolation as error:
+                connection.rollback()
+                raise ConflictError("An account with this email already exists.") from error
+
+    def get_user(self, user_id: str) -> User | None:
+        """Find an account by ID.
+
+        Args:
+            user_id: The account's ID.
+
+        Returns:
+            The account, or ``None``.
+        """
+        with self._rows() as connection:
+            row = connection.execute(
+                """
+                SELECT id, email, password_hash, display_name, created_at
+                FROM users
+                WHERE id = %s
+                """,
+                (user_id,),
+            ).fetchone()
+        return _user(row) if row is not None else None
+
+    def get_user_by_email(self, email: str) -> User | None:
+        """Find an account by lowercase email.
+
+        Args:
+            email: Already lowercase.
+
+        Returns:
+            The account, or ``None``.
+        """
+        with self._rows() as connection:
+            row = connection.execute(
+                """
+                SELECT id, email, password_hash, display_name, created_at
+                FROM users
+                WHERE email = %s
+                """,
+                (email,),
+            ).fetchone()
+        return _user(row) if row is not None else None
+
     def delete(self, project_id: str) -> None:
         """Remove a project, its files, and its runs.
 
@@ -239,10 +318,16 @@ class NeonProjectStore:
         with self._rows() as connection:
             connection.execute(
                 """
-                INSERT INTO projects (id, name, created_at, files_added)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO projects (id, name, created_at, files_added, owner_id)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
-                (project.id, project.name, project.created_at, project.files_added),
+                (
+                    project.id,
+                    project.name,
+                    project.created_at,
+                    project.files_added,
+                    project.owner_id,
+                ),
             )
             self._replace_children(connection, project)
             self._trim(connection)
@@ -307,7 +392,7 @@ class NeonProjectStore:
         """Read one project and its files and runs."""
         project_row = connection.execute(
             """
-            SELECT id, name, created_at, files_added
+            SELECT id, name, created_at, files_added, owner_id
             FROM projects
             WHERE id = %s
             """,

@@ -7,9 +7,9 @@ LegacyLift analyzes legacy COBOL programs and converts them to Python for human 
 | Pipeline step | Today |
 | --- | --- |
 | Upload programs, copybooks, and data files | Working; saved in PostgreSQL (Neon) when `DATABASE_URL` is set, otherwise as JSON on the API's disk |
-| Convert COBOL to Python | Working for a small subset; other lines become `TODO` review notes. Each run is saved |
-| Dependency analysis (`COPY`, `CALL`, `PERFORM`) | Placeholder: counts files |
-| Verify against COBOL (GnuCOBOL) | Placeholder: `not_verified` |
+| Convert COBOL to Python | Working for a subset (fields, groups, `OCCURS`, `IF`/`EVALUATE`, `PERFORM`, `CALL`, `COPY`); other lines become `TODO` review notes. Each run is saved |
+| Dependency analysis (`COPY`, `CALL`, `PERFORM`) | Working: links between files and paragraphs, plus names with no matching file |
+| Verify against COBOL (GnuCOBOL) | Working with `docker compose up`: COBOL and Python run in the runner container and outputs are compared. Off elsewhere (`not_verified`) |
 | Gemini + RAG | Not started |
 
 Generated Python is a draft; review it before use.
@@ -24,7 +24,7 @@ You need [Docker](https://docs.docker.com/get-docker/) with Compose. From the re
 docker compose up --build
 ```
 
-This starts PostgreSQL, the API, and the web app. Open <http://localhost:8080> for the web app and <http://localhost:8000/docs> for the API. Projects are kept in the `db-data` volume; `docker compose down -v` deletes them. Stop with `Ctrl+C` or `docker compose down`.
+This starts PostgreSQL, the API, the GnuCOBOL runner, and the web app. Open <http://localhost:8080> for the web app and <http://localhost:8000/docs> for the API. Projects are kept in the `db-data` volume; `docker compose down -v` deletes them (do this once if the API stops with `schema "neon_auth" does not exist`). Stop with `Ctrl+C` or `docker compose down`.
 
 ### Without Docker
 
@@ -55,10 +55,12 @@ In the browser: on **Upload**, click **Load demo project**; on **Convert**, clic
 | [`backend/`](backend/) | FastAPI service: routes, project workflow, COBOL converter, tests. [README](backend/README.md), [changelog](backend/docs/CHANGELOG.md) |
 | [`frontend/app/`](frontend/app/) | React + Vite app for uploading, converting, and downloading. [README](frontend/app/README.md) |
 | [`backend/prototype/`](backend/prototype/) | Earlier research scripts shown in the design deck. The API does not use them. [README](backend/prototype/README.md) |
-| [`docs/`](docs/) | Course website, design deck, and the [developer guide](docs/developer.md) |
+| [`docs/`](docs/) | Course website, design deck, the [developer guide](docs/developer.md), and the [Demo 2 walkthrough](docs/walkthrough.md) |
 | [`TODO.MD`](TODO.MD) | Work planned for Demo 2 |
-| [`docker-compose.yml`](docker-compose.yml) | Starts the database, API, and web app together; images from `backend/Dockerfile` and `frontend/app/Dockerfile` |
-| [`.github/workflows/`](.github/workflows/) | Backend checks, and the GitHub Pages deployment |
+| [`docker-compose.yml`](docker-compose.yml) | Starts the database, API, runner, and web app together; images from `backend/Dockerfile`, `backend/runner.Dockerfile`, and `frontend/app/Dockerfile` |
+| [`.github/workflows/`](.github/workflows/) | Backend and frontend checks, CodeQL code scanning (security and quality), dependency review, and the GitHub Pages deployment; [`dependabot.yml`](.github/dependabot.yml) sets weekly dependency updates |
+| [`.editorconfig`](.editorconfig), [`.gitattributes`](.gitattributes) | Editor settings; COBOL, `.dat`, and recorded output keep LF line endings |
+| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability privately |
 
 ## Checks
 
@@ -67,7 +69,7 @@ In the browser: on **Upload**, click **Load demo project**; on **Convert**, clic
 | `backend/` | `uv run --frozen pytest`, `uv run --frozen ruff check src tests`, `uv run --frozen ruff format --check src tests`, `uv run --frozen mypy` |
 | `frontend/app/` | `npm run lint`, `npm run build` (Windows PowerShell: `npm.cmd`) |
 
-GitHub Actions runs the backend checks on every change under `backend/`.
+On every pull request GitHub Actions runs the backend checks, the frontend checks, CodeQL, and a dependency review that fails on new dependencies with high or critical vulnerabilities.
 
 ## Merge rule
 

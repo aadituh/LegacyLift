@@ -48,6 +48,7 @@ class RunKind(StrEnum):
     ANALYZE = "analyze"
     CONVERT = "convert"
     VERIFY = "verify"
+    AI_REVIEW = "ai_review"
 
 
 class RunStatus(StrEnum):
@@ -57,9 +58,11 @@ class RunStatus(StrEnum):
     ANALYZED = "analyzed"  # analyze found COPY/CALL links (may include unresolved)
     DRAFT = "draft"  # converted with no review notes, but still unverified
     REVIEW_REQUIRED = "review_required"  # converted with lines marked TODO
-    NOT_VERIFIED = "not_verified"  # verify could not compare (e.g. GnuCOBOL missing)
+    NOT_VERIFIED = "not_verified"  # verify could not compare (runner off or unreachable)
     VERIFIED = "verified"  # COBOL and Python stdout matched for every program
     MISMATCH = "mismatch"  # at least one program differed or failed to run
+    CLEAR = "clear"  # AI review found no concerns
+    CONCERNS = "concerns"  # AI review found at least one concern
 
 
 class SourceFile(BaseModel):
@@ -126,6 +129,7 @@ class EquivalenceCheck(BaseModel):
         cobol_stdout: Output from GnuCOBOL.
         python_stdout: Output from the generated Python.
         error: Failure detail when not equivalent.
+        diff: Unified diff from the COBOL output to the Python output; empty when they match.
     """
 
     source_name: str
@@ -134,6 +138,7 @@ class EquivalenceCheck(BaseModel):
     cobol_stdout: str = ""
     python_stdout: str = ""
     error: str | None = None
+    diff: str = ""
 
 
 class FileCounts(BaseModel):
@@ -168,6 +173,36 @@ class UnresolvedDependency(BaseModel):
     line: int
 
 
+class LineFinding(BaseModel):
+    """One AI observation, tied to COBOL and Python line numbers.
+
+    Attributes:
+        cobol_lines: 1-based lines in the COBOL source. Empty if none apply.
+        python_lines: 1-based lines in the generated Python. Empty if none apply.
+        detail: One sentence on why these lines match or need a human look.
+    """
+
+    cobol_lines: list[int] = Field(default_factory=list)
+    python_lines: list[int] = Field(default_factory=list)
+    detail: str
+
+
+class FileReview(BaseModel):
+    """Gemini's comparison of one program with its generated Python.
+
+    Attributes:
+        source_name: COBOL file name.
+        python_name: Generated Python file name.
+        matches: Behaviors the model could justify from both sources.
+        concerns: Lines the rules could not prove, or behavior that may differ.
+    """
+
+    source_name: str
+    python_name: str
+    matches: list[LineFinding] = Field(default_factory=list)
+    concerns: list[LineFinding] = Field(default_factory=list)
+
+
 class RunSummary(BaseModel):
     """A record that one pipeline step ran on a project.
 
@@ -195,12 +230,32 @@ class Run(RunSummary):
         checks: Equivalence results from a verify run; empty for other runs.
         dependencies: Resolved COPY/CALL links from an analyze run.
         unresolved: COPY/CALL names with no matching project file.
+        reviews: Per-program AI findings; empty for other runs.
     """
 
     files: list[ConvertedProjectFile] = []
     checks: list[EquivalenceCheck] = []
     dependencies: list[DependencyLink] = []
     unresolved: list[UnresolvedDependency] = []
+    reviews: list[FileReview] = []
+
+
+class User(BaseModel):
+    """An account. The password hash stays in storage and is never sent to clients.
+
+    Attributes:
+        id: UUID text.
+        email: Lowercase email, unique.
+        password_hash: Argon2 hash. Not a password.
+        display_name: Name shown in the header.
+        created_at: When the account was created (UTC).
+    """
+
+    id: str
+    email: str
+    password_hash: str
+    display_name: str
+    created_at: datetime = Field(default_factory=utc_now)
 
 
 class Project(BaseModel):
@@ -214,6 +269,7 @@ class Project(BaseModel):
         runs: Steps run so far, oldest first.
         files_added: How many files were ever added, including deleted ones.
             The next file's ID is this plus one. Saved, but not sent to clients.
+        owner_id: Account that owns the project, or ``None`` when login is off.
     """
 
     id: str
@@ -222,3 +278,4 @@ class Project(BaseModel):
     files: list[SourceFile] = []
     runs: list[Run] = []
     files_added: int = 0
+    owner_id: str | None = None

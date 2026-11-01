@@ -6,12 +6,13 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Added
 
-<<<<<<< HEAD
 - `POST /api/projects/{id}/describe` (issue #31): a plain-language map of each program and the data they share. Needs `LEGACYLIFT_GEMINI_API_KEY`. Tests mock the Gemini call.
-- Converter (issue #21): `cobol/runtime.py` helpers (`cobol_number`, `cobol_text`, `display_number`) so generated Python pads/truncates like GnuCOBOL; `Decimal` + `ROUNDED`; documented cases in `docs/cobol_display_cases.md`; recorded FEESCHED/INTCALC fixtures under `tests/data/recorded/`.
-=======
+- `POST /api/auth/register`, `POST /api/auth/login`, and `GET /api/auth/me`. Passwords are Argon2 hashes (`pwdlib`); tokens are JWTs (`PyJWT`) signed with `LEGACYLIFT_TOKEN_SECRET` (set on Render, listed in `.env.example`, never committed). A used email is 409; a weak password is 422; a wrong email or password is the same 401. Project routes call `current_user` only when `LEGACYLIFT_REQUIRE_LOGIN` is true (default false). Accounts are stored in `users` (`database/schema.sql`) and, without a database, in `users.json`.
+- Recorded GnuCOBOL output for BANKMAIN (`tests/data/recorded/bank/`: sample, normal, overdraft, and closed-account cases) and `scripts/record_cobol_output.py` to re-record it in the runner image. `tests/test_recorded_output.py` checks the record widths and, where `cobc` is installed, that GnuCOBOL still prints the recorded output.
+- Demo 2 walkthrough ([`docs/walkthrough.md`](../../docs/walkthrough.md)): `MONTHEND.cbl` and `FEERATES.cpy` in `src/legacylift/data/`, with recorded GnuCOBOL output in `tests/data/recorded/MONTHEND.out`.
+- `database/compose-init.sql`: Compose creates a local stand-in for Neon Auth's `neon_auth."user"` table, so `database/schema.sql` applies to the local database and the API starts.
+- Runner container (`backend/runner.Dockerfile`, `legacylift.runner`): GnuCOBOL and Python behind `POST /run/cobol` and `POST /run/python`, each run in its own temporary folder with a time limit and an output limit. Compose service `runner` on an internal network with only the API, read-only, no capabilities, non-root, memory and process limits.
 - Converter (issue #20): sample-bank constructs — groups as dicts, level `88` / `SET … TO TRUE`, `OCCURS` lists with 1-based indexes, `PERFORM UNTIL` / `VARYING`, `IF`/`EVALUATE`, `CALL "X" USING …`, `PROCEDURE DIVISION USING` callees, and `COPY` expansion from project copybooks. File I/O, edited PICs, and `COMPUTE ROUNDED` stay as review notes. Covered by `tests/test_converter.py` (issue #20 cases).
->>>>>>> main
 - Converter (issue #22): programs beyond the sample bank — group/`05` fields, `PIC …V…` decimals, paragraphs/`PERFORM`/`PERFORM … THRU`, `COMPUTE`, `MULTIPLY`/`DIVIDE`. Unsupported lines stay as review notes; drafts still run. Covered by `tests/test_converter.py` (`employee_payroll`, `simple_account`).
 - `backend/Dockerfile` and `docker-compose.yml`: `docker compose up --build` starts PostgreSQL, the API (waits for the database), and the web app on port 8080.
 - `POST /api/projects/{id}/verify` compiles each program with GnuCOBOL (`cobc`), runs it, compares stdout to the generated Python, and returns per-file results (`verified` / `mismatch` / `not_verified` if `cobc` is missing). Optional `LEGACYLIFT_COBC_PATH`.
@@ -25,6 +26,7 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Changed
 
+- Verify runs in the runner container: each main program compiles with the programs it calls, both COBOL and Python get the project's `.dat` files, and each file in the response adds `diff`. Off unless `LEGACYLIFT_ENABLE_RUNNER=true` (Compose turns it on); `not_verified` when off or unreachable. Called programs get no check of their own. `LEGACYLIFT_COBC_PATH` is removed.
 - Short IDs: projects are `"1"`, `"2"`, …; files and runs are numbered within their project. IDs are never reused (the project counter is saved in `last_id.txt`). Projects saved with the old long IDs still load.
 - `MOVE`/`ADD`/`SUBTRACT` lines are read by splitting on spaces; a 100 KB line converts in well under a second.
 - Upload and convert routes run conversion and saving in a worker thread, so other requests keep answering.
