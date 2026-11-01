@@ -65,7 +65,7 @@ def create_project(
 def list_projects(service: ProjectServiceDep, user: ActiveUserDep) -> ProjectListResponse:
     """List every project, newest first, with file counts and its last run.
 
-    When login is required, only the signed-in account's projects are listed.
+    When the request has a Neon Auth token, only that account's projects are listed.
     """
     owner_id = user.id if user is not None else None
     summaries = [

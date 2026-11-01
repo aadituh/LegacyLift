@@ -1,8 +1,9 @@
 """Account routes under ``/api/auth``.
 
 Register, log in, and read the current account. Passwords are not written to
-the response or the log. Project routes ignore these tokens until
-``LEGACYLIFT_REQUIRE_LOGIN`` is turned on.
+the response or the log. Project routes use these tokens only when
+``LEGACYLIFT_REQUIRE_LOGIN`` is on. A Neon Auth token is accepted on project
+routes whenever the client sends one.
 """
 
 from fastapi import APIRouter

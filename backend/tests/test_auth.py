@@ -1,8 +1,12 @@
 """Sign up, log in, and the token on GET /api/auth/me."""
 
+import base64
+import json
 from datetime import UTC, datetime, timedelta
 
 import jwt
+
+from legacylift.errors import UnauthenticatedError
 
 from helpers import make_client
 
@@ -120,3 +124,54 @@ def test_login_required_projects_belong_to_the_signed_in_account(tmp_path):
         client.get(f"/api/projects/{created.json()['id']}", headers=other_headers).status_code
         == 404
     )
+
+
+ADA_ID = "860dc360-609f-4b7d-9e70-ec93fe6414d3"
+OTHER_ID = "11111111-1111-4111-8111-111111111111"
+
+
+def _eddsa_token(sub: str) -> str:
+    """A JWT whose header says EdDSA. The route test stubs signature checks."""
+
+    def part(value: dict[str, str]) -> str:
+        raw = json.dumps(value, separators=(",", ":")).encode()
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+    return f"{part({'alg': 'EdDSA', 'typ': 'JWT'})}.{part({'sub': sub})}.sig"
+
+
+class _Neon:
+    """Stand-in that accepts the two ids used below."""
+
+    def user_id(self, token: str) -> str:
+        payload = token.split(".")[1]
+        pad = "=" * (-len(payload) % 4)
+        sub = json.loads(base64.urlsafe_b64decode(payload + pad))["sub"]
+        if sub not in {ADA_ID, OTHER_ID}:
+            raise UnauthenticatedError("Invalid login token.")
+        return sub
+
+
+def test_neon_token_owns_the_project_and_hides_it_from_the_other_account(tmp_path):
+    client = make_client(tmp_path)
+    client.app.state.neon_auth = _Neon()
+    ada = {"Authorization": f"Bearer {_eddsa_token(ADA_ID)}"}
+    other = {"Authorization": f"Bearer {_eddsa_token(OTHER_ID)}"}
+    created = client.post("/api/projects", json={"name": "Mine"}, headers=ada)
+    assert created.status_code == 201
+    project_id = created.json()["id"]
+    assert client.get("/api/projects", headers=ada).json()["projects"][0]["name"] == "Mine"
+    assert client.get("/api/projects", headers=other).json() == {"projects": []}
+    assert client.get(f"/api/projects/{project_id}", headers=other).status_code == 404
+    assert client.get("/api/projects").json()["projects"][0]["name"] == "Mine"
+
+
+def test_bad_neon_token_is_401(tmp_path):
+    client = make_client(tmp_path)
+    client.app.state.neon_auth = _Neon()
+    response = client.post(
+        "/api/projects",
+        json={"name": "Nope"},
+        headers={"Authorization": f"Bearer {_eddsa_token('not-a-user')}"},
+    )
+    assert (response.status_code, response.json()["detail"]) == (401, "Invalid login token.")

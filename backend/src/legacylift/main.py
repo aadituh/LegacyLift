@@ -24,6 +24,7 @@ from legacylift.neon_store import NeonProjectStore
 from legacylift.routers import auth, convert, projects
 from legacylift.services.auth import AuthService
 from legacylift.services.batch_downloads import BatchDownloadStore
+from legacylift.services.neon_auth import NeonAuth
 from legacylift.services.projects import ProjectService
 from legacylift.services.verification import RunnerClient
 from legacylift.storage import ProjectRepository, ProjectStore
@@ -97,6 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         secret=settings.token_secret,
         ttl_seconds=settings.token_ttl_seconds,
     )
+    app.state.neon_auth = NeonAuth(settings.neon_auth_url) if settings.neon_auth_url.strip() else None
     app.state.batch_downloads = BatchDownloadStore()
     app.include_router(auth.router)
     app.include_router(projects.router)
