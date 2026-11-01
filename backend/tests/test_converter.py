@@ -203,7 +203,7 @@ def test_simple_account_add_subtract_across_paragraphs():
     out = run_python(draft.python)
     assert "Deposit processed for account 0000000000" in out
     assert "Withdrawal processed for account 0000000000" in out
-    assert "Account Balance Report: 0000000000.00" in out
+    assert "Account Balance Report: +0000000000.00" in out
 
 
 def test_paragraph_perform_thru_calls_each_paragraph_in_range():
