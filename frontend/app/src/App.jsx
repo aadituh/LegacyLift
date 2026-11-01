@@ -23,6 +23,7 @@ import {
   setUnauthorizedHandler,
 } from './api'
 import './App.css'
+import { authClient } from './auth'
 import BackgroundFx from './BackgroundFx'
 
 const sampleCobol = `IDENTIFICATION DIVISION.
