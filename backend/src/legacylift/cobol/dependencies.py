@@ -1,6 +1,6 @@
 """COPY, CALL, and PERFORM dependency links from parsed COBOL programs.
 
-Hand-off for the API::
+Hand-off for the API (issue #24 / frontend #27)::
 
     find_dependencies(programs, catalog) -> (list[Dependency], list[UnresolvedRef])
 
@@ -10,6 +10,11 @@ Hand-off for the API::
   (``source`` = ``file:CALLER``, ``target`` = performed paragraph).
   ``PERFORM a THRU b`` expands to every paragraph from ``a`` through ``b``.
   Unknown paragraph names go in ``unresolved``.
+
+``ProjectService.analyze`` also attaches a per-program field and paragraph
+inventory (``ProgramSummary``) so the analyze response shows what to convert
+together. Sample-bank checks: BANKMAIN → ACCTDEF/TXNDEF (COPY) and
+TXNPOST/INTCALC (CALL); TXNPOST/INTCALC → ACCTDEF (COPY).
 """
 
 from __future__ import annotations
