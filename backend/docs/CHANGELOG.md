@@ -4,6 +4,10 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ## Unreleased
 
+### Removed
+
+- Local `cobol/gnucobol.py` and `cobol/equivalence.py` (and `tests/test_equivalence.py`): verify uses the runner container since #37 (issue #99).
+
 ### Added
 
 - `POST /api/projects/{id}/describe` (issue #31): a plain-language map of each program and the data they share. Needs `LEGACYLIFT_GEMINI_API_KEY`. Tests mock the Gemini call.
