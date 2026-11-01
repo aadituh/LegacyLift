@@ -175,3 +175,21 @@ def test_bad_neon_token_is_401(tmp_path):
         headers={"Authorization": f"Bearer {_eddsa_token('not-a-user')}"},
     )
     assert (response.status_code, response.json()["detail"]) == (401, "Invalid login token.")
+
+
+def test_projects_made_before_login_have_no_owner_and_stay_hidden(tmp_path):
+    open_client = make_client(tmp_path, token_secret=SECRET, require_login=False)
+    created = open_client.post("/api/projects", json={"name": "Before"})
+    assert created.status_code == 201
+    saved = json.loads((tmp_path / "1.json").read_text(encoding="utf-8"))
+    assert saved["owner_id"] is None
+
+    locked = make_client(tmp_path, token_secret=SECRET, require_login=True)
+    register(locked)
+    token = locked.post(
+        "/api/auth/login",
+        json={"email": ACCOUNT["email"], "password": ACCOUNT["password"]},
+    ).json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    assert locked.get("/api/projects", headers=headers).json() == {"projects": []}
+    assert locked.get("/api/projects/1", headers=headers).status_code == 404

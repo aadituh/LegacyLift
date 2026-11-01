@@ -2,7 +2,11 @@
 
 import json
 
-from legacylift.models import Project
+import pytest
+
+from legacylift.errors import ConflictError
+from legacylift.models import Project, User
+from legacylift.services.projects import ProjectService
 from legacylift.storage import ProjectStore
 
 from helpers import HELLO, make_client
@@ -45,6 +49,42 @@ def test_deleted_project_stays_deleted(tmp_path):
     store.delete(project.id)
     store.save(project)
     assert not (tmp_path / f"{project.id}.json").exists()
+
+
+def test_accounts_round_trip_and_reject_a_duplicate_email(tmp_path):
+    store = ProjectStore(tmp_path, max_projects=10)
+    user = User(
+        id="u1",
+        email="ada@example.com",
+        password_hash="hash",
+        display_name="Ada",
+    )
+    store.add_user(user)
+    assert store.get_user("u1") == user
+    assert store.get_user_by_email("ada@example.com") == user
+    assert store.get_user("missing") is None
+    assert store.get_user_by_email("other@example.com") is None
+    with pytest.raises(ConflictError):
+        store.add_user(
+            User(
+                id="u2",
+                email="ada@example.com",
+                password_hash="other",
+                display_name="Ada",
+            )
+        )
+    restarted = ProjectStore(tmp_path, max_projects=10)
+    assert restarted.get_user_by_email("ada@example.com").password_hash == "hash"
+    assert "plain-password" not in (tmp_path / "users.json").read_text(encoding="utf-8")
+
+
+def test_list_projects_returns_only_that_owner(tmp_path):
+    service = ProjectService(ProjectStore(tmp_path, max_projects=10))
+    service.create_project("Before")
+    service.create_project("Mine", owner_id="ada")
+    service.create_project("Theirs", owner_id="grace")
+    assert [project.name for project in service.list_projects("ada")] == ["Mine"]
+    assert [project.name for project in service.list_projects()] == ["Theirs", "Mine", "Before"]
 
 
 def test_unreadable_and_old_style_files_do_not_break_startup(tmp_path):
