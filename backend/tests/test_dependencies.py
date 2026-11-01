@@ -120,6 +120,26 @@ def test_matching_ignores_case_and_extension() -> None:
     assert (DependencyKind.CALL, "intcalc.cob") in targets
 
 
+def test_call_does_not_resolve_to_copybook() -> None:
+    """CALL must match a .cbl/.cob program, not a same-named .cpy (issue #100)."""
+    text = (
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. P.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       MAIN.\n"
+        '           CALL "RATES" USING WS-X.\n'
+        "           STOP RUN.\n"
+    )
+    programs = [parse_program("P.cbl", text)]
+    catalog = ["P.cbl", "RATES.cpy"]
+    deps, unresolved = find_dependencies(programs, catalog)
+    assert [d for d in deps if d.kind == DependencyKind.CALL] == []
+    call_unresolved = [u for u in unresolved if u.kind == DependencyKind.CALL]
+    assert len(call_unresolved) == 1
+    assert call_unresolved[0].name == "RATES"
+    assert call_unresolved[0].source == "P.cbl"
+
+
 def test_missing_copybook_is_unresolved() -> None:
     programs = _parse("BANKMAIN.cbl")
     # ACCTDEF and callees present; TXNDEF missing
