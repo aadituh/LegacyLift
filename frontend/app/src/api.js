@@ -29,23 +29,8 @@ function detailMessage(data, fallback) {
   return fallback
 }
 
-/** localStorage key agreed with the login routes. */
+/** localStorage key agreed with the login routes. The login page writes it. */
 export const tokenStorageKey = 'legacylift-token'
-
-let onUnauthorized = () => {}
-
-/** The page registers this so a 401 returns to the log-in form. */
-export function setUnauthorizedHandler(handler) {
-  onUnauthorized = handler
-}
-
-export function readToken() {
-  try {
-    return localStorage.getItem(tokenStorageKey) || ''
-  } catch {
-    return ''
-  }
-}
 
 export function saveToken(token) {
   localStorage.setItem(tokenStorageKey, token)
@@ -55,6 +40,14 @@ export function clearToken() {
   localStorage.removeItem(tokenStorageKey)
 }
 
+function readToken() {
+  try {
+    return localStorage.getItem(tokenStorageKey) || ''
+  } catch {
+    return ''
+  }
+}
+
 function withAuth(options) {
   const headers = { ...(options.headers || {}) }
   const token = readToken()
@@ -62,13 +55,6 @@ function withAuth(options) {
     headers.Authorization = `Bearer ${token}`
   }
   return { ...options, headers }
-}
-
-function failAuth(data) {
-  clearToken()
-  const message = detailMessage(data, 'Please log in again.')
-  onUnauthorized(message)
-  throw new Error(message)
 }
 
 async function request(path, options = {}) {
@@ -81,7 +67,7 @@ async function request(path, options = {}) {
 
   if (response.status === 204) return null
   const data = await response.json().catch(() => ({}))
-  if (response.status === 401) failAuth(data)
+  if (response.status === 401) clearToken()
   if (!response.ok) {
     if (response.status === 413) {
       throw new Error(`That upload is too large. The API rejects a request over 1.2 MB.`)
@@ -200,6 +186,17 @@ export async function verifyProject(projectId) {
   return data
 }
 
+/**
+ * Ask Gemini to compare each converted program with its Python
+ * (POST /api/projects/{id}/ai-review).
+ * Returns `{ project_id, run_id, status, model, files }`.
+ * `status` is `clear` or `concerns`. Each file has `matches` and `concerns`;
+ * each finding is `{ cobol_lines, python_lines, detail }`.
+ */
+export async function reviewProject(projectId) {
+  return request(`/api/projects/${projectId}/ai-review`, { method: 'POST' })
+}
+
 /** GET /api/projects. Newest first, with file counts and the last run, without file contents. */
 export async function listProjects() {
   return request('/api/projects', { method: 'GET' })
@@ -222,8 +219,17 @@ export async function getRun(projectId, runId) {
   return request(`/api/projects/${projectId}/runs/${runId}`, { method: 'GET' })
 }
 
+/** POST /api/auth/register. Returns the account without a password or hash. */
+export async function register(email, password, displayName) {
+  return request('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, display_name: displayName }),
+  })
+}
+
 /**
- * POST /api/auth/login. Saves the token for later requests.
+ * POST /api/auth/login. Saves the token in localStorage.
  * Returns `{ token, token_type, expires_in }`.
  */
 export async function login(email, password) {

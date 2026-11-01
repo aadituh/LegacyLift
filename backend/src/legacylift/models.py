@@ -205,6 +205,24 @@ class Run(RunSummary):
     unresolved: list[UnresolvedDependency] = []
 
 
+class User(BaseModel):
+    """An account. The password hash stays in storage and is never sent to clients.
+
+    Attributes:
+        id: UUID text.
+        email: Lowercase email, unique.
+        password_hash: Argon2 hash. Not a password.
+        display_name: Name shown in the header.
+        created_at: When the account was created (UTC).
+    """
+
+    id: str
+    email: str
+    password_hash: str
+    display_name: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class Project(BaseModel):
     """A set of COBOL files and the history of steps run on them.
 
@@ -216,6 +234,7 @@ class Project(BaseModel):
         runs: Steps run so far, oldest first.
         files_added: How many files were ever added, including deleted ones.
             The next file's ID is this plus one. Saved, but not sent to clients.
+        owner_id: Account that owns the project, or ``None`` when login is off.
     """
 
     id: str
@@ -224,3 +243,4 @@ class Project(BaseModel):
     files: list[SourceFile] = []
     runs: list[Run] = []
     files_added: int = 0
+    owner_id: str | None = None

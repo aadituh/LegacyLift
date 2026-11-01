@@ -21,7 +21,8 @@ from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 from legacylift.config import Settings
 from legacylift.errors import LegacyLiftError
 from legacylift.neon_store import NeonProjectStore
-from legacylift.routers import convert, projects
+from legacylift.routers import auth, convert, projects
+from legacylift.services.auth import AuthService
 from legacylift.services.batch_downloads import BatchDownloadStore
 from legacylift.services.projects import ProjectService
 from legacylift.services.verification import RunnerClient
@@ -89,8 +90,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     else:
         store = ProjectStore(settings.data_dir, settings.max_projects)
     runner = RunnerClient(settings.runner_url) if settings.enable_runner else None
+    app.state.settings = settings
     app.state.project_service = ProjectService(store, runner=runner)
+    app.state.auth_service = AuthService(
+        store,
+        secret=settings.token_secret,
+        ttl_seconds=settings.token_ttl_seconds,
+    )
     app.state.batch_downloads = BatchDownloadStore()
+    app.include_router(auth.router)
     app.include_router(projects.router)
     app.include_router(convert.router)
 

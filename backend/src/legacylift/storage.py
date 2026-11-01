@@ -6,13 +6,15 @@ is unset, ``ProjectStore`` writes JSON files. ``NeonProjectStore`` writes the
 same projects to Postgres instead.
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Protocol
 
 from pydantic import ValidationError
 
-from legacylift.models import Project
+from legacylift.errors import ConflictError
+from legacylift.models import Project, User
 
 
 class ProjectRepository(Protocol):
@@ -36,10 +38,20 @@ class ProjectRepository(Protocol):
     def save(self, project: Project) -> None:
         """Write a changed project."""
 
+    def add_user(self, user: User) -> None:
+        """Save an account."""
+
+    def get_user(self, user_id: str) -> User | None:
+        """Find an account by ID."""
+
+    def get_user_by_email(self, email: str) -> User | None:
+        """Find an account by lowercase email."""
+
 
 # Uvicorn already prints this logger, so messages appear in the server console.
 logger = logging.getLogger("uvicorn.error")
 LAST_ID_FILE = "last_id.txt"
+USERS_FILE = "users.json"
 
 
 class ProjectStore:
@@ -75,6 +87,7 @@ class ProjectStore:
             self._projects[project.id] = project
         numbers = [int(project_id) for project_id in self._projects if project_id.isdigit()]
         self._last_number = max([*numbers, self._read_last_number()], default=0)
+        self._users = self._read_users()
         self._remove_oldest()
 
     def next_id(self) -> str:
@@ -147,6 +160,86 @@ class ProjectStore:
         temp_path.write_text(project.model_dump_json(indent=2), encoding="utf-8")
         temp_path.replace(self.data_dir / f"{project.id}.json")  # atomic swap
 
+    def add_user(self, user: User) -> None:
+        """Save an account. The same email cannot be saved twice.
+
+        Args:
+            user: The account, including its password hash.
+
+        Raises:
+            ConflictError: An account with this email already exists.
+        """
+        if self.get_user_by_email(user.email) is not None:
+            raise ConflictError("An account with this email already exists.")
+        self._users[user.id] = user
+        self._write_users()
+
+    def get_user(self, user_id: str) -> User | None:
+        """Find an account by ID.
+
+        Args:
+            user_id: The account's ID.
+
+        Returns:
+            The account, or ``None``.
+        """
+        return self._users.get(user_id)
+
+    def get_user_by_email(self, email: str) -> User | None:
+        """Find an account by lowercase email.
+
+        Args:
+            email: Already lowercase.
+
+        Returns:
+            The account, or ``None``.
+        """
+        for user in self._users.values():
+            if user.email == email:
+                return user
+        return None
+
+    def _users_path(self) -> Path | None:
+        """Path of the accounts file, or ``None`` when storage is memory only."""
+        if self.data_dir is None:
+            return None
+        return self.data_dir / USERS_FILE
+
+    def _read_users(self) -> dict[str, User]:
+        """Load accounts from ``users.json``.
+
+        Returns:
+            Accounts keyed by ID. Unreadable files yield an empty dict.
+        """
+        path = self._users_path()
+        if path is None or not path.is_file():
+            return {}
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            logger.warning("Skipped unreadable accounts file %s: %s", path.name, error)
+            return {}
+        if not isinstance(raw, list):
+            return {}
+        users: dict[str, User] = {}
+        for item in raw:
+            try:
+                user = User.model_validate(item)
+            except ValidationError as error:
+                logger.warning("Skipped unreadable account: %s", error)
+                continue
+            users[user.id] = user
+        return users
+
+    def _write_users(self) -> None:
+        """Write every account to ``users.json``. Memory-only stores skip this."""
+        path = self._users_path()
+        if path is None:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = [user.model_dump(mode="json") for user in self._users.values()]
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
     def _remove_oldest(self) -> None:
         """Delete the oldest projects, and their files, until at most ``max_projects`` remain."""
         while len(self._projects) > self.max_projects:
@@ -174,6 +267,8 @@ class ProjectStore:
             return []
         projects = []
         for path in self.data_dir.glob("*.json"):
+            if path.name == USERS_FILE:
+                continue
             try:
                 projects.append(Project.model_validate_json(path.read_text(encoding="utf-8")))
             except (OSError, ValidationError) as error:
