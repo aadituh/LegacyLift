@@ -67,19 +67,22 @@ def _catalog_index(catalog: Sequence[str]) -> dict[str, list[str]]:
     return index
 
 
-def _prefer_target(candidates: list[str], kind: DependencyKind) -> str:
-    """Pick the best catalog match for a COPY (prefer ``.cpy``) or CALL (``.cbl``/``.cob``)."""
-    if len(candidates) == 1:
-        return candidates[0]
+def _prefer_target(candidates: list[str], kind: DependencyKind) -> str | None:
+    """Pick the best catalog match for a COPY (``.cpy``) or CALL (``.cbl``/``.cob``).
+
+    CALL never falls back to a copybook or data file when no program exists
+    (issue #100). COPY still prefers ``.cpy`` but may use any same-stem file.
+    """
 
     def suffix(name: str) -> str:
         return PurePosixPath(name.replace("\\", "/")).suffix.casefold()
 
     if kind == DependencyKind.COPY:
         preferred = [n for n in candidates if suffix(n) == ".cpy"]
-    else:
-        preferred = [n for n in candidates if suffix(n) in {".cbl", ".cob"}]
-    return preferred[0] if preferred else candidates[0]
+        return (preferred or candidates)[0]
+
+    programs = [n for n in candidates if suffix(n) in {".cbl", ".cob"}]
+    return programs[0] if programs else None
 
 
 def _resolve_file(
