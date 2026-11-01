@@ -155,7 +155,7 @@ class ProjectService:
 
         Args:
             name: The project name. Spaces at either end are removed.
-            owner_id: Account that owns the project when login is required.
+            owner_id: Neon Auth user id that owns the project, when the request had a token.
 
         Returns:
             The new project.
@@ -181,7 +181,7 @@ class ProjectService:
         """Create and save a project holding the files in ``sample_data.DEMO_FILES``.
 
         Args:
-            owner_id: Account that owns the project when login is required.
+            owner_id: Neon Auth user id that owns the project, when the request had a token.
 
         Returns:
             A project with ``store_report.cbl``, ``order.cpy``, and ``orders.dat``
@@ -220,7 +220,7 @@ class ProjectService:
         """Return every project, newest first.
 
         Args:
-            owner_id: When set, only that account's projects. ``None`` returns all.
+            owner_id: When set, only that Neon Auth account's projects. ``None`` returns all.
 
         Returns:
             The projects, most recently created first.

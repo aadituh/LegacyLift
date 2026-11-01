@@ -325,7 +325,8 @@ class Project(BaseModel):
         runs: Steps run so far, oldest first.
         files_added: How many files were ever added, including deleted ones.
             The next file's ID is this plus one. Saved, but not sent to clients.
-        owner_id: Account that owns the project, or ``None`` when login is off.
+        owner_id: Neon Auth user id (``neon_auth."user".id``), or ``None`` when
+            the project was created without a Neon token.
     """
 
     id: str

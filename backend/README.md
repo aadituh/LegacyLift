@@ -81,7 +81,8 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_RUNNER_URL` | `http://runner:8001` | The runner container's address. |
 | `LEGACYLIFT_TOKEN_SECRET` | unset | HMAC secret for login tokens. Set it on Render and in `backend/.env`. Never commit it. Login cannot sign a token until it is set. |
 | `LEGACYLIFT_TOKEN_TTL_SECONDS` | `86400` | How long a login token stays valid (24 hours). |
-| `LEGACYLIFT_REQUIRE_LOGIN` | `false` | When `true`, every `/api/projects` route requires `Authorization: Bearer <token>` and lists only that account's projects. Leave it off until the login pages are ready. |
+| `LEGACYLIFT_REQUIRE_LOGIN` | `false` | When `true`, every `/api/projects` route requires `Authorization: Bearer <token>`. A Neon Auth token still sets the owner and limits the list when this is off. |
+| `LEGACYLIFT_NEON_AUTH_URL` | this project's Neon Auth URL | JWKS base URL. An EdDSA bearer token from the web app is checked here, and its `sub` is saved as `projects.owner_id`. |
 | `LEGACYLIFT_GEMINI_API_KEY` | unset | Gemini API key for `POST /api/projects/{id}/describe` and `POST /api/projects/{id}/ai-review`. Keep it in `backend/.env`. |
 | `LEGACYLIFT_GEMINI_TIMEOUT_SECONDS` | `30` | How long one Gemini request may wait. |
 
@@ -139,7 +140,7 @@ Agreed with the accounts table (#30), the login page (#15), and the sign-up page
 | Password | 8 to 128 characters, at least one letter and one number. Message: `Password must be 8 to 128 characters and include a letter and a number.` |
 | Email | Stored lowercase. The same address cannot register twice |
 | Display name | 1 to 100 characters |
-| Routes that need login | `/api/projects` only, and only when `LEGACYLIFT_REQUIRE_LOGIN=true`. `/api/auth/*`, `/api/convert`, `/health` stay open. Projects created while login is off have no owner and are hidden once login is required |
+| Routes that need login | `/api/projects` requires a token only when `LEGACYLIFT_REQUIRE_LOGIN=true`. A Neon Auth token on those routes still sets `projects.owner_id` and limits the list to that account. `/api/auth/*`, `/api/convert`, `/health` stay open. Projects created with no token have no owner |
 | Wrong login | Unknown email and wrong password both return `{"detail": "Invalid email or password."}` |
 | Expired token | `{"detail": "Please log in again."}` |
 

@@ -42,6 +42,8 @@ class Settings(BaseSettings):
         token_secret: HMAC secret for login tokens. Never stored in the repo.
         token_ttl_seconds: How long a login token stays valid.
         require_login: When true, project routes require a login token.
+        neon_auth_url: Neon Auth base URL. Project routes verify EdDSA bearer
+            tokens against its JWKS and store ``sub`` as the project owner.
         gemini_api_key: Key for ``POST /api/projects/{id}/describe`` and
             ``POST /api/projects/{id}/ai-review``. Unset means those routes answer 400.
         gemini_timeout_seconds: How long one Gemini request may wait.
@@ -62,6 +64,9 @@ class Settings(BaseSettings):
     token_secret: str | None = None
     token_ttl_seconds: int = Field(default=86_400, gt=0)
     require_login: bool = False
+    neon_auth_url: str = (
+        "https://ep-jolly-tree-b5ygfgag.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth"
+    )
     gemini_api_key: str | None = None
     gemini_timeout_seconds: float = Field(default=30, gt=0)
 

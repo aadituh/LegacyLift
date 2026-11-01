@@ -1,3 +1,5 @@
+import { neonAccessToken } from './auth'
+
 /**
  * HTTP client for the LegacyLift FastAPI backend.
  *
@@ -62,11 +64,21 @@ function failAuth(data) {
   throw new Error(message)
 }
 
-function withAuth(options) {
+async function sessionToken() {
+  try {
+    const token = await neonAccessToken()
+    if (token) return token
+  } catch {
+    // Signed out, or the auth host did not answer. The API token below still works.
+  }
+  return readToken()
+}
+
+async function withAuth(options) {
   const headers = { ...(options.headers || {}) }
-  const token = readToken()
-  if (token && !headers.Authorization && !headers.authorization) {
-    headers.Authorization = `Bearer ${token}`
+  if (!headers.Authorization && !headers.authorization) {
+    const token = await sessionToken()
+    if (token) headers.Authorization = `Bearer ${token}`
   }
   return { ...options, headers }
 }
@@ -74,7 +86,7 @@ function withAuth(options) {
 async function request(path, options = {}) {
   let response
   try {
-    response = await fetch(endpoint(path), withAuth(options))
+    response = await fetch(endpoint(path), await withAuth(options))
   } catch {
     throw new Error('Cannot reach the LegacyLift backend. Check the API connection and try again.')
   }
@@ -129,7 +141,7 @@ export async function convertFiles(files) {
 export async function downloadPythonFile(path, fileName) {
   let response
   try {
-    response = await fetch(endpoint(path), withAuth({}))
+    response = await fetch(endpoint(path), await withAuth({}))
   } catch {
     throw new Error('Cannot reach the LegacyLift backend. Check the API connection and try again.')
   }

@@ -6,8 +6,10 @@ A route parameter typed ``ProjectServiceDep`` receives the app's
 runs. ``BatchDownloadDep`` receives the in-memory batch conversions.
 """
 
+from dataclasses import dataclass
 from typing import Annotated, cast
 
+import jwt
 from fastapi import Depends, Header, Request
 
 from legacylift.config import Settings
@@ -15,6 +17,7 @@ from legacylift.errors import NotFoundError, UnauthenticatedError
 from legacylift.models import Project, User
 from legacylift.services.auth import AuthService
 from legacylift.services.batch_downloads import BatchDownloadStore
+from legacylift.services.neon_auth import NeonAuth
 from legacylift.services.projects import ProjectService
 
 
@@ -87,37 +90,67 @@ def get_current_user(
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
+@dataclass(frozen=True, slots=True)
+class SignedIn:
+    """Account id from a verified bearer token.
+
+    Attributes:
+        id: Neon Auth user id, or the API account id when that token was used.
+    """
+
+    id: str
+
+
+def _jwt_algorithm(token: str) -> str | None:
+    """Return the unverified ``alg`` header, or ``None`` when the token is not a JWT."""
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.PyJWTError:
+        return None
+    algorithm = header.get("alg")
+    return algorithm if isinstance(algorithm, str) else None
+
+
 def get_active_user(
     request: Request,
     auth: AuthServiceDep,
     authorization: Annotated[str | None, Header()] = None,
-) -> User | None:
-    """Return the logged-in account when login is required, otherwise ``None``.
+) -> SignedIn | None:
+    """Return the account id for a Neon Auth token, or for an API token when login is required.
 
-    Project routes use this so they keep working until the login pages turn
-    ``LEGACYLIFT_REQUIRE_LOGIN`` on.
+    A Neon Auth token (EdDSA) sets the project owner even when
+    ``LEGACYLIFT_REQUIRE_LOGIN`` is off. With no token, project routes stay
+    open until that flag is turned on.
 
     Args:
         request: The current request.
-        auth: The auth service.
+        auth: The auth service. Used for the API's own login tokens.
         authorization: The raw header.
 
     Returns:
-        The account, or ``None`` when login is not required.
+        The account id, or ``None`` when no Neon token was sent and login is not required.
 
     Raises:
-        UnauthenticatedError: Login is required and the token is missing or bad (401).
+        UnauthenticatedError: The Neon token is bad, or login is required and the
+            token is missing or bad (401).
     """
     settings = cast(Settings, request.app.state.settings)
-    if not settings.require_login:
-        return None
     token = _bearer_token(authorization)
     if token is None:
-        raise UnauthenticatedError("Missing login token.")
-    return auth.user_from_token(token)
+        if settings.require_login:
+            raise UnauthenticatedError("Missing login token.")
+        return None
+    if _jwt_algorithm(token) == "EdDSA":
+        neon = cast(NeonAuth | None, getattr(request.app.state, "neon_auth", None))
+        if neon is None:
+            raise UnauthenticatedError("Invalid login token.")
+        return SignedIn(neon.user_id(token))
+    if not settings.require_login:
+        return None
+    return SignedIn(auth.user_from_token(token).id)
 
 
-ActiveUserDep = Annotated[User | None, Depends(get_active_user)]
+ActiveUserDep = Annotated[SignedIn | None, Depends(get_active_user)]
 
 
 def get_batch_downloads(request: Request) -> BatchDownloadStore:
@@ -142,13 +175,14 @@ def get_project_from_url(
 ) -> Project:
     """Load the project named by ``{project_id}`` in the URL.
 
-    When login is required, another account's project is the same 404 as a
+    When the caller sent a token, another account's project is the same 404 as a
     missing one.
 
     Args:
         project_id: From the URL.
         service: Injected by FastAPI.
-        user: The logged-in account, or ``None`` when login is off.
+        user: The signed-in account, or ``None`` when the request had no Neon token
+            and login is not required.
 
     Returns:
         The project.
