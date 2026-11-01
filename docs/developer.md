@@ -36,7 +36,7 @@ If you change a route's JSON, update `api.js` and `App.jsx` in the same pull req
 2. Add or update a test in [`backend/tests/`](../backend/tests/) for any backend change.
 3. Run the checks: `pytest`, `ruff`, and `mypy` in `backend/`; `npm run lint` and `npm run build` in `frontend/app/`.
 4. Add a line to the [backend changelog](../backend/docs/CHANGELOG.md).
-5. Open a pull request. GitHub Actions runs the backend checks.
+5. Open a pull request. GitHub Actions runs the backend and frontend checks, CodeQL, and the dependency review.
 
 ## Configuration and hosting
 
