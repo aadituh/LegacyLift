@@ -29,6 +29,50 @@
   color: #8a1f1f;
 }
 
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-actions .api-badge {
+  margin-left: 0;
+}
+
+.auth-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-card {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 360px);
+  padding: 28px 24px;
+  border: 1px solid rgba(41, 69, 55, 0.4);
+  border-radius: 16px;
+  background: rgba(3, 13, 10, 0.86);
+}
+
+.auth-card h1 {
+  margin: 0;
+  color: #e7f2ea;
+  font-size: 28px;
+}
+
+.auth-card p {
+  margin: 0;
+}
+
+.auth-card input {
+  border: 0;
+  border-radius: 9px;
+  padding: 11px 12px;
+}
+
 .file-kind {
   color: #698071;
   font-size: 12px;
