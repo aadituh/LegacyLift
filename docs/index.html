@@ -62,6 +62,36 @@
             <p>LegacyLift proposes an AI-driven pipeline that analyzes dependencies and incrementally converts legacy systems to modern infrastructure. It will maintain full compatibility with the infrastructure of the legacy code while enabling the security and performance benefits of modern programming languages.</p>
         </section>
 
+        <section>
+            <h2>How It Works</h2>
+            <p>A user uploads a COBOL project, LegacyLift maps how its files depend on each other, converts each program to Python, and then runs the original COBOL and the Python side by side to check that they print the same output.</p>
+            <figure class="diagram">
+                <img src="img/pipeline.svg" alt="Pipeline: upload, analyze, convert, verify">
+                <figcaption>The four steps of a LegacyLift project.</figcaption>
+            </figure>
+            <figure class="diagram">
+                <img src="img/architecture.svg" alt="Architecture: browser, web app, API, PostgreSQL, and the GnuCOBOL runner on an internal network">
+                <figcaption>Services started by <code>docker compose up</code>. Uploaded code runs only in the runner, which has no internet access.</figcaption>
+            </figure>
+        </section>
+
+        <section>
+            <h2>Features at Demo 2</h2>
+            <table class="feature-table">
+                <thead>
+                    <tr><th>Feature</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Upload COBOL programs, copybooks, and data files as a project</td><td>Working; saved in PostgreSQL</td></tr>
+                    <tr><td>Dependency analysis (<code>COPY</code>, <code>CALL</code>, <code>PERFORM</code>)</td><td>Working</td></tr>
+                    <tr><td>COBOL to Python conversion</td><td>Working for a subset; other lines become review notes</td></tr>
+                    <tr><td>Verification: run COBOL (GnuCOBOL) and Python, compare output</td><td>Working in the runner container</td></tr>
+                    <tr><td>User accounts</td><td>In progress</td></tr>
+                    <tr><td>AI-assisted translation (Gemini with RAG)</td><td>Planned for Demo 3</td></tr>
+                </tbody>
+            </table>
+        </section>
+
         <section class="references">
             <h2>References</h2>
             <p>Gruca, A. (2025, July 24). <em>2025 legacy code stats: Costs, risks &amp; modernization</em>. Pragmatic Coders. <a href="https://www.pragmaticcoders.com/resources/legacy-code-stats" target="_blank" rel="noopener">https://www.pragmaticcoders.com/resources/legacy-code-stats</a></p>
