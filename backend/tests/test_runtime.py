@@ -28,7 +28,8 @@ DATA = BACKEND / "src" / "legacylift" / "data"
         (14, 4, 0, False, "0014"),  # case 1
         (1234, 3, 0, False, "234"),  # case 2 overflow
         (-5, 3, 0, False, "005"),  # case 3 unsigned drops sign
-        (-5, 3, 0, True, "-005"),  # case 4 signed
+        (-5, 3, 0, True, "-005"),  # case 4 signed negative
+        (5, 3, 0, True, "+005"),  # signed positive leads with +
         (35, 3, 0, False, "035"),  # case 9 FEESCHED fee
         (65, 4, 0, False, "0065"),  # case 10 FEESCHED total
     ],
@@ -38,6 +39,21 @@ def test_display_number_matches_documented_gnucobol_cases(
 ):
     stored = cobol_number(value, integers=integers, decimals=decimals, signed=signed)
     assert display_number(stored, integers=integers, decimals=decimals, signed=signed) == printed
+
+
+def test_signed_display_includes_leading_plus():
+    """GnuCOBOL prints a leading + for positive S9… DISPLAY fields (issue #95)."""
+    source = (
+        "PROGRAM-ID. SIGNED1.\nWORKING-STORAGE SECTION.\n"
+        "01 WS-BAL PIC S9(7)V99 VALUE 13054.87.\n"
+        "PROCEDURE DIVISION.\nDISPLAY WS-BAL.\nSTOP RUN.\n"
+    )
+    draft = translate_program(source)
+    assert draft.notes == []
+    assert run_python(draft.python) == "+0013054.87\n"
+    assert display_number(
+        Decimal("13054.87"), integers=7, decimals=2, signed=True
+    ) == "+0013054.87"
 
 
 def test_cobol_text_pads_and_truncates():
@@ -67,7 +83,7 @@ def test_intcalc_alice_interest_matches_recorded_output():
     )
     assert recorded == "2.57"
     assert interest == Decimal(recorded)
-    assert display_number(interest, integers=7, decimals=2, signed=True) == "0000002.57"
+    assert display_number(interest, integers=7, decimals=2, signed=True) == "+0000002.57"
 
 
 def test_feesched_matches_recorded_gnucobol_stdout():

@@ -8,7 +8,8 @@ These ten cases are the team's written record of real COBOL behaviour
 1. ``PIC 9(4)`` holding 14 **DISPLAY**s as ``0014`` (leading zeros).
 2. ``PIC 9(3)`` holding 1234 **stores/displays** ``234`` (leftmost digits drop).
 3. ``PIC 9(3)`` receiving ``-5`` **stores/displays** ``005`` (unsigned drops sign).
-4. ``PIC S9(3)`` receiving ``-5`` **DISPLAY**s ``-005`` (sign kept).
+4. ``PIC S9(3)`` receiving ``-5`` **DISPLAY**s ``-005``; positive signed
+   values get a leading ``+`` (e.g. ``+005``).
 5. ``PIC X(10)`` holding ``"HI"`` **DISPLAY**s ``HI        `` (space pad on the right).
 6. ``PIC X(10)`` holding ``"ABCDEFGHIJKLMN"`` **DISPLAY**s ``ABCDEFGHIJ`` (cut on the right).
 7. ``PIC 9V99`` stores with two fractional places; ``1.239`` without ``ROUNDED``
@@ -148,9 +149,8 @@ def display_number(
     """Format a stored number the way COBOL ``DISPLAY`` prints a numeric PIC.
 
     Whole numbers are zero-padded to ``integers`` digits. Decimals include a
-    decimal point and exactly ``decimals`` fractional digits. Signed negatives
-    get a leading ``-``; positives have no ``+`` (plain DISPLAY, not
-    ``SIGN LEADING SEPARATE``).
+    decimal point and exactly ``decimals`` fractional digits. Signed fields
+    (``S9…``) always get a leading ``+`` or ``-`` (GnuCOBOL 3.x plain DISPLAY).
     """
     number = cobol_number(value, integers=integers, decimals=decimals, signed=signed)
     negative = number < 0
@@ -162,6 +162,6 @@ def display_number(
         as_str = f"{magnitude:.{decimals}f}"
         whole, frac = as_str.split(".")
         body = f"{int(whole):0{max(integers, 1)}d}.{frac}"
-    if signed and negative:
-        return f"-{body}"
-    return body
+    if not signed:
+        return body
+    return f"-{body}" if negative else f"+{body}"
