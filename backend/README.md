@@ -125,6 +125,14 @@ Each run gets a new temporary folder: COBOL compiles with `cobc -x -I <copybooks
 
 Build and start only the runner: `docker compose up --build runner`. Tests that need `cobc` are skipped when it isn't installed.
 
+### Recorded COBOL output
+
+[`tests/data/recorded/`](tests/data/recorded/) holds what GnuCOBOL printed: `FEESCHED.out`, and `bank/<case>/BANKMAIN.out` for the cases `sample` (the files in `src/legacylift/data/`), `normal`, `overdraft`, and `closed` (each with its own `accounts.dat` and `transactions.dat`). Re-record after changing a case or a sample program, from the repository root:
+
+```bash
+docker compose run --rm --no-deps -v ./backend:/backend runner python /backend/scripts/record_cobol_output.py
+```
+
 Tests are in [`tests/`](tests/); pytest also runs the examples in docstrings.
 
 ## Where new work goes
