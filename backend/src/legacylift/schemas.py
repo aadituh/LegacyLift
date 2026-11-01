@@ -84,7 +84,8 @@ class RegisterRequest(BaseModel):
     Attributes:
         email: Stored lowercase. A second sign-up with the same email is 409.
         password: 8 to 128 characters, with a letter and a number. Not stored.
-        display_name: 1 to 100 characters after spaces are removed.
+        display_name: 1 to 100 characters after spaces are removed. Letters, numbers,
+            spaces, periods, apostrophes, and hyphens only.
     """
 
     email: str

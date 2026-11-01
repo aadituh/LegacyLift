@@ -10,6 +10,8 @@ Agreed with the login page (#15), sign-up page (#32), and accounts table (#30):
 - The frontend keeps the token in ``localStorage`` under ``legacylift-token``
   and sends ``Authorization: Bearer <token>``.
 - A password is 8 to 128 characters and includes a letter and a number.
+- A display name is 1 to 100 characters: letters, numbers, spaces, periods,
+  apostrophes, and hyphens.
 - Project routes require this token only when ``LEGACYLIFT_REQUIRE_LOGIN`` is on.
   A Neon Auth token is accepted on those routes whenever the client sends one.
 """
@@ -26,7 +28,12 @@ from legacylift.errors import InputError, ProjectStateError, UnauthenticatedErro
 from legacylift.models import User
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_DISPLAY_NAME = re.compile(r"[A-Za-z0-9 .'-]+")
 PASSWORD_RULE = "Password must be 8 to 128 characters and include a letter and a number."
+DISPLAY_NAME_RULE = (
+    "Display name must be 1 to 100 characters and use only letters, numbers, "
+    "spaces, periods, apostrophes, and hyphens."
+)
 INVALID_LOGIN = "Invalid email or password."
 MISSING_SECRET = "Set LEGACYLIFT_TOKEN_SECRET before signing in."
 
@@ -118,8 +125,8 @@ class AuthService:
         if not _EMAIL.fullmatch(normalized) or len(normalized) > 254:
             raise InputError("Enter a valid email address.")
         name = display_name.strip()
-        if not name or len(name) > 100:
-            raise InputError("Display name must be 1 to 100 characters.")
+        if not name or len(name) > 100 or _DISPLAY_NAME.fullmatch(name) is None:
+            raise InputError(DISPLAY_NAME_RULE)
         if not password_is_strong(password):
             raise InputError(PASSWORD_RULE)
         user = User(

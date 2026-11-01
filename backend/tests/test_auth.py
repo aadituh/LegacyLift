@@ -37,6 +37,22 @@ def test_register_hides_the_password_and_stores_only_a_hash(tmp_path):
     assert "password_hash" in saved
 
 
+def test_bad_email_and_display_name_are_422(tmp_path):
+    client = make_client(tmp_path, token_secret=SECRET)
+    bad_email = register(client, email="not-an-email")
+    assert bad_email.status_code == 422
+    assert bad_email.json()["detail"] == "Enter a valid email address."
+    bad_name = register(client, display_name="Ada_Lovelace")
+    assert bad_name.status_code == 422
+    assert bad_name.json()["detail"] == (
+        "Display name must be 1 to 100 characters and use only letters, numbers, "
+        "spaces, periods, apostrophes, and hyphens."
+    )
+    blank = register(client, display_name="   ")
+    assert blank.status_code == 422
+    assert blank.json()["detail"] == bad_name.json()["detail"]
+
+
 def test_used_email_is_409_and_a_weak_password_is_422(tmp_path):
     client = make_client(tmp_path, token_secret=SECRET)
     assert register(client).status_code == 201

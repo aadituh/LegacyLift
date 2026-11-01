@@ -18,12 +18,12 @@ import {
   listProjects,
   login,
   logout,
+  register,
   getMe,
   readToken,
   setUnauthorizedHandler,
 } from './api'
 import './App.css'
-import { authClient } from './auth'
 import BackgroundFx from './BackgroundFx'
 
 const sampleCobol = `IDENTIFICATION DIVISION.
@@ -130,6 +130,26 @@ function lineList(lines) {
   return lines.join(', ')
 }
 
+const displayNamePattern = /^[A-Za-z0-9 .'-]+$/
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const passwordRule = 'Password must be 8 to 128 characters and include a letter and a number.'
+const displayNameRule =
+  'Display name must be 1 to 100 characters and use only letters, numbers, spaces, periods, apostrophes, and hyphens.'
+
+/** Message for bad sign-up input, or '' when the API should decide. */
+function signUpProblem(displayName, email, password, confirmPassword) {
+  const name = displayName.trim()
+  if (!name) return 'Enter a display name.'
+  if (name.length > 100 || !displayNamePattern.test(name)) return displayNameRule
+  const address = email.trim()
+  if (!address) return 'Enter an email address.'
+  if (address.length > 254 || !emailPattern.test(address)) return 'Enter a valid email address.'
+  if (!password) return 'Enter a password.'
+  if (password.length < 8 || password.length > 128) return passwordRule
+  if (password !== confirmPassword) return 'Those passwords do not match.'
+  return ''
+}
+
 function runTime(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
@@ -143,13 +163,14 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState(0)
   const [results, setResults] = useState(() => savedBatch?.results ?? [])
   const [error, setError] = useState('')
-  const { data: session, isPending } = authClient.useSession()
+  const [sessionPending, setSessionPending] = useState(true)
   const [account, setAccount] = useState(null)
-  const user = account ?? session?.user ?? null
+  const user = account
   const [authMode, setAuthMode] = useState('sign-in')
   const [accountName, setAccountName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [status, setStatus] = useState(() => savedBatch?.status ?? '')
   const [isConverting, setIsConverting] = useState(false)
   const [conversionProgress, setConversionProgress] = useState(0)
@@ -211,7 +232,10 @@ export default function App() {
     })
     let cancelled = false
     async function restoreSession() {
-      if (!readToken()) return
+      if (!readToken()) {
+        if (!cancelled) setSessionPending(false)
+        return
+      }
       try {
         const signedIn = await getMe()
         if (!cancelled) setAccount(signedIn)
@@ -220,6 +244,8 @@ export default function App() {
           setAccount(null)
           setError(cause.message || 'Please log in again.')
         }
+      } finally {
+        if (!cancelled) setSessionPending(false)
       }
     }
     restoreSession()
@@ -673,9 +699,13 @@ export default function App() {
 
   async function handleSignIn(event) {
     event.preventDefault()
+    if (!email.trim() || !password) {
+      setError('Enter your email and password.')
+      return
+    }
     setError('')
     try {
-      await login(email, password)
+      await login(email.trim(), password)
       setAccount(await getMe())
       setPassword('')
     } catch (cause) {
@@ -685,22 +715,18 @@ export default function App() {
 
   async function handleSignUp(event) {
     event.preventDefault()
+    const problem = signUpProblem(accountName, email, password, confirmPassword)
+    if (problem) {
+      setError(problem)
+      return
+    }
     setError('')
     try {
-      const { error: signUpError } = await authClient.signUp.email({
-        name: accountName,
-        email,
-        password,
-      })
-      if (signUpError) {
-        setError(signUpError.message)
-        return
-      }
-      const { data: sessionData } = await authClient.getSession()
-      if (!sessionData?.user) {
-        setAuthMode('sign-in')
-        setError('Account created. Sign in with that email and password.')
-      }
+      await register(email.trim(), password, accountName.trim())
+      await login(email.trim(), password)
+      setAccount(await getMe())
+      setPassword('')
+      setConfirmPassword('')
     } catch (cause) {
       setError(cause.message || 'Could not create the account.')
     }
@@ -937,7 +963,7 @@ export default function App() {
     },
   ]
 
-  if (isPending) {
+  if (sessionPending) {
     return (
       <div className="auth-gate">
         <p>Checking session…</p>
@@ -949,14 +975,18 @@ export default function App() {
     const signingIn = authMode === 'sign-in'
     return (
       <div className="auth-gate">
-        <form className="auth-card" onSubmit={signingIn ? handleSignIn : handleSignUp}>
+        <form
+          className="auth-card"
+          noValidate
+          onSubmit={signingIn ? handleSignIn : handleSignUp}
+        >
           <h1>LegacyLift</h1>
           {!signingIn && (
             <input
               value={accountName}
               onChange={(event) => setAccountName(event.target.value)}
-              placeholder="Name"
-              required
+              placeholder="Display name"
+              autoComplete="name"
             />
           )}
           <input
@@ -964,15 +994,24 @@ export default function App() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="Email"
-            required
+            autoComplete="email"
           />
           <input
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Password"
-            required
+            autoComplete={signingIn ? 'current-password' : 'new-password'}
           />
+          {!signingIn && (
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              placeholder="Confirm password"
+              autoComplete="new-password"
+            />
+          )}
           <button className="button primary" type="submit">
             {signingIn ? 'Sign in' : 'Create account'}
           </button>
@@ -986,7 +1025,11 @@ export default function App() {
           >
             {signingIn ? 'Need an account? Create one' : 'Already have an account? Sign in'}
           </button>
-          {error ? <p>{error}</p> : null}
+          {error ? (
+            <p className="message error" role="alert">
+              {error}
+            </p>
+          ) : null}
         </form>
       </div>
     )
@@ -1040,7 +1083,6 @@ export default function App() {
               onClick={() => {
                 logout()
                 setAccount(null)
-                authClient.signOut()
               }}
             >
               Sign out
