@@ -24,11 +24,15 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: postgresql://legacylift:legacylift@db:5432/legacylift
+      LEGACYLIFT_ENABLE_RUNNER: "true"
+      LEGACYLIFT_RUNNER_URL: http://runner:8001
     ports:
       - "8000:8000"
     networks: [default, runner]
     depends_on:
       db:
+        condition: service_healthy
+      runner:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

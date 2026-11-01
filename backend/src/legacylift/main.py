@@ -24,6 +24,7 @@ from legacylift.neon_store import NeonProjectStore
 from legacylift.routers import convert, projects
 from legacylift.services.batch_downloads import BatchDownloadStore
 from legacylift.services.projects import ProjectService
+from legacylift.services.verification import RunnerClient
 from legacylift.storage import ProjectRepository, ProjectStore
 
 logger = logging.getLogger("uvicorn.error")
@@ -87,7 +88,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         store = NeonProjectStore(settings.database_url, settings.max_projects)
     else:
         store = ProjectStore(settings.data_dir, settings.max_projects)
-    app.state.project_service = ProjectService(store, cobc_path=settings.cobc_path)
+    runner = RunnerClient(settings.runner_url) if settings.enable_runner else None
+    app.state.project_service = ProjectService(store, runner=runner)
     app.state.batch_downloads = BatchDownloadStore()
     app.include_router(projects.router)
     app.include_router(convert.router)

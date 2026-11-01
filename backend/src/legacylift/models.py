@@ -57,7 +57,7 @@ class RunStatus(StrEnum):
     ANALYZED = "analyzed"  # analyze found COPY/CALL links (may include unresolved)
     DRAFT = "draft"  # converted with no review notes, but still unverified
     REVIEW_REQUIRED = "review_required"  # converted with lines marked TODO
-    NOT_VERIFIED = "not_verified"  # verify could not compare (e.g. GnuCOBOL missing)
+    NOT_VERIFIED = "not_verified"  # verify could not compare (runner off or unreachable)
     VERIFIED = "verified"  # COBOL and Python stdout matched for every program
     MISMATCH = "mismatch"  # at least one program differed or failed to run
 
@@ -126,6 +126,7 @@ class EquivalenceCheck(BaseModel):
         cobol_stdout: Output from GnuCOBOL.
         python_stdout: Output from the generated Python.
         error: Failure detail when not equivalent.
+        diff: Unified diff from the COBOL output to the Python output; empty when they match.
     """
 
     source_name: str
@@ -134,6 +135,7 @@ class EquivalenceCheck(BaseModel):
     cobol_stdout: str = ""
     python_stdout: str = ""
     error: str | None = None
+    diff: str = ""
 
 
 class FileCounts(BaseModel):

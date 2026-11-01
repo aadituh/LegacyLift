@@ -36,7 +36,9 @@ class Settings(BaseSettings):
             Postgres instead of ``data_dir``.
         max_projects: How many projects to keep; the oldest is deleted first.
         max_request_bytes: Largest request body accepted; bigger ones get 413.
-        cobc_path: Optional path to GnuCOBOL's ``cobc`` for verify runs.
+        enable_runner: Let verify run COBOL and Python in the runner container.
+            Off by default, so uploaded code never runs unless this is turned on.
+        runner_url: The runner container's base URL.
     """
 
     model_config = SettingsConfigDict(env_prefix="LEGACYLIFT_", env_file=".env", extra="ignore")
@@ -49,7 +51,8 @@ class Settings(BaseSettings):
     )
     max_projects: int = 100
     max_request_bytes: int = 1_200_000  # 10 files x 100 KB, plus form overhead
-    cobc_path: str | None = None
+    enable_runner: bool = False
+    runner_url: str = "http://runner:8001"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

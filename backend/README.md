@@ -32,7 +32,7 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `DELETE /api/projects/{id}/files/{file_id}` | none | Removes one file (204); saved runs keep their results |
 | `POST /api/projects/{id}/analyze` | none | File counts plus COPY/CALL/PERFORM `dependencies` and `unresolved` (status `analyzed`) |
 | `POST /api/projects/{id}/convert` | none | Python for each program, saved as a run |
-| `POST /api/projects/{id}/verify` | none | Run each program with GnuCOBOL and compare stdout to Python: `verified` / `mismatch` / `not_verified` (no `cobc`) |
+| `POST /api/projects/{id}/verify` | none | Run each main program as COBOL and as Python in the runner and compare stdout: `verified` / `mismatch` / `not_verified` (runner off or unreachable) |
 | `GET /api/projects/{id}/runs` | none | All runs, oldest first, without their Python |
 | `GET /api/projects/{id}/runs/{run_id}` | none | One run; a convert run includes its Python |
 | `GET /api/projects/{id}/runs/{run_id}/files/{name}` | none | One saved `.py` file (`Content-Disposition: attachment`) |
@@ -70,7 +70,8 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_DATA_DIR` | `data/projects` | Used when `DATABASE_URL` is unset: projects are saved as `<id>.json` (plus `last_id.txt`, the ID counter), relative to where uvicorn starts. Git ignores `backend/data/`. Render resets it on redeploy. |
 | `LEGACYLIFT_MAX_PROJECTS` | `100` | Projects kept; the oldest is deleted first. |
 | `LEGACYLIFT_MAX_REQUEST_BYTES` | `1200000` | Largest request body. |
-| `LEGACYLIFT_COBC_PATH` | unset | Optional path to GnuCOBOL `cobc` for verify. Otherwise `cobc` must be on PATH. |
+| `LEGACYLIFT_ENABLE_RUNNER` | `false` | Lets verify run code in the runner container. Compose sets it to `true`. |
+| `LEGACYLIFT_RUNNER_URL` | `http://runner:8001` | The runner container's address. |
 
 ## Code layout
 
@@ -90,26 +91,30 @@ src/legacylift/
 ├── data/             sample COBOL bank (programs, copybooks, .dat files)
 ├── routers/          HTTP only: convert.py, projects.py
 ├── responses.py      `.py` download responses
-├── services/         rules: uploads.py, conversion.py, projects.py, batch_downloads.py
+├── services/         rules: uploads.py, conversion.py, projects.py, verification.py, batch_downloads.py
 ├── runner/           runs COBOL and Python in the runner container: sandbox.py, server.py
 └── cobol/
     ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
     ├── dependencies.py  find_dependencies(): COPY/CALL/PERFORM links + unresolved
     ├── runtime.py       cobol_number / cobol_text / display_number (DISPLAY semantics)
     ├── converter.py     translate_program(): COBOL subset → Python
-    ├── gnucobol.py      compile/run programs with cobc
-    └── equivalence.py   compare GnuCOBOL stdout to generated Python
+    ├── gnucobol.py      compile/run one program with a local cobc (not used by verify)
+    └── equivalence.py   compare that run with in-process Python (not used by verify)
 ```
 
-### Verify / GnuCOBOL
+### Verify
 
-`POST /api/projects/{id}/verify` (after convert) compiles each `.cbl`/`.cob` with [GnuCOBOL](https://gnucobol.sourceforge.io/) (`cobc -x -free`), runs it, runs the matching Python draft, and requires **exact** stdout equality. Copybooks in the project are placed beside the program for `COPY`.
+`POST /api/projects/{id}/verify` (after convert) uses the [runner container](#runner-container). For each main program (one that no other program `CALL`s) it compiles the program with the programs it calls and the project's copybooks, runs it with the project's `.dat` files, runs the generated Python with the same files, and compares stdout exactly (only `
+` vs `
+` is ignored). Called programs get no check of their own.
+
+Each entry in `files` has `equivalent`, `cobol_stdout`, `python_stdout`, `diff` (unified diff, empty when they match), and `error`.
 
 | Status | Meaning |
 | --- | --- |
 | `verified` | Every program matched (`passed: true`) |
-| `mismatch` | At least one differed or failed (`passed: false`) |
-| `not_verified` | `cobc` not found (`passed: null`) |
+| `mismatch` | At least one differed, failed to compile, crashed, or hit a limit (`passed: false`) |
+| `not_verified` | Runner off (`LEGACYLIFT_ENABLE_RUNNER`) or unreachable (`passed: null`) |
 
 ### Runner container
 
