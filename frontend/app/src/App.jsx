@@ -614,7 +614,7 @@ export default function App() {
       setStatus('')
     } catch (cause) {
       setUser(null)
-      setError(cause.message)
+      setError(cause.message || 'Something went wrong. Try again.')
     }
   }
 
@@ -856,6 +856,11 @@ export default function App() {
           </label>
           <button className="button dark" type="submit">Log in</button>
           {error ? <p className="message error" role="alert">{error}</p> : null}
+          {!error && backendChecked && !backendReady ? (
+            <p className="message error" role="alert">
+              Backend is not reachable. Check the API connection, then try again.
+            </p>
+          ) : null}
         </form>
       </div>
     )
