@@ -871,17 +871,29 @@ export default function App() {
   )
   const programUnresolved = (analysis?.unresolved || []).filter((item) =>
     item.source === selectedProgramName || item.source.startsWith(`${selectedProgramName}:`))
+  const programSummary = (analysis?.programs || []).find(
+    (item) => item.source_name === selectedProgramName,
+  )
+  const programFields = programSummary?.fields || []
+  const programParagraphs = programSummary?.paragraphs || []
 
   const programCheck = (verification?.files || []).find(
     (file) => file.source_name === selectedProgramName,
   )
+
+  const callerLink = (analysis?.dependencies || []).find(
+    (link) => link.kind === 'call' && link.target === selectedProgramName,
+  )
+  const callerName = callerLink?.source?.replace(/\.(cbl|cob)$/i, '')
   const programBadge = verification?.status === 'not_verified'
     ? 'not_verified'
     : programCheck?.equivalent
       ? 'verified'
       : programCheck
         ? 'mismatch'
-        : ''
+        : callerName
+          ? `runs inside ${callerName}`
+          : ''
   
   const cobolLines = programCheck?.cobol_stdout
     ? programCheck.cobol_stdout.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n')
@@ -901,7 +913,7 @@ export default function App() {
   const progressNote = isVerifying
     ? 'Verification is running.'
     : verification
-      ? `Verification ${verification.status}.`
+      ? (verification.note || `Verification ${verification.status}.`)
       : progressStep === 0
         ? hasOnlyOtherFiles
           ? 'Upload a COBOL program before converting.'
@@ -1402,6 +1414,33 @@ export default function App() {
                   ) : (
                     <p>No unresolved references.</p>
                   )}
+                  <h2>Fields</h2>
+                  {programFields.length > 0 ? (
+                    <ul>
+                      {programFields.map((field) => (
+                        <li key={`${field.name}-${field.line}`}>
+                          {field.level} {field.name}
+                          {field.picture ? ` PIC ${field.picture}` : ''}
+                          {field.occurs ? ` OCCURS ${field.occurs}` : ''}
+                          {` (line ${field.line})`}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No fields for this program.</p>
+                  )}
+                  <h2>Paragraphs</h2>
+                  {programParagraphs.length > 0 ? (
+                    <ul>
+                      {programParagraphs.map((paragraph) => (
+                        <li key={`${paragraph.name}-${paragraph.start_line}`}>
+                          {paragraph.name} (lines {paragraph.start_line}-{paragraph.end_line})
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No paragraphs for this program.</p>
+                  )}
                 </section>
               )}
 
@@ -1413,6 +1452,7 @@ export default function App() {
                   ) : (
                     <>
                       <p className="run-status">{programBadge}</p>
+                      {verification?.note && <p>{verification.note}</p>}
                       {programCheck?.error && <p>{programCheck.error}</p>}
                       {outputLineCount > 0 && (
                       <div className="diff-lines" aria-label="COBOL and Python output lines">

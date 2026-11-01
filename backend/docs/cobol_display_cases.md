@@ -12,7 +12,7 @@ scripts noted in issue #36.
 | 1 | `PIC 9(4)` value 14 | DISPLAY `0014` | Leading zeros |
 | 2 | `PIC 9(3)` value 1234 | DISPLAY `234` | Overflow drops leftmost digits |
 | 3 | `PIC 9(3)` value −5 | DISPLAY `005` | Unsigned drops the sign |
-| 4 | `PIC S9(3)` value −5 | DISPLAY `-005` | Signed keeps the minus |
+| 4 | `PIC S9(3)` value −5 / +5 | DISPLAY `-005` / `+005` | Signed always shows `+` or `-` |
 | 5 | `PIC X(10)` value `"HI"` | `HI        ` | Right-pad with spaces |
 | 6 | `PIC X(10)` value `"ABCDEFGHIJKLMN"` | `ABCDEFGHIJ` | Truncate to 10 |
 | 7 | `PIC 9V99` store 1.239 (no ROUNDED) | `1.23` | Truncate toward zero |

@@ -4,8 +4,14 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ## Unreleased
 
+### Removed
+
+- Local `cobol/gnucobol.py` and `cobol/equivalence.py` (and `tests/test_equivalence.py`): verify uses the runner container since #37 (issue #99).
+
 ### Added
 
+- `POST /api/projects/{id}/describe` (issue #31): a plain-language map of each program and the data they share. Needs `LEGACYLIFT_GEMINI_API_KEY`. Tests mock the Gemini call.
+- Analyze (issue #24): `POST /api/projects/{id}/analyze` returns per-program `programs` summaries (`fields` and `paragraphs`) alongside COPY/CALL/PERFORM `dependencies` / `unresolved`. OpenAPI `/docs` includes a response example. Covered by `tests/test_dependencies.py`.
 - `POST /api/auth/register`, `POST /api/auth/login`, and `GET /api/auth/me`. Passwords are Argon2 hashes (`pwdlib`); tokens are JWTs (`PyJWT`) signed with `LEGACYLIFT_TOKEN_SECRET` (set on Render, listed in `.env.example`, never committed). A used email is 409; a weak password is 422; a wrong email or password is the same 401. Project routes call `current_user` only when `LEGACYLIFT_REQUIRE_LOGIN` is true (default false). Accounts are stored in `users` (`database/schema.sql`) and, without a database, in `users.json`.
 - Recorded GnuCOBOL output for BANKMAIN (`tests/data/recorded/bank/`: sample, normal, overdraft, and closed-account cases) and `scripts/record_cobol_output.py` to re-record it in the runner image. `tests/test_recorded_output.py` checks the record widths and, where `cobc` is installed, that GnuCOBOL still prints the recorded output.
 - Demo 2 walkthrough ([`docs/walkthrough.md`](../../docs/walkthrough.md)): `MONTHEND.cbl` and `FEERATES.cpy` in `src/legacylift/data/`, with recorded GnuCOBOL output in `tests/data/recorded/MONTHEND.out`.

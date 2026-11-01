@@ -12,19 +12,70 @@ Example:
 """
 
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from legacylift.cobol.describe import ProgramDescription
 from legacylift.models import (
     ConvertedFile,
     ConvertedProjectFile,
     DependencyLink,
     FileCounts,
+    FileReview,
+    ProgramSummary,
     RunStatus,
     RunSummary,
     SourceFile,
     UnresolvedDependency,
 )
+
+# Example payload shown in Swagger UI at GET /docs for POST .../analyze (issue #24).
+_ANALYZE_RESPONSE_EXAMPLE: dict[str, Any] = {
+    "project_id": "1",
+    "run_id": "1",
+    "status": "analyzed",
+    "program_count": 3,
+    "copybook_count": 2,
+    "data_file_count": 0,
+    "dependencies": [
+        {"source": "BANKMAIN.cbl", "target": "ACCTDEF.cpy", "kind": "copy", "line": 41},
+        {"source": "BANKMAIN.cbl", "target": "TXNDEF.cpy", "kind": "copy", "line": 44},
+        {"source": "BANKMAIN.cbl", "target": "TXNPOST.cbl", "kind": "call", "line": 116},
+        {"source": "BANKMAIN.cbl", "target": "INTCALC.cbl", "kind": "call", "line": 156},
+        {
+            "source": "BANKMAIN.cbl:MAIN-LOGIC",
+            "target": "LOAD-ACCOUNTS",
+            "kind": "perform",
+            "line": 74,
+        },
+        {"source": "TXNPOST.cbl", "target": "ACCTDEF.cpy", "kind": "copy", "line": 17},
+        {"source": "INTCALC.cbl", "target": "ACCTDEF.cpy", "kind": "copy", "line": 15},
+    ],
+    "unresolved": [],
+    "programs": [
+        {
+            "source_name": "BANKMAIN.cbl",
+            "program_id": "BANKMAIN",
+            "fields": [
+                {
+                    "level": "01",
+                    "name": "WS-ACCOUNT-COUNT",
+                    "picture": "9(3)",
+                    "value": "0",
+                    "occurs": None,
+                    "line": 48,
+                    "parent": None,
+                    "section": "WORKING-STORAGE",
+                }
+            ],
+            "paragraphs": [
+                {"name": "MAIN-LOGIC", "start_line": 72, "end_line": 78},
+                {"name": "LOAD-ACCOUNTS", "start_line": 79, "end_line": 92},
+            ],
+        }
+    ],
+}
 
 
 class RegisterRequest(BaseModel):
@@ -187,16 +238,34 @@ class AnalyzeResponse(FileCounts):
     Attributes:
         project_id: The analyzed project.
         run_id: ID of the saved analyze run.
-        status: ``analyzed`` after COPY/CALL dependency discovery.
-        dependencies: Resolved COPY/CALL links (matched project file names).
-        unresolved: COPY/CALL names with no matching project file.
+        status: ``analyzed`` after COPY/CALL/PERFORM dependency discovery.
+        dependencies: Resolved COPY/CALL/PERFORM links (matched file or paragraph).
+        unresolved: COPY/CALL/PERFORM names that could not be resolved.
+        programs: Per-program field and paragraph summaries (what to convert together).
     """
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_ANALYZE_RESPONSE_EXAMPLE]})
 
     project_id: str
     run_id: str
     status: RunStatus
     dependencies: list[DependencyLink] = Field(default_factory=list)
     unresolved: list[UnresolvedDependency] = Field(default_factory=list)
+    programs: list[ProgramSummary] = Field(default_factory=list)
+
+
+class DescribeResponse(BaseModel):
+    """Response from ``POST /api/projects/{id}/describe``.
+
+    Attributes:
+        project_id: The described project.
+        programs: One plain-language summary per program file.
+        shared_data: Which files and copybooks those programs share.
+    """
+
+    project_id: str
+    programs: list[ProgramDescription]
+    shared_data: str
 
 
 class FileEquivalenceResponse(BaseModel):
@@ -231,6 +300,25 @@ class VerifyResponse(BaseModel):
     passed: bool | None
     note: str
     files: list[FileEquivalenceResponse] = []
+
+
+class AIReviewResponse(BaseModel):
+    """Response from ``POST /api/projects/{id}/ai-review``.
+
+    Attributes:
+        project_id: The project.
+        run_id: ID of the saved AI review run.
+        status: ``clear`` when every program has no concerns, otherwise ``concerns``.
+        model: The Gemini model that produced the review.
+        files: One comparison per program, each with ``matches`` and ``concerns``.
+            Every finding has ``cobol_lines``, ``python_lines``, and ``detail``.
+    """
+
+    project_id: str
+    run_id: str
+    status: RunStatus
+    model: str
+    files: list[FileReview] = []
 
 
 class RunsResponse(BaseModel):

@@ -1,7 +1,7 @@
 """Project routes under ``/api/projects``.
 
 List, create, read, and delete projects; upload and remove files; analyze,
-convert, and verify; read runs.
+describe, convert, verify, and ask Gemini for a second review; read runs.
 
 Each route reads the request, calls one ``ProjectService`` method, and returns
 a body from ``schemas.py``. Service errors become 4xx responses through the
@@ -18,13 +18,16 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
+from legacylift.cobol.ai_review import GEMINI_MODEL
 from legacylift.dependencies import ActiveUserDep, ProjectDep, ProjectServiceDep
 from legacylift.models import Project, Run, RunStatus
 from legacylift.responses import python_attachment
 from legacylift.schemas import (
+    AIReviewResponse,
     AnalyzeResponse,
     ConvertResponse,
     CreateProjectRequest,
+    DescribeResponse,
     FileEquivalenceResponse,
     ProjectListResponse,
     ProjectResponse,
@@ -134,9 +137,81 @@ def delete_file(project: ProjectDep, service: ProjectServiceDep, file_id: str) -
     service.delete_file(project, file_id)
 
 
-@router.post("/{project_id}/analyze")
+@router.post(
+    "/{project_id}/analyze",
+    response_model=AnalyzeResponse,
+    responses={
+        200: {
+            "description": (
+                "File counts, COPY/CALL/PERFORM links, unresolved names, "
+                "and per-program fields/paragraphs."
+            ),
+            "content": {
+                "application/json": {
+                    "example": {
+                        "project_id": "1",
+                        "run_id": "1",
+                        "status": "analyzed",
+                        "program_count": 3,
+                        "copybook_count": 2,
+                        "data_file_count": 0,
+                        "dependencies": [
+                            {
+                                "source": "BANKMAIN.cbl",
+                                "target": "ACCTDEF.cpy",
+                                "kind": "copy",
+                                "line": 41,
+                            },
+                            {
+                                "source": "BANKMAIN.cbl",
+                                "target": "TXNPOST.cbl",
+                                "kind": "call",
+                                "line": 116,
+                            },
+                            {
+                                "source": "BANKMAIN.cbl:MAIN-LOGIC",
+                                "target": "LOAD-ACCOUNTS",
+                                "kind": "perform",
+                                "line": 74,
+                            },
+                        ],
+                        "unresolved": [],
+                        "programs": [
+                            {
+                                "source_name": "BANKMAIN.cbl",
+                                "program_id": "BANKMAIN",
+                                "fields": [
+                                    {
+                                        "level": "01",
+                                        "name": "WS-ACCOUNT-COUNT",
+                                        "picture": "9(3)",
+                                        "value": "0",
+                                        "occurs": None,
+                                        "line": 48,
+                                        "parent": None,
+                                        "section": "WORKING-STORAGE",
+                                    }
+                                ],
+                                "paragraphs": [
+                                    {
+                                        "name": "MAIN-LOGIC",
+                                        "start_line": 72,
+                                        "end_line": 78,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                }
+            },
+        }
+    },
+)
 def analyze_project(project: ProjectDep, service: ProjectServiceDep) -> AnalyzeResponse:
-    """Count files and resolve COPY/CALL links between programs and project files.
+    """Count files, resolve COPY/CALL/PERFORM links, and list fields/paragraphs.
+
+    Use the result to see which copybooks and callees belong with a program before
+    convert. OpenAPI example is in ``/docs`` under this route.
 
     \f
     Raises:
@@ -150,7 +225,20 @@ def analyze_project(project: ProjectDep, service: ProjectServiceDep) -> AnalyzeR
         **counts.model_dump(),
         dependencies=run.dependencies,
         unresolved=run.unresolved,
+        programs=run.programs,
     )
+
+
+@router.post("/{project_id}/describe")
+def describe_project(project: ProjectDep, service: ProjectServiceDep) -> DescribeResponse:
+    """Describe how the project's programs fit together.
+
+    \f
+    Raises:
+        ProjectStateError: The project has no programs, or the API key is unset (400).
+    """
+    described = service.describe(project)
+    return DescribeResponse(project_id=project.id, **described.model_dump())
 
 
 @router.post("/{project_id}/convert")
@@ -209,6 +297,28 @@ def verify_project(project: ProjectDep, service: ProjectServiceDep) -> VerifyRes
             )
             for check in run.checks
         ],
+    )
+
+
+@router.post("/{project_id}/ai-review")
+def review_project(project: ProjectDep, service: ProjectServiceDep) -> AIReviewResponse:
+    """Compare each program with its Python using Gemini.
+
+    Returns matches and concerns. Each one lists the COBOL lines, the Python
+    lines, and a one-sentence detail. Status is `clear` or `concerns`.
+
+    \f
+    Raises:
+        ProjectStateError: The API key is unset, or the project has not been converted (400).
+        AIReviewError: Gemini timed out or returned an unexpected body (502).
+    """
+    run = service.ai_review(project)
+    return AIReviewResponse(
+        project_id=project.id,
+        run_id=run.id,
+        status=run.status,
+        model=GEMINI_MODEL,
+        files=run.reviews,
     )
 
 

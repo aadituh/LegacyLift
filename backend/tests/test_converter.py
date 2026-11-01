@@ -203,7 +203,7 @@ def test_simple_account_add_subtract_across_paragraphs():
     out = run_python(draft.python)
     assert "Deposit processed for account 0000000000" in out
     assert "Withdrawal processed for account 0000000000" in out
-    assert "Account Balance Report: 0000000000.00" in out
+    assert "Account Balance Report: +0000000000.00" in out
 
 
 def test_paragraph_perform_thru_calls_each_paragraph_in_range():
@@ -331,8 +331,27 @@ PROCEDURE DIVISION.
     draft = translate_program(source)
     assert draft.notes == []
     assert "for _ in range(3)" in draft.python
-    assert '[0]["item_val"]' in draft.python or "(ws_idx) - 1" in draft.python
+    assert "int(ws_idx)-1" in draft.python.replace(" ", "")
     assert run_python(draft.python) == "007\n008\n009\n"
+
+
+def test_occurs_subscript_uses_int_for_cobol_number_index():
+    """Decimal cobol_number indexes must cast to int for list access (issue #96)."""
+    source = """PROGRAM-ID. IDX1.
+WORKING-STORAGE SECTION.
+01 WS-IDX PIC 9(3) VALUE 2.
+01 WS-TABLE.
+   05 WS-SLOT OCCURS 3 TIMES.
+      10 SLOT-VAL PIC 9(3) VALUE 0.
+PROCEDURE DIVISION.
+    MOVE 42 TO SLOT-VAL(WS-IDX)
+    DISPLAY SLOT-VAL(WS-IDX)
+    STOP RUN.
+"""
+    draft = translate_program(source)
+    assert draft.notes == []
+    assert "int(ws_idx)" in draft.python
+    assert run_python(draft.python) == "042\n"
 
 
 def test_perform_until_and_varying_become_loops():
@@ -445,6 +464,27 @@ PROCEDURE DIVISION.
     with __import__("contextlib").redirect_stdout(output):
         namespace["main"]()
     assert output.getvalue() == "OK\n00015\n"
+
+
+def test_compute_rounded_split_across_lines_joins_and_runs():
+    """COMPUTE ROUNDED = on one line and the expression on the next (issue #97)."""
+    source = """PROGRAM-ID. SPLIT1.
+WORKING-STORAGE SECTION.
+01 WS-A PIC 9(3)V99 VALUE 10.00.
+01 WS-B PIC 9(3)V99 VALUE 2.00.
+01 WS-OUT PIC S9(7)V99 VALUE 0.
+PROCEDURE DIVISION.
+    COMPUTE WS-OUT ROUNDED =
+        WS-A * WS-B / 4
+    DISPLAY WS-OUT
+    STOP RUN.
+"""
+    draft = translate_program(source)
+    assert draft.notes == []
+    assert "cobol_number(" in draft.python and "rounded=True" in draft.python
+    assert "# TODO:" not in draft.python
+    out = run_python(draft.python)
+    assert out in {"+0000005.00\n", "0000005.00\n"}  # + if #95 merged
 
 
 def test_project_convert_expands_copybooks(client):

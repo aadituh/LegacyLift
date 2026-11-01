@@ -120,6 +120,26 @@ def test_matching_ignores_case_and_extension() -> None:
     assert (DependencyKind.CALL, "intcalc.cob") in targets
 
 
+def test_call_does_not_resolve_to_copybook() -> None:
+    """CALL must match a .cbl/.cob program, not a same-named .cpy (issue #100)."""
+    text = (
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. P.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       MAIN.\n"
+        '           CALL "RATES" USING WS-X.\n'
+        "           STOP RUN.\n"
+    )
+    programs = [parse_program("P.cbl", text)]
+    catalog = ["P.cbl", "RATES.cpy"]
+    deps, unresolved = find_dependencies(programs, catalog)
+    assert [d for d in deps if d.kind == DependencyKind.CALL] == []
+    call_unresolved = [u for u in unresolved if u.kind == DependencyKind.CALL]
+    assert len(call_unresolved) == 1
+    assert call_unresolved[0].name == "RATES"
+    assert call_unresolved[0].source == "P.cbl"
+
+
 def test_missing_copybook_is_unresolved() -> None:
     programs = _parse("BANKMAIN.cbl")
     # ACCTDEF and callees present; TXNDEF missing
@@ -174,5 +194,43 @@ def test_analyze_endpoint_returns_dependencies(client) -> None:
     assert ("BANKMAIN.cbl:POST-ONE-TRANSACTION", "perform", "FIND-ACCOUNT") in links
     assert result["unresolved"] == []
 
+    by_source = {p["source_name"]: p for p in result["programs"]}
+    assert set(by_source) == {"BANKMAIN.cbl", "TXNPOST.cbl", "INTCALC.cbl"}
+    bank = by_source["BANKMAIN.cbl"]
+    assert bank["program_id"] == "BANKMAIN"
+    field_names = {f["name"] for f in bank["fields"]}
+    assert "WS-ACCOUNT-COUNT" in field_names
+    assert "WS-DAYS" in field_names
+    paragraph_names = [p["name"] for p in bank["paragraphs"]]
+    assert paragraph_names == [
+        "MAIN-LOGIC",
+        "LOAD-ACCOUNTS",
+        "POST-TRANSACTIONS",
+        "POST-ONE-TRANSACTION",
+        "FIND-ACCOUNT",
+        "PRINT-STATEMENT",
+    ]
+    assert all("start_line" in p and "end_line" in p for p in bank["paragraphs"])
+
     run = client.get(f"{base}/runs/{result['run_id']}").json()
     assert run["dependencies"] == result["dependencies"]
+    assert run["programs"] == result["programs"]
+
+
+def test_analyze_openapi_docs_include_example(client) -> None:
+    """GET /docs (OpenAPI) documents analyze with an example that includes programs."""
+    schema = client.get("/openapi.json").json()
+    analyze = schema["paths"]["/api/projects/{project_id}/analyze"]["post"]
+    content = analyze["responses"]["200"]["content"]["application/json"]
+    example = content.get("example") or (content.get("examples") or {}).get("AnalyzeResponse")
+    if example is None:
+        # FastAPI may nest the response model example under the schema $ref.
+        ref = content["schema"].get("$ref", "")
+        name = ref.rsplit("/", 1)[-1]
+        model = schema["components"]["schemas"][name]
+        examples = model.get("examples") or []
+        example = examples[0] if examples else model.get("example")
+    assert example is not None
+    assert "programs" in example
+    assert "dependencies" in example
+    assert example["status"] == "analyzed"

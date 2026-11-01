@@ -92,13 +92,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         store = ProjectStore(settings.data_dir, settings.max_projects)
     runner = RunnerClient(settings.runner_url) if settings.enable_runner else None
     app.state.settings = settings
-    app.state.project_service = ProjectService(store, runner=runner)
+    app.state.project_service = ProjectService(
+        store,
+        runner=runner,
+        gemini_api_key=settings.gemini_api_key,
+        gemini_timeout_seconds=settings.gemini_timeout_seconds,
+    )
     app.state.auth_service = AuthService(
         store,
         secret=settings.token_secret,
         ttl_seconds=settings.token_ttl_seconds,
     )
-    app.state.neon_auth = NeonAuth(settings.neon_auth_url) if settings.neon_auth_url.strip() else None
+    app.state.neon_auth = (
+        NeonAuth(settings.neon_auth_url) if settings.neon_auth_url.strip() else None
+    )
     app.state.batch_downloads = BatchDownloadStore()
     app.include_router(auth.router)
     app.include_router(projects.router)

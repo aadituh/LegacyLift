@@ -44,6 +44,9 @@ class Settings(BaseSettings):
         require_login: When true, project routes require a login token.
         neon_auth_url: Neon Auth base URL. Project routes verify EdDSA bearer
             tokens against its JWKS and store ``sub`` as the project owner.
+        gemini_api_key: Key for ``POST /api/projects/{id}/describe`` and
+            ``POST /api/projects/{id}/ai-review``. Unset means those routes answer 400.
+        gemini_timeout_seconds: How long one Gemini request may wait.
     """
 
     model_config = SettingsConfigDict(env_prefix="LEGACYLIFT_", env_file=".env", extra="ignore")
@@ -64,6 +67,8 @@ class Settings(BaseSettings):
     neon_auth_url: str = (
         "https://ep-jolly-tree-b5ygfgag.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth"
     )
+    gemini_api_key: str | None = None
+    gemini_timeout_seconds: float = Field(default=30, gt=0)
 
     @field_validator("cors_origins", mode="before")
     @classmethod
