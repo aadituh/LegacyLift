@@ -24,6 +24,7 @@ def test_rows_round_trip_to_the_project_model():
         name="Payroll",
         created_at=created,
         files_added=1,
+        owner_id="11111111-1111-1111-1111-111111111111",
         files=[SourceFile(id="1", name="PAY.cbl", kind=FileKind.PROGRAM, content="STOP RUN.")],
         runs=[
             Run(
@@ -51,6 +52,7 @@ def test_rows_round_trip_to_the_project_model():
             "name": project.name,
             "created_at": project.created_at,
             "files_added": project.files_added,
+            "owner_id": project.owner_id,
         },
         [{"id": "1", "name": "PAY.cbl", "kind": "program", "content": "STOP RUN."}],
         [{"id": "1", "kind": "convert", "status": "review_required", "created_at": created}],
@@ -72,3 +74,9 @@ def test_rows_round_trip_to_the_project_model():
 
 def test_api_reads_the_database_folder_schema():
     assert REPO_SCHEMA.resolve() == SCHEMA_PATH
+    schema = REPO_SCHEMA.read_text(encoding="utf-8")
+    assert "CREATE TABLE IF NOT EXISTS users" in schema
+    assert "email text NOT NULL UNIQUE" in schema
+    assert "password_hash text NOT NULL" in schema
+    assert "CHECK (email = lower(email))" in schema
+    assert 'FOREIGN KEY (owner_id) REFERENCES neon_auth."user" (id)' in schema

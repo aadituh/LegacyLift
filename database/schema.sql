@@ -57,6 +57,11 @@ CREATE TABLE IF NOT EXISTS users (
     created_at timestamptz NOT NULL
 );
 
+-- Sign-up stores the address lowercase. Reject anything else.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_lowercase;
+ALTER TABLE users
+  ADD CONSTRAINT users_email_lowercase CHECK (email = lower(email));
+
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS owner_id uuid;
 -- Idempotent: NeonProjectStore re-runs this file on every API startup.
 -- The signed-in Neon Auth account is neon_auth."user", not the API users table.
