@@ -225,9 +225,12 @@ export async function getProject(projectId) {
   return request(`/api/projects/${projectId}`, { method: 'GET' })
 }
 
-export async function  getRuns(projectId) {
+export async function listRuns(projectId) {
   return request(`/api/projects/${projectId}/runs`, { method: 'GET' })
 }
+
+/** Same call as `listRuns`. Older pages import this name. */
+export const getRuns = listRuns
 
 export async function getRun(projectId, runId) {
   return request(`/api/projects/${projectId}/runs/${runId}`, { method: 'GET' })
