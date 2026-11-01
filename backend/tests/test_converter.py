@@ -447,6 +447,27 @@ PROCEDURE DIVISION.
     assert output.getvalue() == "OK\n00015\n"
 
 
+def test_compute_rounded_split_across_lines_joins_and_runs():
+    """COMPUTE ROUNDED = on one line and the expression on the next (issue #97)."""
+    source = """PROGRAM-ID. SPLIT1.
+WORKING-STORAGE SECTION.
+01 WS-A PIC 9(3)V99 VALUE 10.00.
+01 WS-B PIC 9(3)V99 VALUE 2.00.
+01 WS-OUT PIC S9(7)V99 VALUE 0.
+PROCEDURE DIVISION.
+    COMPUTE WS-OUT ROUNDED =
+        WS-A * WS-B / 4
+    DISPLAY WS-OUT
+    STOP RUN.
+"""
+    draft = translate_program(source)
+    assert draft.notes == []
+    assert "cobol_number(" in draft.python and "rounded=True" in draft.python
+    assert "# TODO:" not in draft.python
+    out = run_python(draft.python)
+    assert out in {"+0000005.00\n", "0000005.00\n"}  # + if #95 merged
+
+
 def test_project_convert_expands_copybooks(client):
     """Project convert passes copybooks so COPY ACCTDEF fields appear."""
     txnpost = (BACKEND / "src" / "legacylift" / "data" / "TXNPOST.cbl").read_text(encoding="utf-8")
