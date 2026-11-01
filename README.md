@@ -58,7 +58,9 @@ In the browser: on **Upload**, click **Load demo project**; on **Convert**, clic
 | [`docs/`](docs/) | Course website, design deck, the [developer guide](docs/developer.md), and the [Demo 2 walkthrough](docs/walkthrough.md) |
 | [`TODO.MD`](TODO.MD) | Work planned for Demo 2 |
 | [`docker-compose.yml`](docker-compose.yml) | Starts the database, API, runner, and web app together; images from `backend/Dockerfile`, `backend/runner.Dockerfile`, and `frontend/app/Dockerfile` |
-| [`.github/workflows/`](.github/workflows/) | Backend checks, and the GitHub Pages deployment |
+| [`.github/workflows/`](.github/workflows/) | Backend and frontend checks, CodeQL code scanning (security and quality), dependency review, and the GitHub Pages deployment; [`dependabot.yml`](.github/dependabot.yml) sets weekly dependency updates |
+| [`.editorconfig`](.editorconfig), [`.gitattributes`](.gitattributes) | Editor settings; COBOL, `.dat`, and recorded output keep LF line endings |
+| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability privately |
 
 ## Checks
 
@@ -67,7 +69,7 @@ In the browser: on **Upload**, click **Load demo project**; on **Convert**, clic
 | `backend/` | `uv run --frozen pytest`, `uv run --frozen ruff check src tests`, `uv run --frozen ruff format --check src tests`, `uv run --frozen mypy` |
 | `frontend/app/` | `npm run lint`, `npm run build` (Windows PowerShell: `npm.cmd`) |
 
-GitHub Actions runs the backend checks on every change under `backend/`.
+On every pull request GitHub Actions runs the backend checks, the frontend checks, CodeQL, and a dependency review that fails on new dependencies with high or critical vulnerabilities.
 
 ## Merge rule
 

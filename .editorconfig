@@ -1,0 +1,24 @@
+# Editor settings for everyone (VS Code: install the EditorConfig extension).
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+max_line_length = 100
+
+[docs/*.{html,css}]
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+
+# COBOL columns and recorded program output must stay exactly as written.
+[*.{cbl,cob,cpy,dat,out}]
+trim_trailing_whitespace = false
+end_of_line = lf

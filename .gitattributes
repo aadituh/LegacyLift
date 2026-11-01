@@ -1,0 +1,12 @@
+# COBOL sources, data files, and recorded output keep LF line endings on every
+# machine, so fixed-width records stay byte-exact on Windows checkouts too.
+*.cbl text eol=lf
+*.cob text eol=lf
+*.cpy text eol=lf
+*.dat text eol=lf
+*.out text eol=lf -whitespace
+*.sh  text eol=lf
+
+*.pdf binary
+*.jpg binary
+*.png binary
