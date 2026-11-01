@@ -16,6 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from legacylift.cobol.describe import ProgramDescription
 from legacylift.models import (
     ConvertedFile,
     ConvertedProjectFile,
@@ -251,6 +252,20 @@ class AnalyzeResponse(FileCounts):
     dependencies: list[DependencyLink] = Field(default_factory=list)
     unresolved: list[UnresolvedDependency] = Field(default_factory=list)
     programs: list[ProgramSummary] = Field(default_factory=list)
+
+
+class DescribeResponse(BaseModel):
+    """Response from ``POST /api/projects/{id}/describe``.
+
+    Attributes:
+        project_id: The described project.
+        programs: One plain-language summary per program file.
+        shared_data: Which files and copybooks those programs share.
+    """
+
+    project_id: str
+    programs: list[ProgramDescription]
+    shared_data: str
 
 
 class FileEquivalenceResponse(BaseModel):

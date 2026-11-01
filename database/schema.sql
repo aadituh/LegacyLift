@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS owner_id uuid;
 -- Idempotent: NeonProjectStore re-runs this file on every API startup.
--- Older databases pointed owner_id at neon_auth."user"; accounts now live in users.
+-- Older databases pointed owner_id at neon_auth."user". Accounts now live in users.
 ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_owner_fk;
 ALTER TABLE projects
   ADD CONSTRAINT projects_owner_fk

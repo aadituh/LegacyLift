@@ -1,7 +1,7 @@
 """Project routes under ``/api/projects``.
 
 List, create, read, and delete projects; upload and remove files; analyze,
-convert, verify, and ask Gemini for a second review; read runs.
+describe, convert, verify, and ask Gemini for a second review; read runs.
 
 Each route reads the request, calls one ``ProjectService`` method, and returns
 a body from ``schemas.py``. Service errors become 4xx responses through the
@@ -27,6 +27,7 @@ from legacylift.schemas import (
     AnalyzeResponse,
     ConvertResponse,
     CreateProjectRequest,
+    DescribeResponse,
     FileEquivalenceResponse,
     ProjectListResponse,
     ProjectResponse,
@@ -226,6 +227,18 @@ def analyze_project(project: ProjectDep, service: ProjectServiceDep) -> AnalyzeR
         unresolved=run.unresolved,
         programs=run.programs,
     )
+
+
+@router.post("/{project_id}/describe")
+def describe_project(project: ProjectDep, service: ProjectServiceDep) -> DescribeResponse:
+    """Describe how the project's programs fit together.
+
+    \f
+    Raises:
+        ProjectStateError: The project has no programs, or the API key is unset (400).
+    """
+    described = service.describe(project)
+    return DescribeResponse(project_id=project.id, **described.model_dump())
 
 
 @router.post("/{project_id}/convert")

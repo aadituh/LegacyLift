@@ -42,8 +42,8 @@ class Settings(BaseSettings):
         token_secret: HMAC secret for login tokens. Never stored in the repo.
         token_ttl_seconds: How long a login token stays valid.
         require_login: When true, project routes require a login token.
-        gemini_api_key: Key for ``POST /api/projects/{id}/ai-review``. Unset means
-            that route answers 400.
+        gemini_api_key: Key for ``POST /api/projects/{id}/describe`` and
+            ``POST /api/projects/{id}/ai-review``. Unset means those routes answer 400.
         gemini_timeout_seconds: How long one Gemini request may wait.
     """
 

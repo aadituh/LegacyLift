@@ -34,8 +34,10 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `POST /api/projects/{id}/files` | files in multipart field `files` | The files that were added |
 | `DELETE /api/projects/{id}/files/{file_id}` | none | Removes one file (204); saved runs keep their results |
 | `POST /api/projects/{id}/analyze` | none | File counts, COPY/CALL/PERFORM `dependencies` and `unresolved`, plus per-program `programs` (fields + paragraphs). Example in `/docs` (status `analyzed`) |
+| `POST /api/projects/{id}/describe` | none | What each program does and which data they share. Needs `LEGACYLIFT_GEMINI_API_KEY`. |
 | `POST /api/projects/{id}/convert` | none | Python for each program, saved as a run |
 | `POST /api/projects/{id}/verify` | none | Run each main program as COBOL and as Python in the runner and compare stdout: `verified` / `mismatch` / `not_verified` (runner off or unreachable) |
+| `POST /api/projects/{id}/ai-review` | none | Gemini compares each program with its Python. Needs `LEGACYLIFT_GEMINI_API_KEY`. Status is `clear` or `concerns` |
 | `GET /api/projects/{id}/runs` | none | All runs, oldest first, without their Python |
 | `GET /api/projects/{id}/runs/{run_id}` | none | One run; a convert run includes its Python |
 | `GET /api/projects/{id}/runs/{run_id}/files/{name}` | none | One saved `.py` file (`Content-Disposition: attachment`) |
@@ -80,6 +82,8 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_TOKEN_SECRET` | unset | HMAC secret for login tokens. Set it on Render and in `backend/.env`. Never commit it. Login cannot sign a token until it is set. |
 | `LEGACYLIFT_TOKEN_TTL_SECONDS` | `86400` | How long a login token stays valid (24 hours). |
 | `LEGACYLIFT_REQUIRE_LOGIN` | `false` | When `true`, every `/api/projects` route requires `Authorization: Bearer <token>` and lists only that account's projects. Leave it off until the login pages are ready. |
+| `LEGACYLIFT_GEMINI_API_KEY` | unset | Gemini API key for `POST /api/projects/{id}/describe` and `POST /api/projects/{id}/ai-review`. Keep it in `backend/.env`. |
+| `LEGACYLIFT_GEMINI_TIMEOUT_SECONDS` | `30` | How long one Gemini request may wait. |
 
 ## Code layout
 
@@ -104,6 +108,7 @@ src/legacylift/
 └── cobol/
     ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
     ├── dependencies.py  find_dependencies(): COPY/CALL/PERFORM links + unresolved
+    ├── describe.py      build_prompt() / describe_map(): plain-language dependency map
     ├── runtime.py       cobol_number / cobol_text / display_number (DISPLAY semantics)
     ├── converter.py     translate_program(): COBOL subset → Python
     ├── gnucobol.py      compile/run one program with a local cobc (not used by verify)
