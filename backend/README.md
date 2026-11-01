@@ -163,7 +163,7 @@ Build and start only the runner: `docker compose up --build runner`. Tests that 
 docker compose run --rm --no-deps -v ./backend:/backend runner python /backend/scripts/record_cobol_output.py
 ```
 
-Tests are in [`tests/`](tests/); pytest also runs the examples in docstrings.
+Tests are in [`tests/`](tests/); pytest also runs the examples in docstrings. The Gemini call is mocked in tests.
 
 ## Where new work goes
 
