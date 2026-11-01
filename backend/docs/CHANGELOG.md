@@ -4,6 +4,10 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ## Unreleased
 
+### Removed
+
+- Local `cobol/gnucobol.py` and `cobol/equivalence.py` (and `tests/test_equivalence.py`): verify uses the runner container since #37 (issue #99).
+
 ### Added
 
 - Analyze (issue #24): `POST /api/projects/{id}/analyze` returns per-program `programs` summaries (`fields` and `paragraphs`) alongside COPY/CALL/PERFORM `dependencies` / `unresolved`. OpenAPI `/docs` includes a response example. Covered by `tests/test_dependencies.py`.

@@ -106,8 +106,7 @@ src/legacylift/
     ├── dependencies.py  find_dependencies(): COPY/CALL/PERFORM links + unresolved
     ├── runtime.py       cobol_number / cobol_text / display_number (DISPLAY semantics)
     ├── converter.py     translate_program(): COBOL subset → Python
-    ├── gnucobol.py      compile/run one program with a local cobc (not used by verify)
-    └── equivalence.py   compare that run with in-process Python (not used by verify)
+    └── ai_review.py     Gemini comparison of COBOL vs generated Python
 ```
 
 ### Verify
