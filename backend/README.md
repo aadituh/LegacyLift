@@ -22,6 +22,9 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | Route | Body | Result |
 | --- | --- | --- |
 | `GET /health` | none | `{"status": "ok"}` |
+| `POST /api/auth/register` | `{"email", "password", "display_name"}` | New account without the password or its hash (201). Used email is 409. A weak password is 422 |
+| `POST /api/auth/login` | `{"email", "password"}` | `{"token", "token_type": "bearer", "expires_in"}`. A wrong email or password is the same 401 |
+| `GET /api/auth/me` | `Authorization: Bearer <token>` | The account for that token. Missing, wrong, or expired token is 401 |
 | `POST /api/convert` | 1–5 `.cbl`/`.cob` files in multipart field `files` | Python for each file, plus `download_id`. Not saved as a project |
 | `GET /api/projects` | none | Every project, newest first: id, name, file counts, last run (no file contents) |
 | `POST /api/projects` | `{"name": "Demo"}` | New empty project (201) |
@@ -32,8 +35,7 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `DELETE /api/projects/{id}/files/{file_id}` | none | Removes one file (204); saved runs keep their results |
 | `POST /api/projects/{id}/analyze` | none | File counts plus COPY/CALL/PERFORM `dependencies` and `unresolved` (status `analyzed`) |
 | `POST /api/projects/{id}/convert` | none | Python for each program, saved as a run |
-| `POST /api/projects/{id}/verify` | none | Run each program with GnuCOBOL and compare stdout to Python: `verified` / `mismatch` / `not_verified` (no `cobc`) |
-| `POST /api/projects/{id}/ai-review` | none | Gemini compares each converted program with its Python and the review notes. Returns `matches` and `concerns`, each with `cobol_lines`, `python_lines`, and `detail`. Status `clear` or `concerns` |
+| `POST /api/projects/{id}/verify` | none | Run each main program as COBOL and as Python in the runner and compare stdout: `verified` / `mismatch` / `not_verified` (runner off or unreachable) |
 | `GET /api/projects/{id}/runs` | none | All runs, oldest first, without their Python |
 | `GET /api/projects/{id}/runs/{run_id}` | none | One run; a convert run includes its Python |
 | `GET /api/projects/{id}/runs/{run_id}/files/{name}` | none | One saved `.py` file (`Content-Disposition: attachment`) |
@@ -55,11 +57,12 @@ Errors are `{"detail": "message"}`; the frontend shows the message as-is. Classe
 
 | Status | Cause |
 | --- | --- |
-| 400 | Bad file, file count, or name (`InvalidInputError`); step run too early (`ProjectStateError`); no `PROGRAM-ID` or `PROCEDURE DIVISION` (`ConversionError`); AI review requested with no API key |
+| 400 | Bad file, file count, or name (`InvalidInputError`); step run too early (`ProjectStateError`); no `PROGRAM-ID` or `PROCEDURE DIVISION` (`ConversionError`); login while `LEGACYLIFT_TOKEN_SECRET` is unset |
+| 401 | Missing, wrong, or expired login token (`UnauthenticatedError`); wrong email or password on login |
 | 404 | Unknown project, file, or run (`NotFoundError`) |
+| 409 | Email already registered (`ConflictError`) |
 | 413 | Request body too large |
-| 422 | Missing or invalid field, such as an empty `name` |
-| 502 | Gemini timed out or returned a review that was not the expected JSON (`AIReviewError`) |
+| 422 | Missing or invalid field, such as an empty `name` or a weak password (`InputError`) |
 
 ## Settings
 
@@ -72,9 +75,11 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_DATA_DIR` | `data/projects` | Used when `DATABASE_URL` is unset: projects are saved as `<id>.json` (plus `last_id.txt`, the ID counter), relative to where uvicorn starts. Git ignores `backend/data/`. Render resets it on redeploy. |
 | `LEGACYLIFT_MAX_PROJECTS` | `100` | Projects kept; the oldest is deleted first. |
 | `LEGACYLIFT_MAX_REQUEST_BYTES` | `1200000` | Largest request body. |
-| `LEGACYLIFT_COBC_PATH` | unset | Optional path to GnuCOBOL `cobc` for verify. Otherwise `cobc` must be on PATH. |
-| `LEGACYLIFT_GEMINI_API_KEY` | unset | Gemini API key for `POST /api/projects/{id}/ai-review`. Set it in `backend/.env` or the host's environment. Never commit it. |
-| `LEGACYLIFT_GEMINI_TIMEOUT_SECONDS` | `30` | How long one Gemini request may wait. |
+| `LEGACYLIFT_ENABLE_RUNNER` | `false` | Lets verify run code in the runner container. Compose sets it to `true`. |
+| `LEGACYLIFT_RUNNER_URL` | `http://runner:8001` | The runner container's address. |
+| `LEGACYLIFT_TOKEN_SECRET` | unset | HMAC secret for login tokens. Set it on Render and in `backend/.env`. Never commit it. Login cannot sign a token until it is set. |
+| `LEGACYLIFT_TOKEN_TTL_SECONDS` | `86400` | How long a login token stays valid (24 hours). |
+| `LEGACYLIFT_REQUIRE_LOGIN` | `false` | When `true`, every `/api/projects` route requires `Authorization: Bearer <token>` and lists only that account's projects. Leave it off until the login pages are ready. |
 
 ## Code layout
 
@@ -92,67 +97,71 @@ src/legacylift/
 ├── dependencies.py   ProjectServiceDep; ProjectDep (loads the project or 404)
 ├── sample_data.py    files for the demo project
 ├── data/             sample COBOL bank (programs, copybooks, .dat files)
-├── routers/          HTTP only: convert.py, projects.py
+├── routers/          HTTP only: auth.py, convert.py, projects.py
 ├── responses.py      `.py` download responses
-├── services/         rules: uploads.py, conversion.py, projects.py, batch_downloads.py
+├── services/         rules: uploads.py, conversion.py, projects.py, auth.py, verification.py, batch_downloads.py
+├── runner/           runs COBOL and Python in the runner container: sandbox.py, server.py
 └── cobol/
     ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
     ├── dependencies.py  find_dependencies(): COPY/CALL/PERFORM links + unresolved
     ├── runtime.py       cobol_number / cobol_text / display_number (DISPLAY semantics)
     ├── converter.py     translate_program(): COBOL subset → Python
-    ├── gnucobol.py      compile/run programs with cobc
-    ├── equivalence.py   compare GnuCOBOL stdout to generated Python
-    └── ai_review.py     Gemini prompt and JSON review (matches, concerns, lines)
+    ├── gnucobol.py      compile/run one program with a local cobc (not used by verify)
+    └── equivalence.py   compare that run with in-process Python (not used by verify)
 ```
 
-### Verify / GnuCOBOL
+### Verify
 
-`POST /api/projects/{id}/verify` (after convert) compiles each `.cbl`/`.cob` with [GnuCOBOL](https://gnucobol.sourceforge.io/) (`cobc -x -free`), runs it, runs the matching Python draft, and requires **exact** stdout equality. Copybooks in the project are placed beside the program for `COPY`.
+`POST /api/projects/{id}/verify` (after convert) uses the [runner container](#runner-container). For each main program (one that no other program `CALL`s) it compiles the program with the programs it calls and the project's copybooks, runs it with the project's `.dat` files, runs the generated Python with the same files, and compares stdout exactly (only `
+` vs `
+` is ignored). Called programs get no check of their own.
+
+Each entry in `files` has `equivalent`, `cobol_stdout`, `python_stdout`, `diff` (unified diff, empty when they match), and `error`.
 
 | Status | Meaning |
 | --- | --- |
 | `verified` | Every program matched (`passed: true`) |
-| `mismatch` | At least one differed or failed (`passed: false`) |
-| `not_verified` | `cobc` not found (`passed: null`) |
+| `mismatch` | At least one differed, failed to compile, crashed, or hit a limit (`passed: false`) |
+| `not_verified` | Runner off (`LEGACYLIFT_ENABLE_RUNNER`) or unreachable (`passed: null`) |
 
-### AI review
+### Login
 
-`POST /api/projects/{id}/ai-review` (after convert) sends each program to **Gemini 2.5 Flash** (`gemini-2.5-flash`). The prompt contains the COBOL source, the generated Python, and the converter's review notes. The model is a second check on lines the rules could not prove. It does not replace GnuCOBOL verify.
+Agreed with the accounts table (#30), the login page (#15), and the sign-up page (#32):
 
-The JSON shape is fixed. Fields are only added, never renamed:
-
-```json
-{
-  "project_id": "1",
-  "run_id": "2",
-  "status": "concerns",
-  "model": "gemini-2.5-flash",
-  "files": [
-    {
-      "source_name": "store_report.cbl",
-      "python_name": "store_report.py",
-      "matches": [
-        {"cobol_lines": [28], "python_lines": [12], "detail": "DISPLAY maps to print."}
-      ],
-      "concerns": [
-        {"cobol_lines": [36], "python_lines": [20], "detail": "Check the amount due."}
-      ]
-    }
-  ]
-}
-```
-
-| Field | Meaning |
+| Choice | Agreement |
 | --- | --- |
-| `status` | `clear` when every program has an empty `concerns` list, otherwise `concerns` |
-| `matches` | Behavior the model can justify from both sources |
-| `concerns` | Unproven, missing, or possibly different behavior |
-| `cobol_lines`, `python_lines` | 1-based line numbers. Either list may be empty |
-| `detail` | One sentence |
+| Token | JWT, HS256, `Authorization: Bearer <token>`. Default lifetime 24 hours |
+| Where the page keeps it | `localStorage` key `legacylift-token` |
+| Password | 8 to 128 characters, at least one letter and one number. Message: `Password must be 8 to 128 characters and include a letter and a number.` |
+| Email | Stored lowercase. The same address cannot register twice |
+| Display name | 1 to 100 characters |
+| Routes that need login | `/api/projects` only, and only when `LEGACYLIFT_REQUIRE_LOGIN=true`. `/api/auth/*`, `/api/convert`, `/health` stay open. Projects created while login is off have no owner and are hidden once login is required |
+| Wrong login | Unknown email and wrong password both return `{"detail": "Invalid email or password."}` |
+| Expired token | `{"detail": "Please log in again."}` |
 
-`GET /api/projects/{id}/runs/{run_id}` returns the same findings on `reviews`. The run list stays a summary and does not include them.
+The password is hashed with Argon2 and is never stored or logged. The response from register and `/me` is `id`, `email`, `display_name`, `created_at`.
 
-Verify and analyze keep the fields already on those routes. Verify's per-file object is `source_name`, `python_name`, `equivalent`, `cobol_stdout`, `python_stdout`, `error`, plus `passed` and `note` on the run. Analyze's link object is `source`, `target`, `kind` (`copy`, `call`, or `perform`), and `line`; an unresolved name uses `name` instead of `target`.
+### Runner container
+
+[`runner.Dockerfile`](runner.Dockerfile) builds an image with GnuCOBOL 3.1.2 and Python that serves `legacylift.runner.server` on port 8001. Compose starts it as `runner` on an internal network that only the API joins: no internet, read-only file system, no Linux capabilities, user `runner` (uid 1001), 512 MB memory, 64 processes.
+
+| Route | Body | Result |
+| --- | --- | --- |
+| `GET /health` | none | `{"status": "ok"}` |
+| `POST /run/cobol` | `programs`, `main`, optional `copybooks`, `data_files` (each `{"NAME": "text"}`) | `ok`, `stage` (`compile`/`run`), `exit_code`, `stdout`, `stderr`, `timed_out`, `output_truncated` |
+| `POST /run/python` | `scripts`, `main`, optional `data_files` | Same fields |
+
+Each run gets a new temporary folder: COBOL compiles with `cobc -x -I <copybooks> <main> <called programs>` (fixed format), data files sit in the working folder, and Python runs as `python -I`. Settings: `RUNNER_TIMEOUT_SECONDS` (10), `RUNNER_MAX_OUTPUT_BYTES` (256000), `RUNNER_MAX_REQUEST_BYTES` (2000000), `RUNNER_PORT` (8001).
+
+Build and start only the runner: `docker compose up --build runner`. Tests that need `cobc` are skipped when it isn't installed.
+
+### Recorded COBOL output
+
+[`tests/data/recorded/`](tests/data/recorded/) holds what GnuCOBOL printed: `FEESCHED.out`, and `bank/<case>/BANKMAIN.out` for the cases `sample` (the files in `src/legacylift/data/`), `normal`, `overdraft`, and `closed` (each with its own `accounts.dat` and `transactions.dat`). Re-record after changing a case or a sample program, from the repository root:
+
+```bash
+docker compose run --rm --no-deps -v ./backend:/backend runner python /backend/scripts/record_cobol_output.py
+```
 
 Tests are in [`tests/`](tests/); pytest also runs the examples in docstrings. The Gemini call is mocked in tests.
 

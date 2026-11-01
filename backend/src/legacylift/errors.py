@@ -42,7 +42,19 @@ class NotFoundError(LegacyLiftError):
     status_code = 404
 
 
-class AIReviewError(LegacyLiftError):
-    """Gemini did not return a usable review (502)."""
+class UnauthenticatedError(LegacyLiftError):
+    """The login token is missing, wrong, or expired (401)."""
 
-    status_code = 502
+    status_code = 401
+
+
+class ConflictError(LegacyLiftError):
+    """The email is already registered (409)."""
+
+    status_code = 409
+
+
+class InputError(LegacyLiftError):
+    """A sign-up field failed validation (422)."""
+
+    status_code = 422

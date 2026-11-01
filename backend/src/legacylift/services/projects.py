@@ -8,18 +8,16 @@ Every change follows the same pattern: change the ``Project``, then
 FastAPI runs routes on several threads. New files and runs get the project's
 next number as their ID (``"1"``, ``"2"``, ...).
 
-Analyze parses programs for COPY/CALL links (``analyzed``). Verify compiles each
-program with GnuCOBOL, runs it beside the generated Python, and records whether
-stdout matches (``verified`` / ``mismatch`` / ``not_verified`` if ``cobc`` is
-missing). AI review asks Gemini to compare each program with its Python and
-the converter's review notes (``clear`` / ``concerns``).
+Analyze parses programs for COPY/CALL links (``analyzed``). Verify sends each
+main program and its generated Python to the runner container
+(``services.verification``) and records whether stdout matches (``verified`` /
+``mismatch``), or ``not_verified`` when the runner is off or unreachable.
 """
 
 import threading
 
 from legacylift.cobol.ai_review import build_prompt, request_gemini_review
 from legacylift.cobol.dependencies import find_dependencies
-from legacylift.cobol.equivalence import check_functional_equivalence
 from legacylift.cobol.parser import parse_program
 from legacylift.errors import InvalidInputError, NotFoundError, ProjectStateError
 from legacylift.models import (
@@ -39,28 +37,10 @@ from legacylift.models import (
 from legacylift.sample_data import DEMO_FILES
 from legacylift.services.conversion import conversion_status, convert_file, python_file_name
 from legacylift.services.uploads import KIND_BY_SUFFIX, RawUpload, decode_upload
+from legacylift.services.verification import Runner, verify_project
 from legacylift.storage import ProjectRepository, ProjectStore  # noqa: F401
 
 MAX_PROJECT_FILES = 10
-
-
-def _cobc_missing(check: EquivalenceCheck) -> bool:
-    """True when a check failed only because GnuCOBOL was not installed."""
-    if check.error is None:
-        return False
-    text = check.error.lower()
-    return "cobc" in text and "not found" in text
-
-
-def _verify_status(checks: list[EquivalenceCheck]) -> RunStatus:
-    """Pick the verify-run status from per-program equivalence checks."""
-    if not checks:
-        return RunStatus.NOT_VERIFIED
-    if all(_cobc_missing(check) for check in checks):
-        return RunStatus.NOT_VERIFIED
-    if all(check.equivalent for check in checks):
-        return RunStatus.VERIFIED
-    return RunStatus.MISMATCH
 
 
 def file_counts(project: Project) -> FileCounts:
@@ -100,34 +80,23 @@ class ProjectService:
         True
     """
 
-    def __init__(
-        self,
-        store: ProjectRepository,
-        *,
-        cobc_path: str | None = None,
-        gemini_api_key: str | None = None,
-        gemini_timeout_seconds: float = 30,
-    ) -> None:
+    def __init__(self, store: ProjectRepository, *, runner: Runner | None = None) -> None:
         """Create the service.
 
         Args:
             store: Where projects are kept and saved.
-            cobc_path: Optional path to GnuCOBOL ``cobc`` for verify runs.
-            gemini_api_key: Gemini API key for AI review. Blank is treated as unset.
-            gemini_timeout_seconds: How long one Gemini request may wait.
+            runner: Where verify runs COBOL and Python; ``None`` turns verify off.
         """
         self.store = store
-        self.cobc_path = cobc_path
-        key = gemini_api_key.strip() if gemini_api_key else ""
-        self.gemini_api_key = key or None
-        self.gemini_timeout_seconds = gemini_timeout_seconds
+        self.runner = runner
         self._lock = threading.Lock()
 
-    def create_project(self, name: str) -> Project:
+    def create_project(self, name: str, owner_id: str | None = None) -> Project:
         """Create and save an empty project.
 
         Args:
             name: The project name. Spaces at either end are removed.
+            owner_id: Account that owns the project when login is required.
 
         Returns:
             The new project.
@@ -145,19 +114,22 @@ class ProjectService:
         if not name:
             raise InvalidInputError("Project name cannot be blank.")
         with self._lock:
-            project = Project(id=self.store.next_id(), name=name)
+            project = Project(id=self.store.next_id(), name=name, owner_id=owner_id)
             self.store.add(project)
         return project
 
-    def create_demo_project(self) -> Project:
+    def create_demo_project(self, owner_id: str | None = None) -> Project:
         """Create and save a project holding the files in ``sample_data.DEMO_FILES``.
+
+        Args:
+            owner_id: Account that owns the project when login is required.
 
         Returns:
             A project with ``store_report.cbl``, ``order.cpy``, and ``orders.dat``
             (file IDs ``"1"`` to ``"3"``).
         """
         with self._lock:
-            project = Project(id=self.store.next_id(), name="LegacyLift demo")
+            project = Project(id=self.store.next_id(), name="LegacyLift demo", owner_id=owner_id)
             for name, kind, content in DEMO_FILES:
                 self._attach_file(project, name, kind, content)
             self.store.add(project)
@@ -185,8 +157,11 @@ class ProjectService:
             raise NotFoundError("Project not found.")
         return project
 
-    def list_projects(self) -> list[Project]:
+    def list_projects(self, owner_id: str | None = None) -> list[Project]:
         """Return every project, newest first.
+
+        Args:
+            owner_id: When set, only that account's projects. ``None`` returns all.
 
         Returns:
             The projects, most recently created first.
@@ -198,7 +173,10 @@ class ProjectService:
             ['New', 'Old']
         """
         with self._lock:
-            return self.store.all()[::-1]
+            projects = self.store.all()[::-1]
+        if owner_id is None:
+            return projects
+        return [project for project in projects if project.owner_id == owner_id]
 
     def delete_project(self, project: Project) -> None:
         """Delete a project, its files, and its runs.
@@ -443,12 +421,13 @@ class ProjectService:
         )
 
     def verify(self, project: Project) -> Run:
-        """Run each converted program under GnuCOBOL and compare stdout to Python.
+        """Run each main program as COBOL and as its generated Python, and compare stdout.
 
-        Uses the latest convert run's drafts. Copybooks in the project are
-        written beside the program for ``COPY``. Status is ``verified`` when
-        every program matches, ``mismatch`` when any differs or fails, and
-        ``not_verified`` when ``cobc`` is not installed.
+        Uses the latest convert run's drafts. Both runs get the project's ``.dat``
+        files; the COBOL compiles with the programs it calls and the copybooks.
+        Programs that another program calls get no check of their own. Status is
+        ``verified`` when every check matches, ``mismatch`` when any differs or
+        fails, and ``not_verified`` when the runner is off or unreachable.
 
         Args:
             project: The project to verify.
@@ -475,44 +454,7 @@ class ProjectService:
         if not latest.files:
             raise ProjectStateError("The last convert run has no generated Python to verify.")
 
-        by_id = {file.id: file for file in project.files}
-        copybooks = {
-            file.name: file.content for file in project.files if file.kind == FileKind.COPYBOOK
-        }
-
-        checks: list[EquivalenceCheck] = []
-        for converted in latest.files:
-            source = by_id.get(converted.source_file_id)
-            if source is None or source.kind != FileKind.PROGRAM:
-                checks.append(
-                    EquivalenceCheck(
-                        source_name=converted.source_name,
-                        python_name=converted.python_name,
-                        equivalent=False,
-                        error=f"Source program {converted.source_name!r} is missing from the project.",
-                    )
-                )
-                continue
-            result = check_functional_equivalence(
-                source_name=source.name,
-                python_name=converted.python_name,
-                cobol_source=source.content,
-                python_source=converted.python,
-                copybooks=copybooks,
-                cobc_path=self.cobc_path,
-            )
-            checks.append(
-                EquivalenceCheck(
-                    source_name=result.source_name,
-                    python_name=result.python_name,
-                    equivalent=result.equivalent,
-                    cobol_stdout=result.cobol_stdout,
-                    python_stdout=result.python_stdout,
-                    error=result.error,
-                )
-            )
-
-        status = _verify_status(checks)
+        status, checks = verify_project(self.runner, project, latest.files)
         return self._save_run(project, RunKind.VERIFY, status, checks=checks)
 
     def ai_review(self, project: Project) -> Run:

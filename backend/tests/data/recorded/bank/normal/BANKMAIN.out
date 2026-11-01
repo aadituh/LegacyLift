@@ -1,0 +1,16 @@
+LEGACYLIFT BANK - NIGHTLY BATCH
+POSTING TRANSACTIONS
+  200001 D      300.00  POSTED                  
+  200002 W      450.25  POSTED                  
+  200003 W    1,000.00  POSTED                  
+  200002 D       99.50  POSTED                  
+  200001 W       20.00  POSTED                  
+POSTED:     5
+REJECTED:   0
+STATEMENT AFTER 030 DAYS OF INTEREST
+ID     NAME                 T S      BALANCE   INTEREST     
+200001 MARIA GARCIA         S A    5,489.01       9.01
+200002 JAMES WRIGHT         C A    1,500.00       0.00
+200003 PRIYA NAIR           S A   11,031.64      31.64
+TOTAL BALANCE:         18,020.65
+TOTAL INTEREST:            40.65

@@ -58,7 +58,7 @@ class RunStatus(StrEnum):
     ANALYZED = "analyzed"  # analyze found COPY/CALL links (may include unresolved)
     DRAFT = "draft"  # converted with no review notes, but still unverified
     REVIEW_REQUIRED = "review_required"  # converted with lines marked TODO
-    NOT_VERIFIED = "not_verified"  # verify could not compare (e.g. GnuCOBOL missing)
+    NOT_VERIFIED = "not_verified"  # verify could not compare (runner off or unreachable)
     VERIFIED = "verified"  # COBOL and Python stdout matched for every program
     MISMATCH = "mismatch"  # at least one program differed or failed to run
     CLEAR = "clear"  # AI review found no concerns
@@ -129,6 +129,7 @@ class EquivalenceCheck(BaseModel):
         cobol_stdout: Output from GnuCOBOL.
         python_stdout: Output from the generated Python.
         error: Failure detail when not equivalent.
+        diff: Unified diff from the COBOL output to the Python output; empty when they match.
     """
 
     source_name: str
@@ -137,6 +138,7 @@ class EquivalenceCheck(BaseModel):
     cobol_stdout: str = ""
     python_stdout: str = ""
     error: str | None = None
+    diff: str = ""
 
 
 class FileCounts(BaseModel):
@@ -238,6 +240,24 @@ class Run(RunSummary):
     reviews: list[FileReview] = []
 
 
+class User(BaseModel):
+    """An account. The password hash stays in storage and is never sent to clients.
+
+    Attributes:
+        id: UUID text.
+        email: Lowercase email, unique.
+        password_hash: Argon2 hash. Not a password.
+        display_name: Name shown in the header.
+        created_at: When the account was created (UTC).
+    """
+
+    id: str
+    email: str
+    password_hash: str
+    display_name: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class Project(BaseModel):
     """A set of COBOL files and the history of steps run on them.
 
@@ -249,6 +269,7 @@ class Project(BaseModel):
         runs: Steps run so far, oldest first.
         files_added: How many files were ever added, including deleted ones.
             The next file's ID is this plus one. Saved, but not sent to clients.
+        owner_id: Account that owns the project, or ``None`` when login is off.
     """
 
     id: str
@@ -257,3 +278,4 @@ class Project(BaseModel):
     files: list[SourceFile] = []
     runs: list[Run] = []
     files_added: int = 0
+    owner_id: str | None = None
