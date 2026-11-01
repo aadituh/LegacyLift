@@ -7,8 +7,8 @@ LegacyLift analyzes legacy COBOL programs and converts them to Python for human 
 | Pipeline step | Today |
 | --- | --- |
 | Upload programs, copybooks, and data files | Working; saved in PostgreSQL (Neon) when `DATABASE_URL` is set, otherwise as JSON on the API's disk |
-| Convert COBOL to Python | Working for a small subset; other lines become `TODO` review notes. Each run is saved |
-| Dependency analysis (`COPY`, `CALL`, `PERFORM`) | Placeholder: counts files |
+| Convert COBOL to Python | Working for a subset (fields, groups, `OCCURS`, `IF`/`EVALUATE`, `PERFORM`, `CALL`, `COPY`); other lines become `TODO` review notes. Each run is saved |
+| Dependency analysis (`COPY`, `CALL`, `PERFORM`) | Working: links between files and paragraphs, plus names with no matching file |
 | Verify against COBOL (GnuCOBOL) | Working with `docker compose up`: COBOL and Python run in the runner container and outputs are compared. Off elsewhere (`not_verified`) |
 | Gemini + RAG | Not started |
 
