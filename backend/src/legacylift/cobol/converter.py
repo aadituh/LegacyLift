@@ -692,10 +692,7 @@ def join_continued_lines(numbered: list[tuple[int, str]]) -> list[tuple[int, str
             not _STMT_STARTERS.match(line)
             and not next_is_scope
             and not section_header
-            and (
-                incomplete_tail
-                or prev_upper.startswith(("COMPUTE ", "DISPLAY "))
-            )
+            and (incomplete_tail or prev_upper.startswith(("COMPUTE ", "DISPLAY ")))
         ):
             result[-1] = (prev_num, f"{prev} {line}")
             continue
