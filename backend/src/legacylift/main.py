@@ -91,7 +91,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         store = ProjectStore(settings.data_dir, settings.max_projects)
     runner = RunnerClient(settings.runner_url) if settings.enable_runner else None
     app.state.settings = settings
-    app.state.project_service = ProjectService(store, runner=runner)
+    app.state.project_service = ProjectService(
+        store,
+        runner=runner,
+        gemini_api_key=settings.gemini_api_key,
+        gemini_timeout_seconds=settings.gemini_timeout_seconds,
+    )
     app.state.auth_service = AuthService(
         store,
         secret=settings.token_secret,

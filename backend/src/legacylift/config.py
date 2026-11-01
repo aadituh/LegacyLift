@@ -42,6 +42,9 @@ class Settings(BaseSettings):
         token_secret: HMAC secret for login tokens. Never stored in the repo.
         token_ttl_seconds: How long a login token stays valid.
         require_login: When true, project routes require a login token.
+        gemini_api_key: Key for ``POST /api/projects/{id}/ai-review``. Unset means
+            that route answers 400.
+        gemini_timeout_seconds: How long one Gemini request may wait.
     """
 
     model_config = SettingsConfigDict(env_prefix="LEGACYLIFT_", env_file=".env", extra="ignore")
@@ -59,6 +62,8 @@ class Settings(BaseSettings):
     token_secret: str | None = None
     token_ttl_seconds: int = Field(default=86_400, gt=0)
     require_login: bool = False
+    gemini_api_key: str | None = None
+    gemini_timeout_seconds: float = Field(default=30, gt=0)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

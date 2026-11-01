@@ -36,6 +36,12 @@ class ConversionError(LegacyLiftError):
     """A COBOL program cannot be converted (400)."""
 
 
+class AIReviewError(LegacyLiftError):
+    """Gemini timed out or returned a body that was not the expected JSON (502)."""
+
+    status_code = 502
+
+
 class NotFoundError(LegacyLiftError):
     """The requested project does not exist (404)."""
 

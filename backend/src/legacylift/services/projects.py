@@ -80,15 +80,26 @@ class ProjectService:
         True
     """
 
-    def __init__(self, store: ProjectRepository, *, runner: Runner | None = None) -> None:
+    def __init__(
+        self,
+        store: ProjectRepository,
+        *,
+        runner: Runner | None = None,
+        gemini_api_key: str | None = None,
+        gemini_timeout_seconds: float = 30,
+    ) -> None:
         """Create the service.
 
         Args:
             store: Where projects are kept and saved.
             runner: Where verify runs COBOL and Python; ``None`` turns verify off.
+            gemini_api_key: Key for AI review. ``None`` rejects that route.
+            gemini_timeout_seconds: How long one Gemini request may wait.
         """
         self.store = store
         self.runner = runner
+        self.gemini_api_key = gemini_api_key
+        self.gemini_timeout_seconds = gemini_timeout_seconds
         self._lock = threading.Lock()
 
     def create_project(self, name: str, owner_id: str | None = None) -> Project:
