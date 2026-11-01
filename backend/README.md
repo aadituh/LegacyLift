@@ -36,6 +36,7 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `POST /api/projects/{id}/analyze` | none | File counts, COPY/CALL/PERFORM `dependencies` and `unresolved`, plus per-program `programs` (fields + paragraphs). Example in `/docs` (status `analyzed`) |
 | `POST /api/projects/{id}/convert` | none | Python for each program, saved as a run |
 | `POST /api/projects/{id}/verify` | none | Run each main program as COBOL and as Python in the runner and compare stdout: `verified` / `mismatch` / `not_verified` (runner off or unreachable) |
+| `POST /api/projects/{id}/ai-review` | none | Gemini compares each converted program with its Python. Status is `clear` or `concerns`. Requires a convert run and `LEGACYLIFT_GEMINI_API_KEY` |
 | `GET /api/projects/{id}/runs` | none | All runs, oldest first, without their Python |
 | `GET /api/projects/{id}/runs/{run_id}` | none | One run; a convert run includes its Python |
 | `GET /api/projects/{id}/runs/{run_id}/files/{name}` | none | One saved `.py` file (`Content-Disposition: attachment`) |
@@ -63,6 +64,7 @@ Errors are `{"detail": "message"}`; the frontend shows the message as-is. Classe
 | 409 | Email already registered (`ConflictError`) |
 | 413 | Request body too large |
 | 422 | Missing or invalid field, such as an empty `name` or a weak password (`InputError`) |
+| 502 | Gemini timed out or returned a body that was not the expected JSON (`AIReviewError`) |
 
 ## Settings
 
@@ -80,6 +82,8 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_TOKEN_SECRET` | unset | HMAC secret for login tokens. Set it on Render and in `backend/.env`. Never commit it. Login cannot sign a token until it is set. |
 | `LEGACYLIFT_TOKEN_TTL_SECONDS` | `86400` | How long a login token stays valid (24 hours). |
 | `LEGACYLIFT_REQUIRE_LOGIN` | `false` | When `true`, every `/api/projects` route requires `Authorization: Bearer <token>` and lists only that account's projects. Leave it off until the login pages are ready. |
+| `LEGACYLIFT_GEMINI_API_KEY` | unset | Key for `POST /api/projects/{id}/ai-review`. Unset answers 400. Put it in `backend/.env`. Never commit it. |
+| `LEGACYLIFT_GEMINI_TIMEOUT_SECONDS` | `30` | How long one Gemini request may wait, in seconds. |
 
 ## Code layout
 
@@ -106,6 +110,7 @@ src/legacylift/
     ├── dependencies.py  find_dependencies(): COPY/CALL/PERFORM links + unresolved
     ├── runtime.py       cobol_number / cobol_text / display_number (DISPLAY semantics)
     ├── converter.py     translate_program(): COBOL subset → Python
+    ├── ai_review.py     build_prompt() / request_gemini_review(): Gemini 2.5 Flash
     ├── gnucobol.py      compile/run one program with a local cobc (not used by verify)
     └── equivalence.py   compare that run with in-process Python (not used by verify)
 ```
@@ -123,6 +128,12 @@ Each entry in `files` has `equivalent`, `cobol_stdout`, `python_stdout`, `diff` 
 | `verified` | Every program matched (`passed: true`) |
 | `mismatch` | At least one differed, failed to compile, crashed, or hit a limit (`passed: false`) |
 | `not_verified` | Runner off (`LEGACYLIFT_ENABLE_RUNNER`) or unreachable (`passed: null`) |
+
+### AI review
+
+`POST /api/projects/{id}/ai-review` (after convert) sends each program, its generated Python, and the converter's review notes to Gemini 2.5 Flash. The key is sent as a header and is not written into the prompt. The result is saved as a run.
+
+Each entry in `files` has `source_name`, `python_name`, `matches`, and `concerns`. Each finding has `cobol_lines`, `python_lines` (1-based; empty when that side has no line), and `detail`. Status is `clear` when no file has concerns, otherwise `concerns`. A missing key, or a project that has not been converted, is 400. A timeout or an unexpected Gemini body is 502.
 
 ### Login
 
