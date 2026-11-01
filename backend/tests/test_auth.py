@@ -1,0 +1,122 @@
+"""Sign up, log in, and the token on GET /api/auth/me."""
+
+from datetime import UTC, datetime, timedelta
+
+import jwt
+
+from helpers import make_client
+
+SECRET = "test-token-secret-not-used-in-production"
+ACCOUNT = {
+    "email": "Ada@Example.com",
+    "password": "correct horse 1",
+    "display_name": "Ada Lovelace",
+}
+
+
+def register(client, **overrides):
+    body = {**ACCOUNT, **overrides}
+    return client.post("/api/auth/register", json=body)
+
+
+def test_register_hides_the_password_and_stores_only_a_hash(tmp_path):
+    client = make_client(tmp_path, token_secret=SECRET)
+    response = register(client)
+    assert response.status_code == 201
+    body = response.json()
+    assert set(body) == {"id", "email", "display_name", "created_at"}
+    assert body["email"] == "ada@example.com"
+    assert body["display_name"] == "Ada Lovelace"
+    assert "correct horse 1" not in response.text
+    saved = (tmp_path / "users.json").read_text(encoding="utf-8")
+    assert "correct horse 1" not in saved
+    assert "password_hash" in saved
+
+
+def test_used_email_is_409_and_a_weak_password_is_422(tmp_path):
+    client = make_client(tmp_path, token_secret=SECRET)
+    assert register(client).status_code == 201
+    again = register(client, email="ADA@example.com")
+    assert (again.status_code, again.json()["detail"]) == (
+        409,
+        "An account with this email already exists.",
+    )
+    weak = register(client, email="new@example.com", password="password")
+    assert weak.status_code == 422
+    assert weak.json()["detail"] == (
+        "Password must be 8 to 128 characters and include a letter and a number."
+    )
+
+
+def test_login_returns_a_token_and_me_returns_the_user(tmp_path):
+    client = make_client(tmp_path, token_secret=SECRET, token_ttl_seconds=3600)
+    created = register(client).json()
+    logged_in = client.post(
+        "/api/auth/login",
+        json={"email": "ada@example.com", "password": ACCOUNT["password"]},
+    )
+    assert logged_in.status_code == 200
+    token = logged_in.json()["token"]
+    assert logged_in.json()["expires_in"] == 3600
+    assert ACCOUNT["password"] not in logged_in.text
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200
+    assert me.json()["id"] == created["id"]
+    assert me.json()["email"] == "ada@example.com"
+    assert "password" not in me.json()
+
+
+def test_wrong_email_and_wrong_password_share_one_message(tmp_path):
+    client = make_client(tmp_path, token_secret=SECRET)
+    register(client)
+    unknown = client.post(
+        "/api/auth/login",
+        json={"email": "missing@example.com", "password": ACCOUNT["password"]},
+    )
+    wrong = client.post(
+        "/api/auth/login",
+        json={"email": ACCOUNT["email"], "password": "correct horse 2"},
+    )
+    assert unknown.status_code == wrong.status_code == 401
+    assert unknown.json() == wrong.json() == {"detail": "Invalid email or password."}
+
+
+def test_missing_wrong_and_expired_tokens_are_401(tmp_path):
+    client = make_client(tmp_path, token_secret=SECRET)
+    missing = client.get("/api/auth/me")
+    assert (missing.status_code, missing.json()["detail"]) == (401, "Missing login token.")
+    wrong = client.get("/api/auth/me", headers={"Authorization": "Bearer not-a-token"})
+    assert (wrong.status_code, wrong.json()["detail"]) == (401, "Invalid login token.")
+    expired = jwt.encode(
+        {"sub": "missing", "exp": datetime.now(UTC) - timedelta(seconds=30)},
+        SECRET,
+        algorithm="HS256",
+    )
+    response = client.get("/api/auth/me", headers={"Authorization": f"Bearer {expired}"})
+    assert (response.status_code, response.json()["detail"]) == (401, "Please log in again.")
+
+
+def test_login_required_projects_belong_to_the_signed_in_account(tmp_path):
+    client = make_client(tmp_path, token_secret=SECRET, require_login=True)
+    register(client)
+    token = client.post(
+        "/api/auth/login",
+        json={"email": ACCOUNT["email"], "password": ACCOUNT["password"]},
+    ).json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    assert client.post("/api/projects", json={"name": "Hidden"}).status_code == 401
+    created = client.post("/api/projects", json={"name": "Mine"}, headers=headers)
+    assert created.status_code == 201
+    assert client.get("/api/projects", headers=headers).json()["projects"][0]["name"] == "Mine"
+
+    register(client, email="other@example.com", display_name="Other")
+    other = client.post(
+        "/api/auth/login",
+        json={"email": "other@example.com", "password": ACCOUNT["password"]},
+    ).json()["token"]
+    other_headers = {"Authorization": f"Bearer {other}"}
+    assert client.get("/api/projects", headers=other_headers).json() == {"projects": []}
+    assert (
+        client.get(f"/api/projects/{created.json()['id']}", headers=other_headers).status_code
+        == 404
+    )

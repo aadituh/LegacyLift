@@ -18,7 +18,7 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
-from legacylift.dependencies import ProjectDep, ProjectServiceDep
+from legacylift.dependencies import ActiveUserDep, ProjectDep, ProjectServiceDep
 from legacylift.models import Project, Run, RunStatus
 from legacylift.responses import python_attachment
 from legacylift.schemas import (
@@ -45,19 +45,29 @@ router = APIRouter(
 
 # response_model=ProjectResponse sends the project without its runs.
 @router.post("", response_model=ProjectResponse, status_code=201)
-def create_project(body: CreateProjectRequest, service: ProjectServiceDep) -> Project:
+def create_project(
+    body: CreateProjectRequest,
+    service: ProjectServiceDep,
+    user: ActiveUserDep,
+) -> Project:
     """Create an empty project.
 
     \f
     Raises:
         InvalidInputError: The name is only spaces (400).
+        UnauthenticatedError: Login is required and the token is missing or bad (401).
     """
-    return service.create_project(body.name)
+    owner_id = user.id if user is not None else None
+    return service.create_project(body.name, owner_id=owner_id)
 
 
 @router.get("")
-def list_projects(service: ProjectServiceDep) -> ProjectListResponse:
-    """List every project, newest first, with file counts and its last run."""
+def list_projects(service: ProjectServiceDep, user: ActiveUserDep) -> ProjectListResponse:
+    """List every project, newest first, with file counts and its last run.
+
+    When login is required, only the signed-in account's projects are listed.
+    """
+    owner_id = user.id if user is not None else None
     summaries = [
         ProjectSummary(
             id=project.id,
@@ -66,15 +76,16 @@ def list_projects(service: ProjectServiceDep) -> ProjectListResponse:
             last_run=project.runs[-1] if project.runs else None,
             **file_counts(project).model_dump(),
         )
-        for project in service.list_projects()
+        for project in service.list_projects(owner_id)
     ]
     return ProjectListResponse(projects=summaries)
 
 
 @router.post("/demo", response_model=ProjectResponse, status_code=201)
-def create_demo_project(service: ProjectServiceDep) -> Project:
+def create_demo_project(service: ProjectServiceDep, user: ActiveUserDep) -> Project:
     """Create a new project with sample files for API exploration."""
-    return service.create_demo_project()
+    owner_id = user.id if user is not None else None
+    return service.create_demo_project(owner_id)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
