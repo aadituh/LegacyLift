@@ -159,10 +159,11 @@ def convert_project(project: ProjectDep, service: ProjectServiceDep) -> ConvertR
 
 @router.post("/{project_id}/verify")
 def verify_project(project: ProjectDep, service: ProjectServiceDep) -> VerifyResponse:
-    """Compile each program with GnuCOBOL and compare stdout to generated Python.
+    """Run each main program as COBOL and as Python in the runner, and compare stdout.
 
     Status is ``verified`` when every program matches, ``mismatch`` when any
-    differ, and ``not_verified`` when ``cobc`` is not installed.
+    differ, and ``not_verified`` when the runner is off or unreachable. Each
+    file has both outputs and a ``diff``.
 
     \f
     Raises:
@@ -177,10 +178,8 @@ def verify_project(project: ProjectDep, service: ProjectServiceDep) -> VerifyRes
         note = "COBOL and Python outputs differed, or a program failed to run."
     else:
         passed = None
-        note = (
-            "GnuCOBOL (cobc) was not available, so outputs were not compared. "
-            "Install GnuCOBOL or set LEGACYLIFT_COBC_PATH."
-        )
+        reason = run.checks[0].error if run.checks else None
+        note = f"Outputs were not compared. {reason or ''}".strip()
     return VerifyResponse(
         project_id=project.id,
         run_id=run.id,
@@ -195,6 +194,7 @@ def verify_project(project: ProjectDep, service: ProjectServiceDep) -> VerifyRes
                 cobol_stdout=check.cobol_stdout,
                 python_stdout=check.python_stdout,
                 error=check.error,
+                diff=check.diff,
             )
             for check in run.checks
         ],

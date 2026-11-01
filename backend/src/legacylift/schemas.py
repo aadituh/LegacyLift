@@ -152,6 +152,7 @@ class FileEquivalenceResponse(BaseModel):
     cobol_stdout: str = ""
     python_stdout: str = ""
     error: str | None = None
+    diff: str = ""
 
 
 class VerifyResponse(BaseModel):
@@ -160,11 +161,12 @@ class VerifyResponse(BaseModel):
     Attributes:
         project_id: The project.
         run_id: ID of the saved verify run.
-        status: ``verified``, ``mismatch``, or ``not_verified`` (no GnuCOBOL).
+        status: ``verified``, ``mismatch``, or ``not_verified`` (runner off or unreachable).
         passed: ``True`` if every program matched, ``False`` on mismatch,
-            ``None`` if GnuCOBOL was unavailable.
+            ``None`` if nothing was compared.
         note: Short human-readable summary.
-        files: Per-program equivalence details.
+        files: Per-program equivalence details, one per main program (programs
+            that another program calls run as part of their caller).
     """
 
     project_id: str

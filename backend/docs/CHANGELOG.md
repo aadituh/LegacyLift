@@ -23,6 +23,7 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Changed
 
+- Verify runs in the runner container: each main program compiles with the programs it calls, both COBOL and Python get the project's `.dat` files, and each file in the response adds `diff`. Off unless `LEGACYLIFT_ENABLE_RUNNER=true` (Compose turns it on); `not_verified` when off or unreachable. Called programs get no check of their own. `LEGACYLIFT_COBC_PATH` is removed.
 - Short IDs: projects are `"1"`, `"2"`, …; files and runs are numbered within their project. IDs are never reused (the project counter is saved in `last_id.txt`). Projects saved with the old long IDs still load.
 - `MOVE`/`ADD`/`SUBTRACT` lines are read by splitting on spaces; a 100 KB line converts in well under a second.
 - Upload and convert routes run conversion and saving in a worker thread, so other requests keep answering.
