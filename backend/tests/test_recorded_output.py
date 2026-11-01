@@ -78,3 +78,17 @@ def test_gnucobol_still_prints_the_recorded_output(case: str):
     )
     assert result.ok, result.stderr
     assert result.stdout == recorded(case)
+
+
+@needs_cobc
+@pytest.mark.parametrize(
+    ("program", "copybooks"),
+    [("FEESCHED.cbl", ()), ("MONTHEND.cbl", ("FEERATES.cpy",))],
+)
+def test_gnucobol_still_prints_the_recorded_program_output(
+    program: str, copybooks: tuple[str, ...]
+):
+    result = run_cobol(read(SAMPLE, program), main=program, copybooks=read(SAMPLE, *copybooks))
+    assert result.ok, result.stderr
+    expected = (BANK.parent / f"{Path(program).stem}.out").read_text(encoding="utf-8")
+    assert result.stdout == expected

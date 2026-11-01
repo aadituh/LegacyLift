@@ -5,7 +5,7 @@ Run it where ``cobc`` is installed, such as the runner image. From the repositor
     docker compose run --rm --no-deps -v ./backend:/backend runner \
         python /backend/scripts/record_cobol_output.py
 
-Writes ``tests/data/recorded/FEESCHED.out`` and, for each folder in
+Writes ``tests/data/recorded/FEESCHED.out``, ``MONTHEND.out``, and, for each folder in
 ``tests/data/recorded/bank/``, ``BANKMAIN.out`` from that folder's ``accounts.dat``
 and ``transactions.dat`` (the ``sample`` folder uses the files in
 ``src/legacylift/data/``).
@@ -50,6 +50,7 @@ def record(
 def main() -> None:
     """Record every program and bank case."""
     record(RECORDED / "FEESCHED.out", "FEESCHED.cbl")
+    record(RECORDED / "MONTHEND.out", "MONTHEND.cbl", copybooks=("FEERATES.cpy",))
     for case in sorted(path for path in (RECORDED / "bank").iterdir() if path.is_dir()):
         record(
             case / "BANKMAIN.out",
