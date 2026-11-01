@@ -507,14 +507,18 @@ def resolve_name(text: str, model: FieldModel) -> Value | None:
 
 
 def resolve_subscript(name: str, index_text: str, model: FieldModel) -> Value | None:
-    """Resolve ``TABLE(I)`` or ``CHILD(I)`` with COBOL 1-based indexing."""
+    """Resolve ``TABLE(I)`` or ``CHILD(I)`` with COBOL 1-based indexing.
+
+    Field indexes are wrapped in ``int(...)`` so ``cobol_number`` ``Decimal``
+    values remain valid list subscripts (issue #96).
+    """
     if WHOLE_NUMBER.fullmatch(index_text):
         index_expr = str(int(index_text) - 1)
     else:
         index_val = translate_value(index_text, model)
         if index_val is None:
             return None
-        index_expr = f"({index_val.code}) - 1"
+        index_expr = f"int({index_val.code}) - 1"
 
     upper = name.upper()
     occurs_tables = {n for n, _ in _occurs_table_names(model)}
