@@ -115,6 +115,20 @@ src/legacylift/
     └── ai_review.py     Gemini comparison of COBOL vs generated Python
 ```
 
+### Analyze
+
+`POST /api/projects/{id}/analyze` returns file counts plus the links and the per-program inventory. `status` is `analyzed`.
+
+| Field | Meaning |
+| --- | --- |
+| `program_count`, `copybook_count`, `data_file_count` | How many of each file kind the project has |
+| `project_id`, `run_id` | The project and the saved analyze run |
+| `dependencies` | Resolved links: `source`, `target`, `kind` (`copy`, `call`, or `perform`), `line` |
+| `unresolved` | Names with no match: `source`, `name`, `kind`, `line` |
+| `programs` | One entry per program: `source_name`, `program_id`, `fields`, `paragraphs` |
+
+Each field in `programs[].fields` has `level`, `name`, `picture`, `value`, `occurs`, `line`, `parent`, and `section`. Each paragraph has `name`, `start_line`, and `end_line`. The same shape is the example on `/docs`.
+
 ### Verify
 
 `POST /api/projects/{id}/verify` (after convert) uses the [runner container](#runner-container). For each main program (one that no other program `CALL`s) it compiles the program with the programs it calls and the project's copybooks, runs it with the project's `.dat` files, runs the generated Python with the same files, and compares stdout exactly (only `
