@@ -18,6 +18,7 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
+from legacylift.cobol.ai_review import GEMINI_MODEL
 from legacylift.dependencies import ActiveUserDep, ProjectDep, ProjectServiceDep
 from legacylift.models import Project, Run, RunStatus
 from legacylift.responses import python_attachment
