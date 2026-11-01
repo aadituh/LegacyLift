@@ -17,6 +17,7 @@ records whether stdout matches (``verified`` / ``mismatch``), or
 
 import threading
 
+from legacylift.cobol.ai_review import build_prompt, request_gemini_review
 from legacylift.cobol.dependencies import find_dependencies
 from legacylift.cobol.parser import ParsedProgram, parse_program
 from legacylift.errors import InvalidInputError, NotFoundError, ProjectStateError
@@ -28,6 +29,7 @@ from legacylift.models import (
     EquivalenceCheck,
     FileCounts,
     FileKind,
+    FileReview,
     ProgramSummary,
     Project,
     Run,
@@ -108,7 +110,7 @@ def file_counts(project: Project) -> FileCounts:
 
 
 class ProjectService:
-    """The project workflow: create, list, upload, analyze, convert, verify, delete.
+    """The project workflow: create, list, upload, analyze, convert, verify, review, delete.
 
     Routes call these methods. Each step is saved as a ``Run`` on the project;
     a convert run also keeps the generated Python.
@@ -123,15 +125,26 @@ class ProjectService:
         True
     """
 
-    def __init__(self, store: ProjectRepository, *, runner: Runner | None = None) -> None:
+    def __init__(
+        self,
+        store: ProjectRepository,
+        *,
+        runner: Runner | None = None,
+        gemini_api_key: str | None = None,
+        gemini_timeout_seconds: float = 30,
+    ) -> None:
         """Create the service.
 
         Args:
             store: Where projects are kept and saved.
             runner: Where verify runs COBOL and Python; ``None`` turns verify off.
+            gemini_api_key: Key for AI review. ``None`` rejects that route.
+            gemini_timeout_seconds: How long one Gemini request may wait.
         """
         self.store = store
         self.runner = runner
+        self.gemini_api_key = gemini_api_key
+        self.gemini_timeout_seconds = gemini_timeout_seconds
         self._lock = threading.Lock()
 
     def create_project(self, name: str, owner_id: str | None = None) -> Project:
@@ -505,6 +518,58 @@ class ProjectService:
         status, checks = verify_project(self.runner, project, latest.files)
         return self._save_run(project, RunKind.VERIFY, status, checks=checks)
 
+    def ai_review(self, project: Project) -> Run:
+        """Ask Gemini to compare each converted program with its Python draft.
+
+        The prompt includes the COBOL, the Python, and the converter's review
+        notes. Status is ``clear`` when no file has concerns, otherwise ``concerns``.
+
+        Args:
+            project: The project to review. It must already have a convert run.
+
+        Returns:
+            The saved AI review run. ``run.reviews`` holds one result per program.
+
+        Raises:
+            ProjectStateError: The project has not been converted, or the API key is unset.
+            AIReviewError: Gemini timed out or returned something other than the JSON shape.
+        """
+        convert_runs = [run for run in project.runs if run.kind == RunKind.CONVERT]
+        if not convert_runs:
+            raise ProjectStateError("Convert the project before requesting an AI review.")
+        if self.gemini_api_key is None:
+            raise ProjectStateError("Set LEGACYLIFT_GEMINI_API_KEY before requesting an AI review.")
+
+        latest = convert_runs[-1]
+        if not latest.files:
+            raise ProjectStateError("The last convert run has no generated Python to review.")
+
+        by_id = {file.id: file for file in project.files}
+        reviews: list[FileReview] = []
+        for converted in latest.files:
+            source = by_id.get(converted.source_file_id)
+            if source is None or source.kind != FileKind.PROGRAM:
+                raise ProjectStateError(
+                    f"Source program {converted.source_name!r} is missing from the project."
+                )
+            findings = request_gemini_review(
+                build_prompt(source.content, converted.python, converted.notes),
+                api_key=self.gemini_api_key,
+                timeout=self.gemini_timeout_seconds,
+            )
+            reviews.append(
+                FileReview(
+                    source_name=converted.source_name,
+                    python_name=converted.python_name,
+                    matches=findings.matches,
+                    concerns=findings.concerns,
+                )
+            )
+
+        has_concerns = any(review.concerns for review in reviews)
+        status = RunStatus.CONCERNS if has_concerns else RunStatus.CLEAR
+        return self._save_run(project, RunKind.AI_REVIEW, status, reviews=reviews)
+
     def _attach_file(self, project: Project, name: str, kind: FileKind, content: str) -> SourceFile:
         """Add a file with the project's next file ID. The caller holds the lock and saves.
 
@@ -526,6 +591,7 @@ class ProjectService:
         dependencies: list[DependencyLink] | None = None,
         unresolved: list[UnresolvedDependency] | None = None,
         programs: list[ProgramSummary] | None = None,
+        reviews: list[FileReview] | None = None,
     ) -> Run:
         """Record a step as the project's next run (IDs ``"1"``, ``"2"``, ...) and save.
 
@@ -542,6 +608,7 @@ class ProjectService:
                 dependencies=dependencies or [],
                 unresolved=unresolved or [],
                 programs=programs or [],
+                reviews=reviews or [],
             )
             project.runs.append(run)
             self.store.save(project)

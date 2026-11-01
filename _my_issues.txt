@@ -1,0 +1,268 @@
+﻿#100: Analyze: CALL should only match .cbl or .cob files
+  milestone=Demo 3 labels=['bug', 'backend']
+---BODY---
+Part of #49.
+
+**What happened:** `CALL "RATES"` links to `RATES.cpy` when the project has no RATES program.
+
+## Steps to reproduce
+
+1. Create a project with a program that has `CALL "RATES".` and a copybook `RATES.cpy`, and no `RATES.cbl`.
+2. `POST /api/projects/{id}/analyze`.
+
+## Expected
+
+The CALL is in `unresolved`.
+
+## Actual
+
+A `call` link from the program to `RATES.cpy`. `_prefer_target` in `cobol/dependencies.py` falls back to any file with the same name.
+
+## Definition of done
+
+- [ ] A test fails before the fix and passes after it.
+- [ ] Work is on a branch named `<area>/<issue number>-<short-name>`.
+- [ ] The pull request says `Closes #<this issue>` and a teammate was asked to review it.
+- [ ] Checks pass.
+===END===
+
+#99: Verify: remove or fix cobol/gnucobol.py and cobol/equivalence.py
+  milestone=Demo 3 labels=['backend', 'task']
+---BODY---
+Part of #50.
+
+Since #37, verify runs in the runner container and the API no longer calls these modules. Decide whether to delete them (and `tests/test_equivalence.py`) or keep them as a local tool. If kept:
+
+- [ ] `run_cobol` compiles with `cobc -x -free`, but the sample programs are fixed format: `cobc -x -free FEESCHED.cbl` fails with "PROCEDURE DIVISION header missing". Use fixed format, as the runner does.
+- [ ] `test_find_cobc_respects_explicit_missing_path` fails on any machine with `cobc` on PATH, because `find_cobc` falls back to PATH. This blocks installing GnuCOBOL in CI.
+
+## Definition of done
+
+- [ ] The modules are removed, or both items above are fixed with tests.
+- [ ] Work is on a branch named `<area>/<issue number>-<short-name>`.
+- [ ] The pull request says `Closes #<this issue>` and a teammate was asked to review it.
+- [ ] Checks pass.
+===END===
+
+#98: Test data: INTCALC_alice_30d.out is not real GnuCOBOL output
+  milestone=Demo 3 labels=['bug', 'backend']
+---BODY---
+Part of #47.
+
+**What happened:** `backend/tests/data/recorded/INTCALC_alice_30d.out` holds `2.57`, computed from a balance of 1,250.05. Alice's `+001250050` in `PIC S9(7)V99` is 12,500.50, and a signed DISPLAY prints a `+`.
+
+## Steps to reproduce
+
+1. Read Alice's line in `backend/src/legacylift/data/accounts.dat` against `ACCTDEF.cpy`.
+
+## Expected
+
+The file holds what GnuCOBOL prints. INTCALC can't run alone (it has a `LINKAGE SECTION`), so record it through a small driver program that CALLs it, with `backend/scripts/record_cobol_output.py` in the runner image.
+
+## Actual
+
+A hand-computed value; the same numbers are in `runtime.py`'s docstring and `backend/docs/cobol_display_cases.md`.
+
+## Definition of done
+
+- [ ] The recorded value comes from GnuCOBOL; the test and docs match it.
+- [ ] Work is on a branch named `<area>/<issue number>-<short-name>`.
+- [ ] The pull request says `Closes #<this issue>` and a teammate was asked to review it.
+- [ ] Checks pass.
+===END===
+
+#97: Converter: join statements that continue on the next line
+  milestone=Demo 3 labels=['bug', 'backend']
+---BODY---
+Part of #47.
+
+**What happened:** a statement split over two lines becomes review notes instead of Python.
+
+## Steps to reproduce
+
+1. Convert `INTCALC.cbl` (with `ACCTDEF.cpy` in the project).
+
+## Expected
+
+`COMPUTE LS-INTEREST ROUNDED =` and the expression on the next line become one Python statement. Fixed-format COBOL ends at column 72, so real programs split long statements (also `DISPLAY` items over two lines).
+
+## Actual
+
+Both lines are review notes. Join a statement's lines (up to the period or the next verb) before translating.
+
+## Definition of done
+
+- [ ] A test fails before the fix and passes after it.
+- [ ] Work is on a branch named `<area>/<issue number>-<short-name>`.
+- [ ] The pull request says `Closes #<this issue>` and a teammate was asked to review it.
+- [ ] Checks pass.
+===END===
+
+#96: Converter: OCCURS subscripts crash the generated Python
+  milestone=Demo 3 labels=['bug', 'backend']
+---BODY---
+Part of #47.
+
+**What happened:** the generated BANKMAIN stops with a `TypeError` when its table is indexed.
+
+## Steps to reproduce
+
+1. Create a project with `BANKMAIN.cbl`, `TXNPOST.cbl`, `INTCALC.cbl`, `ACCTDEF.cpy`, `TXNDEF.cpy`, `accounts.dat`, and `transactions.dat` from `backend/src/legacylift/data/`.
+2. Convert, then verify (or run `BANKMAIN.py` with the `.dat` files beside it).
+
+## Expected
+
+The Python runs; subscripts such as `WS-ACCOUNT(WS-IDX)` index the list.
+
+## Actual
+
+`TypeError: list indices must be integers or slices, not decimal.Decimal`: the subscript is a `cobol_number`. Convert subscripts with `int(...)`.
+
+## Definition of done
+
+- [ ] A test fails before the fix and passes after it.
+- [ ] Work is on a branch named `<area>/<issue number>-<short-name>`.
+- [ ] The pull request says `Closes #<this issue>` and a teammate was asked to review it.
+- [ ] Checks pass.
+===END===
+
+#95: Converter: signed numbers DISPLAY without their sign
+  milestone=Demo 3 labels=['bug', 'backend']
+---BODY---
+Part of #47.
+
+**What happened:** generated Python prints signed numeric fields without the sign GnuCOBOL prints, so every program that DISPLAYs a signed field fails verify.
+
+## Steps to reproduce
+
+1. Convert a program with `01 WS-BAL PIC S9(7)V99 VALUE 13054.87.` and `DISPLAY WS-BAL.`
+2. Run it with GnuCOBOL and run the generated Python (or verify it with `docker compose up`).
+
+## Expected
+
+`+0013054.87` (GnuCOBOL 3.1.2 prints a leading `+` or `-` for signed DISPLAY fields).
+
+## Actual
+
+`0013054.87`. The fix belongs in `runtime.display_number` for signed fields.
+
+## Definition of done
+
+- [ ] A test fails before the fix and passes after it.
+- [ ] Work is on a branch named `<area>/<issue number>-<short-name>`.
+- [ ] The pull request says `Closes #<this issue>` and a teammate was asked to review it.
+- [ ] Checks pass.
+===END===
+
+#50: Epic: Functional equivalence verification
+  milestone=Demo 3 labels=['epic']
+---BODY---
+**User story:** As a user, I want the original COBOL and the generated Python run on the same input and compared, so I know whether the translation does the same thing.
+
+**Feature table (Lab 2):** Partially Implemented in the prototype. **Owners:** Aaditya (runner, verify API), Spencer (comparison), Justin (pages).
+
+## Scope by milestone
+
+- **Demo 2:** GnuCOBOL runner container; recorded real output; printed output compared with a diff; results on the page.
+- **Demo 3:** Files the programs write are compared too; verification on the hosted app.
+
+## Acceptance criteria
+
+- [ ] Verify returns `verified`, `mismatch`, or `not_verified` for each program, with a diff.
+- [ ] Uploaded code runs only in the locked-down runner.
+- [ ] The page shows the result and the differences.
+
+The work is tracked in the sub-issues below. Demo 3 items are split into sub-issues when their sprint starts.
+
+===END===
+
+#49: Epic: Dependency analysis
+  milestone=Demo 3 labels=['epic']
+---BODY---
+**User story:** As a user, I want to see how my programs, copybooks, and paragraphs connect, so I know what to convert together.
+
+**Feature table (Lab 2):** Partially Implemented in the prototype. **Owners:** Spencer (analysis), Justin (page).
+
+## Scope by milestone
+
+- **Demo 2:** `COPY`, `CALL`, and `PERFORM` links and unresolved references, shown on the page.
+- **Demo 3:** Data flow between programs (to be split into sub-issues when the sprint starts).
+
+## Acceptance criteria
+
+- [ ] Analyze returns the links and unresolved references for a project.
+- [ ] The page shows them per program.
+
+The work is tracked in the sub-issues below. Demo 3 items are split into sub-issues when their sprint starts.
+
+===END===
+
+#25: API fields for verify, dependencies, and login
+  milestone=Demo 2 labels=['backend', 'frontend', 'task']
+---BODY---
+**User story:** As a frontend developer, I want the request and response fields for the new routes agreed before they're built, so the pages and the API can be built at the same time.
+
+Fields are added, never renamed or removed, so the current page keeps working.
+
+## Acceptance criteria
+
+- [ ] Fields for verify, analyze, and login are listed in `backend/README.md`.
+- [ ] `frontend/app/src/api.js` has one helper per new route, with the same error handling as the others.
+- [ ] `backend/README.md` matches `/docs`, and API tests cover analyze and verify.
+- [ ] The frontend team has seen the new fields.
+
+## Tasks
+
+- [ ] Agree the hand-off functions between the converter and the API, with stub versions where the logic isn't ready.
+- [ ] Helpers: `analyzeProject`, `verifyProject`, `listRuns`, `getRun`, and the login helpers.
+- [ ] Update the README routes table and the changelog.
+
+## Definition of done
+
+- [ ] Every acceptance criterion is checked.
+- [ ] Work is on a branch named `<area>/<issue number>-<short-name>`.
+- [ ] The pull request says `Closes #25` and has one approval.
+- [ ] Checks pass (backend: pytest, ruff, mypy; frontend: `npm run lint` and `npm run build`).
+- [ ] README, changelog, or API docs are updated if a route, setting, or command changed.
+
+---
+Leave this issue open until the work is merged. Close it through a pull request: write `Closes #25` in the pull request description, get one teammate's approval, and merge. See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md).
+
+===END===
+
+#24: Backend: dependency analysis
+  milestone=Demo 2 labels=['backend', 'task']
+---BODY---
+**User story:** As a user, I want to see which programs use which copybooks, call which programs, and run which paragraphs, so I know what to convert together.
+
+Justin's #27 shows this on the page. Hand-off: `find_dependencies(programs) -> (dependencies, unresolved)`.
+
+## Acceptance criteria
+
+- [x] BANKMAIN links to ACCTDEF and TXNDEF (`COPY`) and to TXNPOST and INTCALC (`CALL`).
+- [x] TXNPOST and INTCALC link to ACCTDEF (`COPY`).
+- [x] BANKMAIN's `PERFORM` links are listed, including `PERFORM a THRU b`.
+- [x] A missing copybook or paragraph shows in `unresolved`.
+- [x] `POST /api/projects/{id}/analyze` returns `dependencies` and `unresolved`, with tests.
+- [ ] Analyze also returns each program's fields and paragraphs.
+- [ ] The response is shown in `/docs` with an example.
+
+## Tasks
+
+- [x] Find `COPY` and `CALL` links.
+- [x] Find `PERFORM` links.
+- [ ] Add a per-program summary (fields, paragraphs) to the analyze response.
+
+## Definition of done
+
+- [ ] Every acceptance criterion is checked.
+- [ ] Work is on a branch named `<area>/<issue number>-<short-name>`.
+- [ ] The pull request says `Closes #24` and has one approval.
+- [ ] Checks pass (backend: pytest, ruff, mypy; frontend: `npm run lint` and `npm run build`).
+- [ ] README, changelog, or API docs are updated if a route, setting, or command changed.
+
+---
+Leave this issue open until the work is merged. Close it through a pull request: write `Closes #24` in the pull request description, get one teammate's approval, and merge. See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md).
+
+===END===
+

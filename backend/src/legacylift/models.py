@@ -48,6 +48,7 @@ class RunKind(StrEnum):
     ANALYZE = "analyze"
     CONVERT = "convert"
     VERIFY = "verify"
+    AI_REVIEW = "ai_review"
 
 
 class RunStatus(StrEnum):
@@ -60,6 +61,8 @@ class RunStatus(StrEnum):
     NOT_VERIFIED = "not_verified"  # verify could not compare (runner off or unreachable)
     VERIFIED = "verified"  # COBOL and Python stdout matched for every program
     MISMATCH = "mismatch"  # at least one program differed or failed to run
+    CLEAR = "clear"  # AI review found no concerns
+    CONCERNS = "concerns"  # AI review found at least one concern
 
 
 class SourceFile(BaseModel):
@@ -224,6 +227,36 @@ class ProgramSummary(BaseModel):
     paragraphs: list[AnalyzedParagraph] = Field(default_factory=list)
 
 
+class LineFinding(BaseModel):
+    """One AI observation, tied to COBOL and Python line numbers.
+
+    Attributes:
+        cobol_lines: 1-based lines in the COBOL source. Empty if none apply.
+        python_lines: 1-based lines in the generated Python. Empty if none apply.
+        detail: One sentence on why these lines match or need a human look.
+    """
+
+    cobol_lines: list[int] = Field(default_factory=list)
+    python_lines: list[int] = Field(default_factory=list)
+    detail: str
+
+
+class FileReview(BaseModel):
+    """Gemini's comparison of one program with its generated Python.
+
+    Attributes:
+        source_name: COBOL file name.
+        python_name: Generated Python file name.
+        matches: Behaviors the model could justify from both sources.
+        concerns: Lines the rules could not prove, or behavior that may differ.
+    """
+
+    source_name: str
+    python_name: str
+    matches: list[LineFinding] = Field(default_factory=list)
+    concerns: list[LineFinding] = Field(default_factory=list)
+
+
 class RunSummary(BaseModel):
     """A record that one pipeline step ran on a project.
 
@@ -252,6 +285,7 @@ class Run(RunSummary):
         dependencies: Resolved COPY/CALL/PERFORM links from an analyze run.
         unresolved: COPY/CALL/PERFORM names that could not be resolved.
         programs: Per-program field and paragraph summaries from an analyze run.
+        reviews: Per-program AI findings; empty for other runs.
     """
 
     files: list[ConvertedProjectFile] = []
@@ -259,6 +293,7 @@ class Run(RunSummary):
     dependencies: list[DependencyLink] = []
     unresolved: list[UnresolvedDependency] = []
     programs: list[ProgramSummary] = []
+    reviews: list[FileReview] = []
 
 
 class User(BaseModel):

@@ -16,8 +16,12 @@ import {
   getRun,
   getRuns,
   listProjects,
+  login,
+  logout,
+  getMe,
+  readToken,
+  setUnauthorizedHandler,
 } from './api'
-import { authClient } from './auth'
 import './App.css'
 import BackgroundFx from './BackgroundFx'
 
@@ -139,7 +143,8 @@ export default function App() {
   const [results, setResults] = useState(() => savedBatch?.results ?? [])
   const [error, setError] = useState('')
   const { data: session, isPending } = authClient.useSession()
-  const user = session?.user ?? null
+  const [account, setAccount] = useState(null)
+  const user = account ?? session?.user ?? null
   const [authMode, setAuthMode] = useState('sign-in')
   const [accountName, setAccountName] = useState('')
   const [email, setEmail] = useState('')
@@ -199,6 +204,30 @@ export default function App() {
   }, [viewMode]) 
 
   useEffect(() => {
+    setUnauthorizedHandler((message) => {
+      setAccount(null)
+      setError(message || 'Please log in again.')
+    })
+    let cancelled = false
+    async function restoreSession() {
+      if (!readToken()) return
+      try {
+        const signedIn = await getMe()
+        if (!cancelled) setAccount(signedIn)
+      } catch (cause) {
+        if (!cancelled) {
+          setAccount(null)
+          setError(cause.message || 'Please log in again.')
+        }
+      }
+    }
+    restoreSession()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
     async function probe() {
       if (!apiConfigured) {
@@ -228,7 +257,7 @@ export default function App() {
   useEffect(() => {
     const id = sessionStorage.getItem(savedProjectKey)
     
-    if(!backendReady || !id) return
+    if (!user || !backendReady || !id) return
     let cancelled = false
     async function restore() {
       try {
@@ -275,10 +304,10 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [backendReady])
+  }, [backendReady, user])
 
   useEffect(() => {
-    if (screen !== 'export' || !project?.id || !backendReady) return
+    if (!user || screen !== 'export' || !project?.id || !backendReady) return
     let cancelled = false
     async function  loadRuns() {
       try {
@@ -292,10 +321,10 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [screen, project, backendReady])
+  }, [screen, project, backendReady, user])
 
   useEffect(() => {
-    if (!project?.id || !backendReady || project.files.length === 0) return
+    if (!user || !project?.id || !backendReady || project.files.length === 0) return
     let cancelled = false
     async function loadAnalysis() {
       try {
@@ -315,10 +344,10 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [project, backendReady])
+  }, [project, backendReady, user])
 
   useEffect(() => {
-    if (screen !== 'upload' || uploadMode !== 'project' || !backendReady) return
+    if (!user || screen !== 'upload' || uploadMode !== 'project' || !backendReady) return
     let cancelled = false
     async function loadSavedProjects() {
       try {
@@ -332,7 +361,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [screen, uploadMode, backendReady, project])
+  }, [screen, uploadMode, backendReady, project, user])
 
   async function showFile(file, index) {
     const readId = ++sourceRead.current
@@ -645,11 +674,9 @@ export default function App() {
     event.preventDefault()
     setError('')
     try {
-      const { error: signInError } = await authClient.signIn.email({
-        email,
-        password,
-      })
-      if (signInError) setError(signInError.message)
+      await login(email, password)
+      setAccount(await getMe())
+      setPassword('')
     } catch (cause) {
       setError(cause.message || 'Sign in failed.')
     }
@@ -994,7 +1021,15 @@ export default function App() {
                 {backendReady ? 'API connected' : 'API offline'}
               </span>
             )}
-            <button className="button secondary" type="button" onClick={() => authClient.signOut()}>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => {
+                logout()
+                setAccount(null)
+                authClient.signOut()
+              }}
+            >
               Sign out
             </button>
           </div>
