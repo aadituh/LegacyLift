@@ -91,6 +91,7 @@ src/legacylift/
 ├── routers/          HTTP only: convert.py, projects.py
 ├── responses.py      `.py` download responses
 ├── services/         rules: uploads.py, conversion.py, projects.py, batch_downloads.py
+├── runner/           runs COBOL and Python in the runner container: sandbox.py, server.py
 └── cobol/
     ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
     ├── dependencies.py  find_dependencies(): COPY/CALL/PERFORM links + unresolved
@@ -110,6 +111,19 @@ src/legacylift/
 | `mismatch` | At least one differed or failed (`passed: false`) |
 | `not_verified` | `cobc` not found (`passed: null`) |
 
+### Runner container
+
+[`runner.Dockerfile`](runner.Dockerfile) builds an image with GnuCOBOL 3.1.2 and Python that serves `legacylift.runner.server` on port 8001. Compose starts it as `runner` on an internal network that only the API joins: no internet, read-only file system, no Linux capabilities, user `runner` (uid 1001), 512 MB memory, 64 processes.
+
+| Route | Body | Result |
+| --- | --- | --- |
+| `GET /health` | none | `{"status": "ok"}` |
+| `POST /run/cobol` | `programs`, `main`, optional `copybooks`, `data_files` (each `{"NAME": "text"}`) | `ok`, `stage` (`compile`/`run`), `exit_code`, `stdout`, `stderr`, `timed_out`, `output_truncated` |
+| `POST /run/python` | `scripts`, `main`, optional `data_files` | Same fields |
+
+Each run gets a new temporary folder: COBOL compiles with `cobc -x -I <copybooks> <main> <called programs>` (fixed format), data files sit in the working folder, and Python runs as `python -I`. Settings: `RUNNER_TIMEOUT_SECONDS` (10), `RUNNER_MAX_OUTPUT_BYTES` (256000), `RUNNER_MAX_REQUEST_BYTES` (2000000), `RUNNER_PORT` (8001).
+
+Build and start only the runner: `docker compose up --build runner`. Tests that need `cobc` are skipped when it isn't installed.
 
 Tests are in [`tests/`](tests/); pytest also runs the examples in docstrings.
 
