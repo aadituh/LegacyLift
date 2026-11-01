@@ -51,9 +51,7 @@ def test_signed_display_includes_leading_plus():
     draft = translate_program(source)
     assert draft.notes == []
     assert run_python(draft.python) == "+0013054.87\n"
-    assert display_number(
-        Decimal("13054.87"), integers=7, decimals=2, signed=True
-    ) == "+0013054.87"
+    assert display_number(Decimal("13054.87"), integers=7, decimals=2, signed=True) == "+0013054.87"
 
 
 def test_cobol_text_pads_and_truncates():
