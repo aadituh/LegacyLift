@@ -23,6 +23,7 @@ import {
   setUnauthorizedHandler,
 } from './api'
 import './App.css'
+import { buildAuditReportCsv } from './auditReportCsv'
 import { authClient } from './auth'
 import BackgroundFx from './BackgroundFx'
 
@@ -830,23 +831,12 @@ export default function App() {
 
   function downloadAuditReport() {
     if (!verification) return
-    const lines = [`Verification ${verification.status}.`, '']
-    for (const file of verification.files || []) {
-      lines.push(`${file.source_name}: ${verificationStatus(file)}`)
-      if (file.error) lines.push(file.error)
-      const cobol = outputLines(file.cobol_stdout)
-      const python = outputLines(file.python_stdout)
-      const count = Math.max(cobol.length, python.length)
-      for (let index = 0; index < count; index += 1) {
-        lines.push(`${index + 1}. ${cobol[index] ?? ''} ${index + 1}. ${python[index] ?? ''}`)
-      }
-      lines.push('')
-    }
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+    const csv = buildAuditReportCsv(verification)
+    const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'audit-report.txt'
+    link.download = 'audit-report.csv'
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -1627,9 +1617,9 @@ export default function App() {
                 ))}
                 {!showingBatch && verification && (
                   <li className="export-row">
-                    <span>audit-report.txt</span>
+                    <span>audit-report.csv</span>
                     <button className="download" type="button" onClick={downloadAuditReport}>
-                      Download report
+                      Download .csv
                     </button>
                   </li>
                 )}
