@@ -153,6 +153,17 @@ export async function verifyProject(projectId) {
   return data
 }
 
+/**
+ * Ask Gemini to compare each converted program with its Python
+ * (POST /api/projects/{id}/ai-review).
+ * Returns `{ project_id, run_id, status, model, files }`.
+ * `status` is `clear` or `concerns`. Each file has `matches` and `concerns`;
+ * each finding is `{ cobol_lines, python_lines, detail }`.
+ */
+export async function reviewProject(projectId) {
+  return request(`/api/projects/${projectId}/ai-review`, { method: 'POST' })
+}
+
 /** GET /api/projects. Newest first, with file counts and the last run, without file contents. */
 export async function listProjects() {
   return request('/api/projects', { method: 'GET' })
