@@ -39,6 +39,9 @@ class Settings(BaseSettings):
         enable_runner: Let verify run COBOL and Python in the runner container.
             Off by default, so uploaded code never runs unless this is turned on.
         runner_url: The runner container's base URL.
+        token_secret: HMAC secret for login tokens. Never stored in the repo.
+        token_ttl_seconds: How long a login token stays valid.
+        require_login: When true, project routes require a login token.
     """
 
     model_config = SettingsConfigDict(env_prefix="LEGACYLIFT_", env_file=".env", extra="ignore")
@@ -53,6 +56,9 @@ class Settings(BaseSettings):
     max_request_bytes: int = 1_200_000  # 10 files x 100 KB, plus form overhead
     enable_runner: bool = False
     runner_url: str = "http://runner:8001"
+    token_secret: str | None = None
+    token_ttl_seconds: int = Field(default=86_400, gt=0)
+    require_login: bool = False
 
     @field_validator("cors_origins", mode="before")
     @classmethod

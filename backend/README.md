@@ -22,6 +22,9 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | Route | Body | Result |
 | --- | --- | --- |
 | `GET /health` | none | `{"status": "ok"}` |
+| `POST /api/auth/register` | `{"email", "password", "display_name"}` | New account without the password or its hash (201). Used email is 409. A weak password is 422 |
+| `POST /api/auth/login` | `{"email", "password"}` | `{"token", "token_type": "bearer", "expires_in"}`. A wrong email or password is the same 401 |
+| `GET /api/auth/me` | `Authorization: Bearer <token>` | The account for that token. Missing, wrong, or expired token is 401 |
 | `POST /api/convert` | 1–5 `.cbl`/`.cob` files in multipart field `files` | Python for each file, plus `download_id`. Not saved as a project |
 | `GET /api/projects` | none | Every project, newest first: id, name, file counts, last run (no file contents) |
 | `POST /api/projects` | `{"name": "Demo"}` | New empty project (201) |
@@ -54,10 +57,12 @@ Errors are `{"detail": "message"}`; the frontend shows the message as-is. Classe
 
 | Status | Cause |
 | --- | --- |
-| 400 | Bad file, file count, or name (`InvalidInputError`); step run too early (`ProjectStateError`); no `PROGRAM-ID` or `PROCEDURE DIVISION` (`ConversionError`) |
+| 400 | Bad file, file count, or name (`InvalidInputError`); step run too early (`ProjectStateError`); no `PROGRAM-ID` or `PROCEDURE DIVISION` (`ConversionError`); login while `LEGACYLIFT_TOKEN_SECRET` is unset |
+| 401 | Missing, wrong, or expired login token (`UnauthenticatedError`); wrong email or password on login |
 | 404 | Unknown project, file, or run (`NotFoundError`) |
+| 409 | Email already registered (`ConflictError`) |
 | 413 | Request body too large |
-| 422 | Missing or invalid field, such as an empty `name` |
+| 422 | Missing or invalid field, such as an empty `name` or a weak password (`InputError`) |
 
 ## Settings
 
@@ -72,6 +77,9 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_MAX_REQUEST_BYTES` | `1200000` | Largest request body. |
 | `LEGACYLIFT_ENABLE_RUNNER` | `false` | Lets verify run code in the runner container. Compose sets it to `true`. |
 | `LEGACYLIFT_RUNNER_URL` | `http://runner:8001` | The runner container's address. |
+| `LEGACYLIFT_TOKEN_SECRET` | unset | HMAC secret for login tokens. Set it on Render and in `backend/.env`. Never commit it. Login cannot sign a token until it is set. |
+| `LEGACYLIFT_TOKEN_TTL_SECONDS` | `86400` | How long a login token stays valid (24 hours). |
+| `LEGACYLIFT_REQUIRE_LOGIN` | `false` | When `true`, every `/api/projects` route requires `Authorization: Bearer <token>` and lists only that account's projects. Leave it off until the login pages are ready. |
 
 ## Code layout
 
@@ -89,9 +97,9 @@ src/legacylift/
 ├── dependencies.py   ProjectServiceDep; ProjectDep (loads the project or 404)
 ├── sample_data.py    files for the demo project
 ├── data/             sample COBOL bank (programs, copybooks, .dat files)
-├── routers/          HTTP only: convert.py, projects.py
+├── routers/          HTTP only: auth.py, convert.py, projects.py
 ├── responses.py      `.py` download responses
-├── services/         rules: uploads.py, conversion.py, projects.py, verification.py, batch_downloads.py
+├── services/         rules: uploads.py, conversion.py, projects.py, auth.py, verification.py, batch_downloads.py
 ├── runner/           runs COBOL and Python in the runner container: sandbox.py, server.py
 └── cobol/
     ├── parser.py        parse_program(): divisions, fields, paragraphs, COPY/CALL
@@ -115,6 +123,23 @@ Each entry in `files` has `equivalent`, `cobol_stdout`, `python_stdout`, `diff` 
 | `verified` | Every program matched (`passed: true`) |
 | `mismatch` | At least one differed, failed to compile, crashed, or hit a limit (`passed: false`) |
 | `not_verified` | Runner off (`LEGACYLIFT_ENABLE_RUNNER`) or unreachable (`passed: null`) |
+
+### Login
+
+Agreed with the accounts table (#30), the login page (#15), and the sign-up page (#32):
+
+| Choice | Agreement |
+| --- | --- |
+| Token | JWT, HS256, `Authorization: Bearer <token>`. Default lifetime 24 hours |
+| Where the page keeps it | `localStorage` key `legacylift-token` |
+| Password | 8 to 128 characters, at least one letter and one number. Message: `Password must be 8 to 128 characters and include a letter and a number.` |
+| Email | Stored lowercase. The same address cannot register twice |
+| Display name | 1 to 100 characters |
+| Routes that need login | `/api/projects` only, and only when `LEGACYLIFT_REQUIRE_LOGIN=true`. `/api/auth/*`, `/api/convert`, `/health` stay open. Projects created while login is off have no owner and are hidden once login is required |
+| Wrong login | Unknown email and wrong password both return `{"detail": "Invalid email or password."}` |
+| Expired token | `{"detail": "Please log in again."}` |
+
+The password is hashed with Argon2 and is never stored or logged. The response from register and `/me` is `id`, `email`, `display_name`, `created_at`.
 
 ### Runner container
 

@@ -27,6 +27,62 @@ from legacylift.models import (
 )
 
 
+class RegisterRequest(BaseModel):
+    """Body of ``POST /api/auth/register``.
+
+    Attributes:
+        email: Stored lowercase. A second sign-up with the same email is 409.
+        password: 8 to 128 characters, with a letter and a number. Not stored.
+        display_name: 1 to 100 characters after spaces are removed.
+    """
+
+    email: str
+    password: str
+    display_name: str
+
+
+class LoginRequest(BaseModel):
+    """Body of ``POST /api/auth/login``.
+
+    Attributes:
+        email: The account email.
+        password: The account password. A mismatch is the same 401 as an unknown email.
+    """
+
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    """An account with no password and no password hash.
+
+    Attributes:
+        id: Account ID.
+        email: Lowercase email.
+        display_name: Name shown in the header.
+        created_at: When the account was created (UTC).
+    """
+
+    id: str
+    email: str
+    display_name: str
+    created_at: datetime
+
+
+class LoginResponse(BaseModel):
+    """Response from ``POST /api/auth/login``.
+
+    Attributes:
+        token: Signed JWT. Send it as ``Authorization: Bearer <token>``.
+        token_type: Always ``bearer``.
+        expires_in: Seconds until the token expires.
+    """
+
+    token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
 class CreateProjectRequest(BaseModel):
     """Body of ``POST /api/projects``.
 

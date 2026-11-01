@@ -89,11 +89,12 @@ class ProjectService:
         self.runner = runner
         self._lock = threading.Lock()
 
-    def create_project(self, name: str) -> Project:
+    def create_project(self, name: str, owner_id: str | None = None) -> Project:
         """Create and save an empty project.
 
         Args:
             name: The project name. Spaces at either end are removed.
+            owner_id: Account that owns the project when login is required.
 
         Returns:
             The new project.
@@ -111,19 +112,22 @@ class ProjectService:
         if not name:
             raise InvalidInputError("Project name cannot be blank.")
         with self._lock:
-            project = Project(id=self.store.next_id(), name=name)
+            project = Project(id=self.store.next_id(), name=name, owner_id=owner_id)
             self.store.add(project)
         return project
 
-    def create_demo_project(self) -> Project:
+    def create_demo_project(self, owner_id: str | None = None) -> Project:
         """Create and save a project holding the files in ``sample_data.DEMO_FILES``.
+
+        Args:
+            owner_id: Account that owns the project when login is required.
 
         Returns:
             A project with ``store_report.cbl``, ``order.cpy``, and ``orders.dat``
             (file IDs ``"1"`` to ``"3"``).
         """
         with self._lock:
-            project = Project(id=self.store.next_id(), name="LegacyLift demo")
+            project = Project(id=self.store.next_id(), name="LegacyLift demo", owner_id=owner_id)
             for name, kind, content in DEMO_FILES:
                 self._attach_file(project, name, kind, content)
             self.store.add(project)
@@ -151,8 +155,11 @@ class ProjectService:
             raise NotFoundError("Project not found.")
         return project
 
-    def list_projects(self) -> list[Project]:
+    def list_projects(self, owner_id: str | None = None) -> list[Project]:
         """Return every project, newest first.
+
+        Args:
+            owner_id: When set, only that account's projects. ``None`` returns all.
 
         Returns:
             The projects, most recently created first.
@@ -164,7 +171,10 @@ class ProjectService:
             ['New', 'Old']
         """
         with self._lock:
-            return self.store.all()[::-1]
+            projects = self.store.all()[::-1]
+        if owner_id is None:
+            return projects
+        return [project for project in projects if project.owner_id == owner_id]
 
     def delete_project(self, project: Project) -> None:
         """Delete a project, its files, and its runs.
