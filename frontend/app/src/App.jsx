@@ -143,7 +143,8 @@ export default function App() {
   const [results, setResults] = useState(() => savedBatch?.results ?? [])
   const [error, setError] = useState('')
   const { data: session, isPending } = authClient.useSession()
-  const user = session?.user ?? null
+  const [account, setAccount] = useState(null)
+  const user = account ?? session?.user ?? null
   const [authMode, setAuthMode] = useState('sign-in')
   const [accountName, setAccountName] = useState('')
   const [email, setEmail] = useState('')
@@ -204,18 +205,18 @@ export default function App() {
 
   useEffect(() => {
     setUnauthorizedHandler((message) => {
-      setUser(null)
+      setAccount(null)
       setError(message || 'Please log in again.')
     })
     let cancelled = false
     async function restoreSession() {
       if (!readToken()) return
       try {
-        const account = await getMe()
-        if (!cancelled) setUser(account)
+        const signedIn = await getMe()
+        if (!cancelled) setAccount(signedIn)
       } catch (cause) {
         if (!cancelled) {
-          setUser(null)
+          setAccount(null)
           setError(cause.message || 'Please log in again.')
         }
       }
@@ -673,11 +674,9 @@ export default function App() {
     event.preventDefault()
     setError('')
     try {
-      const { error: signInError } = await authClient.signIn.email({
-        email,
-        password,
-      })
-      if (signInError) setError(signInError.message)
+      await login(email, password)
+      setAccount(await getMe())
+      setPassword('')
     } catch (cause) {
       setError(cause.message || 'Sign in failed.')
     }
@@ -1022,7 +1021,15 @@ export default function App() {
                 {backendReady ? 'API connected' : 'API offline'}
               </span>
             )}
-            <button className="button secondary" type="button" onClick={() => authClient.signOut()}>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => {
+                logout()
+                setAccount(null)
+                authClient.signOut()
+              }}
+            >
               Sign out
             </button>
           </div>
