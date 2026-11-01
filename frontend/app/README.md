@@ -26,7 +26,8 @@ The side menu has three screens: **Upload**, **Convert**, and **Export**. A prog
 | Convert | **Convert files** (batch) or **Convert project** | `POST /api/convert` (up to 5 `.cbl`/`.cob` files, not saved) or `POST /api/projects/{id}/convert` |
 | Convert | **Review with AI** | `POST /api/projects/{id}/ai-review`. Each program shows `clear` or `concerns`; each concern lists its COBOL and Python lines |
 | Convert | **Both / COBOL only / Python only** | No API call; switches the view |
-| Export | **Download .py** | `GET /api/projects/{id}/runs/{run_id}/files/{name}`, or `GET /api/convert/{download_id}/files/{name}` for a batch |
+| Convert | Python panel | The converted Python is an editor. Typing or deleting updates the copy that **Download .py** saves. |
+| Export | **Download .py** | Saves the Python currently shown, including edits. If that text is not on the page, falls back to `GET /api/projects/{id}/runs/{run_id}/files/{name}` or `GET /api/convert/{download_id}/files/{name}`. |
 
 ## Files
 

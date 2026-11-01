@@ -723,7 +723,30 @@ export default function App() {
     }
   }
 
+  function updateCurrentPython(text) {
+    setResults((current) =>
+      current.map((item, index) => (index === selectedFile ? { ...item, python: text } : item)),
+    )
+  }
+
+  function saveTextFile(text, fileName) {
+    const blob = new Blob([text], { type: 'text/x-python' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   async function downloadPython(result) {
+    if (typeof result.python === 'string') {
+      setError('')
+      saveTextFile(result.python, result.python_name)
+      return
+    }
     const path = downloadRunId && project
       ? `/api/projects/${encodeURIComponent(project.id)}/runs/${encodeURIComponent(downloadRunId)}/files/${encodeURIComponent(result.python_name)}`
       : batchDownloadId
@@ -1247,7 +1270,17 @@ export default function App() {
                         </span>
                       </div>
                     )}
-                    <pre className="code">{currentResult?.python || 'Converted Python will appear here.'}</pre>
+                    {typeof currentResult?.python === 'string' ? (
+                      <textarea
+                        className="code code-editor"
+                        aria-label={`Edit ${currentResult.python_name}`}
+                        value={currentResult.python}
+                        onChange={(event) => updateCurrentPython(event.target.value)}
+                        spellCheck={false}
+                      />
+                    ) : (
+                      <pre className="code">Converted Python will appear here.</pre>
+                    )}
                   </section>
                 )}
               </div>
