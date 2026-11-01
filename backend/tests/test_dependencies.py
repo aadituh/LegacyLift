@@ -174,5 +174,43 @@ def test_analyze_endpoint_returns_dependencies(client) -> None:
     assert ("BANKMAIN.cbl:POST-ONE-TRANSACTION", "perform", "FIND-ACCOUNT") in links
     assert result["unresolved"] == []
 
+    by_source = {p["source_name"]: p for p in result["programs"]}
+    assert set(by_source) == {"BANKMAIN.cbl", "TXNPOST.cbl", "INTCALC.cbl"}
+    bank = by_source["BANKMAIN.cbl"]
+    assert bank["program_id"] == "BANKMAIN"
+    field_names = {f["name"] for f in bank["fields"]}
+    assert "WS-ACCOUNT-COUNT" in field_names
+    assert "WS-DAYS" in field_names
+    paragraph_names = [p["name"] for p in bank["paragraphs"]]
+    assert paragraph_names == [
+        "MAIN-LOGIC",
+        "LOAD-ACCOUNTS",
+        "POST-TRANSACTIONS",
+        "POST-ONE-TRANSACTION",
+        "FIND-ACCOUNT",
+        "PRINT-STATEMENT",
+    ]
+    assert all("start_line" in p and "end_line" in p for p in bank["paragraphs"])
+
     run = client.get(f"{base}/runs/{result['run_id']}").json()
     assert run["dependencies"] == result["dependencies"]
+    assert run["programs"] == result["programs"]
+
+
+def test_analyze_openapi_docs_include_example(client) -> None:
+    """GET /docs (OpenAPI) documents analyze with an example that includes programs."""
+    schema = client.get("/openapi.json").json()
+    analyze = schema["paths"]["/api/projects/{project_id}/analyze"]["post"]
+    content = analyze["responses"]["200"]["content"]["application/json"]
+    example = content.get("example") or (content.get("examples") or {}).get("AnalyzeResponse")
+    if example is None:
+        # FastAPI may nest the response model example under the schema $ref.
+        ref = content["schema"].get("$ref", "")
+        name = ref.rsplit("/", 1)[-1]
+        model = schema["components"]["schemas"][name]
+        examples = model.get("examples") or []
+        example = examples[0] if examples else model.get("example")
+    assert example is not None
+    assert "programs" in example
+    assert "dependencies" in example
+    assert example["status"] == "analyzed"

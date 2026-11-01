@@ -136,9 +136,81 @@ def delete_file(project: ProjectDep, service: ProjectServiceDep, file_id: str) -
     service.delete_file(project, file_id)
 
 
-@router.post("/{project_id}/analyze")
+@router.post(
+    "/{project_id}/analyze",
+    response_model=AnalyzeResponse,
+    responses={
+        200: {
+            "description": (
+                "File counts, COPY/CALL/PERFORM links, unresolved names, "
+                "and per-program fields/paragraphs."
+            ),
+            "content": {
+                "application/json": {
+                    "example": {
+                        "project_id": "1",
+                        "run_id": "1",
+                        "status": "analyzed",
+                        "program_count": 3,
+                        "copybook_count": 2,
+                        "data_file_count": 0,
+                        "dependencies": [
+                            {
+                                "source": "BANKMAIN.cbl",
+                                "target": "ACCTDEF.cpy",
+                                "kind": "copy",
+                                "line": 41,
+                            },
+                            {
+                                "source": "BANKMAIN.cbl",
+                                "target": "TXNPOST.cbl",
+                                "kind": "call",
+                                "line": 116,
+                            },
+                            {
+                                "source": "BANKMAIN.cbl:MAIN-LOGIC",
+                                "target": "LOAD-ACCOUNTS",
+                                "kind": "perform",
+                                "line": 74,
+                            },
+                        ],
+                        "unresolved": [],
+                        "programs": [
+                            {
+                                "source_name": "BANKMAIN.cbl",
+                                "program_id": "BANKMAIN",
+                                "fields": [
+                                    {
+                                        "level": "01",
+                                        "name": "WS-ACCOUNT-COUNT",
+                                        "picture": "9(3)",
+                                        "value": "0",
+                                        "occurs": None,
+                                        "line": 48,
+                                        "parent": None,
+                                        "section": "WORKING-STORAGE",
+                                    }
+                                ],
+                                "paragraphs": [
+                                    {
+                                        "name": "MAIN-LOGIC",
+                                        "start_line": 72,
+                                        "end_line": 78,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                }
+            },
+        }
+    },
+)
 def analyze_project(project: ProjectDep, service: ProjectServiceDep) -> AnalyzeResponse:
-    """Count files and resolve COPY/CALL links between programs and project files.
+    """Count files, resolve COPY/CALL/PERFORM links, and list fields/paragraphs.
+
+    Use the result to see which copybooks and callees belong with a program before
+    convert. OpenAPI example is in ``/docs`` under this route.
 
     \f
     Raises:
@@ -152,6 +224,7 @@ def analyze_project(project: ProjectDep, service: ProjectServiceDep) -> AnalyzeR
         **counts.model_dump(),
         dependencies=run.dependencies,
         unresolved=run.unresolved,
+        programs=run.programs,
     )
 
 

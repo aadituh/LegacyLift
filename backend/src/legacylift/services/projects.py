@@ -8,25 +8,29 @@ Every change follows the same pattern: change the ``Project``, then
 FastAPI runs routes on several threads. New files and runs get the project's
 next number as their ID (``"1"``, ``"2"``, ...).
 
-Analyze parses programs for COPY/CALL links (``analyzed``). Verify sends each
-main program and its generated Python to the runner container
-(``services.verification``) and records whether stdout matches (``verified`` /
-``mismatch``), or ``not_verified`` when the runner is off or unreachable.
+Analyze parses programs for COPY/CALL/PERFORM links and a per-program field /
+paragraph inventory (``analyzed``). Verify sends each main program and its
+generated Python to the runner container (``services.verification``) and
+records whether stdout matches (``verified`` / ``mismatch``), or
+``not_verified`` when the runner is off or unreachable.
 """
 
 import threading
 
 from legacylift.cobol.ai_review import build_prompt, request_gemini_review
 from legacylift.cobol.dependencies import find_dependencies
-from legacylift.cobol.parser import parse_program
+from legacylift.cobol.parser import ParsedProgram, parse_program
 from legacylift.errors import InvalidInputError, NotFoundError, ProjectStateError
 from legacylift.models import (
+    AnalyzedField,
+    AnalyzedParagraph,
     ConvertedProjectFile,
     DependencyLink,
     EquivalenceCheck,
     FileCounts,
     FileKind,
     FileReview,
+    ProgramSummary,
     Project,
     Run,
     RunKind,
@@ -41,6 +45,47 @@ from legacylift.services.verification import Runner, verify_project
 from legacylift.storage import ProjectRepository, ProjectStore  # noqa: F401
 
 MAX_PROJECT_FILES = 10
+
+
+def program_summaries(parsed: list[ParsedProgram]) -> list[ProgramSummary]:
+    """Build per-program field and paragraph summaries for the analyze response.
+
+    Args:
+        parsed: Programs already parsed for dependency discovery.
+
+    Returns:
+        One ``ProgramSummary`` per program, in the same order as ``parsed``.
+    """
+    summaries: list[ProgramSummary] = []
+    for program in parsed:
+        summaries.append(
+            ProgramSummary(
+                source_name=program.name,
+                program_id=program.program_id,
+                fields=[
+                    AnalyzedField(
+                        level=field.level,
+                        name=field.name,
+                        picture=field.picture,
+                        value=field.value,
+                        occurs=field.occurs,
+                        line=field.line,
+                        parent=field.parent,
+                        section=field.section,
+                    )
+                    for field in program.fields
+                ],
+                paragraphs=[
+                    AnalyzedParagraph(
+                        name=paragraph.name,
+                        start_line=paragraph.start_line,
+                        end_line=paragraph.end_line,
+                    )
+                    for paragraph in program.paragraphs
+                ],
+            )
+        )
+    return summaries
 
 
 def file_counts(project: Project) -> FileCounts:
@@ -338,10 +383,12 @@ class ProjectService:
         return new_files
 
     def analyze(self, project: Project) -> tuple[Run, FileCounts]:
-        """Parse programs for COPY/CALL links, count files, and save an analyze run.
+        """Parse programs for COPY/CALL/PERFORM links and field/paragraph summaries.
 
         Matches reference names to project files ignoring case and extension.
-        Unmatched names are stored on the run as ``unresolved``.
+        Unmatched names are stored on the run as ``unresolved``. Each program
+        also gets a ``ProgramSummary`` (fields + paragraphs) so clients know
+        what to convert together.
 
         Args:
             project: The project to analyze.
@@ -357,6 +404,8 @@ class ProjectService:
             >>> run, counts = service.analyze(service.create_demo_project())
             >>> run.status, counts.program_count, counts.copybook_count, counts.data_file_count
             (<RunStatus.ANALYZED: 'analyzed'>, 1, 1, 1)
+            >>> run.programs[0].program_id
+            'STORE_REPORT'
         """
         if not project.files:
             raise ProjectStateError("Upload files before analyzing.")
@@ -390,6 +439,7 @@ class ProjectService:
                 )
                 for u in unresolved
             ],
+            programs=program_summaries(parsed),
         )
         return run, file_counts(project)
 
@@ -540,6 +590,7 @@ class ProjectService:
         checks: list[EquivalenceCheck] | None = None,
         dependencies: list[DependencyLink] | None = None,
         unresolved: list[UnresolvedDependency] | None = None,
+        programs: list[ProgramSummary] | None = None,
         reviews: list[FileReview] | None = None,
     ) -> Run:
         """Record a step as the project's next run (IDs ``"1"``, ``"2"``, ...) and save.
@@ -556,6 +607,7 @@ class ProjectService:
                 checks=checks or [],
                 dependencies=dependencies or [],
                 unresolved=unresolved or [],
+                programs=programs or [],
                 reviews=reviews or [],
             )
             project.runs.append(run)
