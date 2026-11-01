@@ -20,6 +20,7 @@ from legacylift.models import (
     ConvertedProjectFile,
     DependencyLink,
     FileCounts,
+    FileReview,
     RunStatus,
     RunSummary,
     SourceFile,
@@ -173,6 +174,25 @@ class VerifyResponse(BaseModel):
     passed: bool | None
     note: str
     files: list[FileEquivalenceResponse] = []
+
+
+class AIReviewResponse(BaseModel):
+    """Response from ``POST /api/projects/{id}/ai-review``.
+
+    Attributes:
+        project_id: The project.
+        run_id: ID of the saved AI review run.
+        status: ``clear`` when every program has no concerns, otherwise ``concerns``.
+        model: The Gemini model that produced the review.
+        files: One comparison per program, each with ``matches`` and ``concerns``.
+            Every finding has ``cobol_lines``, ``python_lines``, and ``detail``.
+    """
+
+    project_id: str
+    run_id: str
+    status: RunStatus
+    model: str
+    files: list[FileReview] = []
 
 
 class RunsResponse(BaseModel):

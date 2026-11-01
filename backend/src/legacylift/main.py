@@ -87,7 +87,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         store = NeonProjectStore(settings.database_url, settings.max_projects)
     else:
         store = ProjectStore(settings.data_dir, settings.max_projects)
-    app.state.project_service = ProjectService(store, cobc_path=settings.cobc_path)
+    app.state.project_service = ProjectService(
+        store,
+        cobc_path=settings.cobc_path,
+        gemini_api_key=settings.gemini_api_key,
+        gemini_timeout_seconds=settings.gemini_timeout_seconds,
+    )
     app.state.batch_downloads = BatchDownloadStore()
     app.include_router(projects.router)
     app.include_router(convert.router)

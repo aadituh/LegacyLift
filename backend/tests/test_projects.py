@@ -135,6 +135,7 @@ def test_bad_upload_is_rejected(client, base, files, detail):
         ("POST", "/1/analyze", 400, "Upload files before analyzing."),
         ("POST", "/1/convert", 400, "Upload a .cbl or .cob program before converting."),
         ("POST", "/1/verify", 400, "Convert the project before requesting verification."),
+        ("POST", "/1/ai-review", 400, "Convert the project before requesting an AI review."),
         ("GET", "/1/runs/9", 404, "Run not found."),
         ("GET", "/1/runs/9/files/hello.py", 404, "Run not found."),
         ("DELETE", "/1/files/9", 404, "File not found."),

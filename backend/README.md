@@ -33,6 +33,7 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `POST /api/projects/{id}/analyze` | none | File counts plus COPY/CALL/PERFORM `dependencies` and `unresolved` (status `analyzed`) |
 | `POST /api/projects/{id}/convert` | none | Python for each program, saved as a run |
 | `POST /api/projects/{id}/verify` | none | Run each program with GnuCOBOL and compare stdout to Python: `verified` / `mismatch` / `not_verified` (no `cobc`) |
+| `POST /api/projects/{id}/ai-review` | none | Gemini compares each converted program with its Python and the review notes. Returns `matches` and `concerns`, each with `cobol_lines`, `python_lines`, and `detail`. Status `clear` or `concerns` |
 | `GET /api/projects/{id}/runs` | none | All runs, oldest first, without their Python |
 | `GET /api/projects/{id}/runs/{run_id}` | none | One run; a convert run includes its Python |
 | `GET /api/projects/{id}/runs/{run_id}/files/{name}` | none | One saved `.py` file (`Content-Disposition: attachment`) |
@@ -54,10 +55,11 @@ Errors are `{"detail": "message"}`; the frontend shows the message as-is. Classe
 
 | Status | Cause |
 | --- | --- |
-| 400 | Bad file, file count, or name (`InvalidInputError`); step run too early (`ProjectStateError`); no `PROGRAM-ID` or `PROCEDURE DIVISION` (`ConversionError`) |
+| 400 | Bad file, file count, or name (`InvalidInputError`); step run too early (`ProjectStateError`); no `PROGRAM-ID` or `PROCEDURE DIVISION` (`ConversionError`); AI review requested with no API key |
 | 404 | Unknown project, file, or run (`NotFoundError`) |
 | 413 | Request body too large |
 | 422 | Missing or invalid field, such as an empty `name` |
+| 502 | Gemini timed out or returned a review that was not the expected JSON (`AIReviewError`) |
 
 ## Settings
 
@@ -71,6 +73,8 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_MAX_PROJECTS` | `100` | Projects kept; the oldest is deleted first. |
 | `LEGACYLIFT_MAX_REQUEST_BYTES` | `1200000` | Largest request body. |
 | `LEGACYLIFT_COBC_PATH` | unset | Optional path to GnuCOBOL `cobc` for verify. Otherwise `cobc` must be on PATH. |
+| `LEGACYLIFT_GEMINI_API_KEY` | unset | Gemini API key for `POST /api/projects/{id}/ai-review`. Set it in `backend/.env` or the host's environment. Never commit it. |
+| `LEGACYLIFT_GEMINI_TIMEOUT_SECONDS` | `30` | How long one Gemini request may wait. |
 
 ## Code layout
 
@@ -97,7 +101,8 @@ src/legacylift/
     ├── runtime.py       cobol_number / cobol_text / display_number (DISPLAY semantics)
     ├── converter.py     translate_program(): COBOL subset → Python
     ├── gnucobol.py      compile/run programs with cobc
-    └── equivalence.py   compare GnuCOBOL stdout to generated Python
+    ├── equivalence.py   compare GnuCOBOL stdout to generated Python
+    └── ai_review.py     Gemini prompt and JSON review (matches, concerns, lines)
 ```
 
 ### Verify / GnuCOBOL
@@ -110,8 +115,46 @@ src/legacylift/
 | `mismatch` | At least one differed or failed (`passed: false`) |
 | `not_verified` | `cobc` not found (`passed: null`) |
 
+### AI review
 
-Tests are in [`tests/`](tests/); pytest also runs the examples in docstrings.
+`POST /api/projects/{id}/ai-review` (after convert) sends each program to **Gemini 2.5 Flash** (`gemini-2.5-flash`). The prompt contains the COBOL source, the generated Python, and the converter's review notes. The model is a second check on lines the rules could not prove. It does not replace GnuCOBOL verify.
+
+The JSON shape is fixed. Fields are only added, never renamed:
+
+```json
+{
+  "project_id": "1",
+  "run_id": "2",
+  "status": "concerns",
+  "model": "gemini-2.5-flash",
+  "files": [
+    {
+      "source_name": "store_report.cbl",
+      "python_name": "store_report.py",
+      "matches": [
+        {"cobol_lines": [28], "python_lines": [12], "detail": "DISPLAY maps to print."}
+      ],
+      "concerns": [
+        {"cobol_lines": [36], "python_lines": [20], "detail": "Check the amount due."}
+      ]
+    }
+  ]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `status` | `clear` when every program has an empty `concerns` list, otherwise `concerns` |
+| `matches` | Behavior the model can justify from both sources |
+| `concerns` | Unproven, missing, or possibly different behavior |
+| `cobol_lines`, `python_lines` | 1-based line numbers. Either list may be empty |
+| `detail` | One sentence |
+
+`GET /api/projects/{id}/runs/{run_id}` returns the same findings on `reviews`. The run list stays a summary and does not include them.
+
+Verify and analyze keep the fields already on those routes. Verify's per-file object is `source_name`, `python_name`, `equivalent`, `cobol_stdout`, `python_stdout`, `error`, plus `passed` and `note` on the run. Analyze's link object is `source`, `target`, `kind` (`copy`, `call`, or `perform`), and `line`; an unresolved name uses `name` instead of `target`.
+
+Tests are in [`tests/`](tests/); pytest also runs the examples in docstrings. The Gemini call is mocked in tests.
 
 ## Where new work goes
 

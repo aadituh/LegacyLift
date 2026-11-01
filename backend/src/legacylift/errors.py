@@ -40,3 +40,9 @@ class NotFoundError(LegacyLiftError):
     """The requested project does not exist (404)."""
 
     status_code = 404
+
+
+class AIReviewError(LegacyLiftError):
+    """Gemini did not return a usable review (502)."""
+
+    status_code = 502

@@ -1,7 +1,7 @@
 """Project routes under ``/api/projects``.
 
 List, create, read, and delete projects; upload and remove files; analyze,
-convert, and verify; read runs.
+convert, verify, and ask Gemini for a second review; read runs.
 
 Each route reads the request, calls one ``ProjectService`` method, and returns
 a body from ``schemas.py``. Service errors become 4xx responses through the
@@ -18,10 +18,12 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
+from legacylift.cobol.ai_review import GEMINI_MODEL
 from legacylift.dependencies import ProjectDep, ProjectServiceDep
 from legacylift.models import Project, Run, RunStatus
 from legacylift.responses import python_attachment
 from legacylift.schemas import (
+    AIReviewResponse,
     AnalyzeResponse,
     ConvertResponse,
     CreateProjectRequest,
@@ -198,6 +200,28 @@ def verify_project(project: ProjectDep, service: ProjectServiceDep) -> VerifyRes
             )
             for check in run.checks
         ],
+    )
+
+
+@router.post("/{project_id}/ai-review")
+def review_project(project: ProjectDep, service: ProjectServiceDep) -> AIReviewResponse:
+    """Compare each program with its Python using Gemini.
+
+    Returns matches and concerns. Each one lists the COBOL lines, the Python
+    lines, and a one-sentence detail. Status is `clear` or `concerns`.
+
+    \f
+    Raises:
+        ProjectStateError: The API key is unset, or the project has not been converted (400).
+        AIReviewError: Gemini timed out or returned an unexpected body (502).
+    """
+    run = service.ai_review(project)
+    return AIReviewResponse(
+        project_id=project.id,
+        run_id=run.id,
+        status=run.status,
+        model=GEMINI_MODEL,
+        files=run.reviews,
     )
 
 
