@@ -40,7 +40,7 @@ from legacylift.models import (
     SourceFile,
     UnresolvedDependency,
 )
-from legacylift.sample_data import DEMO_FILES
+from legacylift.sample_data import DEMO_FILES, DEMO_NAME
 from legacylift.services.conversion import conversion_status, convert_file, python_file_name
 from legacylift.services.uploads import KIND_BY_SUFFIX, RawUpload, decode_upload
 from legacylift.services.verification import Runner, verify_project
@@ -122,7 +122,7 @@ class ProjectService:
         >>> project = service.create_demo_project()
         >>> run = service.convert(project)
         >>> run.kind, run.status, run.files[0].python_name
-        (<RunKind.CONVERT: 'convert'>, <RunStatus.DRAFT: 'draft'>, 'store_report.py')
+        (<RunKind.CONVERT: 'convert'>, <RunStatus.REVIEW_REQUIRED: 'review_required'>, 'BANKMAIN.py')
         >>> service.get_run(project, run.id) is run
         True
     """
@@ -184,11 +184,11 @@ class ProjectService:
             owner_id: Neon Auth user id that owns the project, when the request had a token.
 
         Returns:
-            A project with ``store_report.cbl``, ``order.cpy``, and ``orders.dat``
-            (file IDs ``"1"`` to ``"3"``).
+            A project named ``October close`` with the 10 sample bank files
+            (file IDs ``"1"`` to ``"10"``).
         """
         with self._lock:
-            project = Project(id=self.store.next_id(), name="LegacyLift demo", owner_id=owner_id)
+            project = Project(id=self.store.next_id(), name=DEMO_NAME, owner_id=owner_id)
             for name, kind, content in DEMO_FILES:
                 self._attach_file(project, name, kind, content)
             self.store.add(project)
@@ -260,8 +260,8 @@ class ProjectService:
             >>> service = ProjectService(ProjectStore(data_dir=None, max_projects=10))
             >>> project = service.create_demo_project()
             >>> service.delete_file(project, project.files[2].id)
-            >>> [file.name for file in project.files]
-            ['store_report.cbl', 'order.cpy']
+            >>> [file.name for file in project.files][:3]
+            ['BANKMAIN.cbl', 'TXNPOST.cbl', 'FEESCHED.cbl']
         """
         with self._lock:
             for file in project.files:
@@ -308,13 +308,13 @@ class ProjectService:
             >>> service = ProjectService(ProjectStore(data_dir=None, max_projects=10))
             >>> project = service.create_demo_project()
             >>> analyze_run, _counts = service.analyze(project)
-            >>> service.python_file(project, analyze_run.id, "store_report.py")
+            >>> service.python_file(project, analyze_run.id, "BANKMAIN.py")
             Traceback (most recent call last):
                 ...
             legacylift.errors.NotFoundError: That run has no generated Python.
             >>> run = service.convert(project)
-            >>> service.python_file(project, run.id, "store_report.py").program_name
-            'STORE-REPORT'
+            >>> service.python_file(project, run.id, "BANKMAIN.py").program_name
+            'BANKMAIN'
         """
         run = self.get_run(project, run_id)
         for converted in run.files:
@@ -406,9 +406,9 @@ class ProjectService:
             >>> service = ProjectService(ProjectStore(data_dir=None, max_projects=10))
             >>> run, counts = service.analyze(service.create_demo_project())
             >>> run.status, counts.program_count, counts.copybook_count, counts.data_file_count
-            (<RunStatus.ANALYZED: 'analyzed'>, 1, 1, 1)
+            (<RunStatus.ANALYZED: 'analyzed'>, 5, 3, 2)
             >>> run.programs[0].program_id
-            'STORE_REPORT'
+            'BANKMAIN'
         """
         if not project.files:
             raise ProjectStateError("Upload files before analyzing.")

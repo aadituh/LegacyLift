@@ -104,7 +104,7 @@ def test_sample_program_route_returns_matches_concerns_and_lines(tmp_path, monke
     assert client.post(f"{project}/convert").status_code == 200
 
     def fake(prompt, *, api_key, timeout):
-        assert "STORE-REPORT" in prompt
+        assert "PROGRAM-ID." in prompt
         assert "Review notes:" in prompt
         assert "Python:" in prompt
         assert api_key == "test-key"
@@ -127,8 +127,8 @@ def test_sample_program_route_returns_matches_concerns_and_lines(tmp_path, monke
     assert "test-key" not in response.text
     file_review = body["files"][0]
     assert (file_review["source_name"], file_review["python_name"]) == (
-        "store_report.cbl",
-        "store_report.py",
+        "BANKMAIN.cbl",
+        "BANKMAIN.py",
     )
     assert file_review["matches"] == [
         {"cobol_lines": [28], "python_lines": [12], "detail": "DISPLAY maps to print."}

@@ -15,7 +15,7 @@ from legacylift.cobol.dependencies import Dependency, UnresolvedRef, find_depend
 from legacylift.cobol.parser import ParsedProgram
 from legacylift.errors import ProjectStateError
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 
 class ProgramDescription(BaseModel):

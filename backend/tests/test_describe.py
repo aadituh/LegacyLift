@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from legacylift.cobol import ai_review, describe
 from legacylift.cobol.dependencies import find_dependencies
 from legacylift.cobol.describe import build_prompt, describe_map
 from legacylift.cobol.parser import parse_program
@@ -102,3 +103,7 @@ def test_describe_endpoint_returns_mocked_map(
     body = client_with_key.post(f"{base}/describe").json()
     assert body["programs"][0]["summary"] == "Nightly batch."
     assert body["shared_data"] == "They share ACCTDEF."
+
+
+def test_describe_and_ai_review_use_the_same_model():
+    assert describe.GEMINI_MODEL == ai_review.GEMINI_MODEL == "gemini-3.5-flash-lite"

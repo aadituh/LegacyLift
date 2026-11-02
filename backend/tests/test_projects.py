@@ -1,8 +1,12 @@
 """The project routes, in the order a user calls them, plus their errors."""
 
+from pathlib import Path
+
 import pytest
 
 from helpers import HELLO, run_python
+
+RECORDED = Path(__file__).parent / "data" / "recorded"
 
 PAGES = "https://aadituh.github.io"
 
@@ -79,12 +83,29 @@ def test_a_non_convert_run_has_no_python_file(client, base):
     )
 
 
-def test_demo_project_converts_with_no_review_notes(client):
+def test_demo_project_is_the_sample_bank(client):
     demo = client.post("/api/projects/demo").json()
-    assert [file["id"] for file in demo["files"]] == ["1", "2", "3"]
+    assert demo["name"] == "October close"
+    assert [(file["id"], file["name"], file["kind"]) for file in demo["files"]] == [
+        ("1", "BANKMAIN.cbl", "program"),
+        ("2", "TXNPOST.cbl", "program"),
+        ("3", "INTCALC.cbl", "program"),
+        ("4", "FEESCHED.cbl", "program"),
+        ("5", "MONTHEND.cbl", "program"),
+        ("6", "ACCTDEF.cpy", "copybook"),
+        ("7", "TXNDEF.cpy", "copybook"),
+        ("8", "FEERATES.cpy", "copybook"),
+        ("9", "accounts.dat", "data"),
+        ("10", "transactions.dat", "data"),
+    ]
+
+
+def test_demo_project_converts_and_matches_the_recorded_month_end(client):
+    demo = client.post("/api/projects/demo").json()
     result = client.post(f"/api/projects/{demo['id']}/convert").json()
-    assert result["status"] == "draft"
-    assert "Amount due: $0014" in run_python(result["files"][0]["python"])
+    assert result["status"] == "review_required"
+    python = {file["source_name"]: file["python"] for file in result["files"]}
+    assert run_python(python["MONTHEND.cbl"]) == (RECORDED / "MONTHEND.out").read_text("utf-8")
 
 
 def test_projects_are_listed_newest_first(client):
