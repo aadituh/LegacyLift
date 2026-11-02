@@ -188,7 +188,8 @@ def test_api_token_hides_projects_from_the_other_account_when_login_is_optional(
     assert client.get("/api/projects", headers=headers).json()["projects"][0]["name"] == "Mine"
     assert client.get("/api/projects", headers=other_headers).json() == {"projects": []}
     assert client.get(f"/api/projects/{project_id}", headers=other_headers).status_code == 404
-    assert client.delete(f"/api/projects/{project_id}", headers=other_headers).status_code == 404
+    denied = client.delete(f"/api/projects/{project_id}", headers=other_headers)
+    assert denied.status_code == 404
     assert client.get(f"/api/projects/{project_id}", headers=headers).status_code == 200
 
 
