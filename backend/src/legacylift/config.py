@@ -58,7 +58,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("database_url", "DATABASE_URL", "LEGACYLIFT_DATABASE_URL"),
     )
     max_projects: int = 100
-    max_request_bytes: int = 12_000_000  # 100 files x 100 KB, plus form overhead
+    max_request_bytes: int = 24_000_000  # 100 files x 200 KB, plus form overhead
     enable_runner: bool = False
     runner_url: str = "http://runner:8001"
     token_secret: str | None = None

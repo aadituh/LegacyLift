@@ -2,6 +2,8 @@
 
 import pytest
 
+from legacylift.services.uploads import MAX_FILE_BYTES
+
 from helpers import HELLO, run_python
 
 
@@ -55,7 +57,10 @@ def test_folder_path_is_removed_from_file_name(client):
         ([("bad.cbl", "DISPLAY HELLO.")], "bad.cbl: File needs PROGRAM-ID and PROCEDURE DIVISION."),
         ([("a.cbl", HELLO), ("A.cob", HELLO)], "COBOL file names must be unique."),
         ([(f"{n}.cbl", HELLO) for n in range(6)], "Choose 1 to 5 COBOL files."),
-        ([("big.cbl", "x" * 100_001)], "big.cbl is larger than 100 KB."),
+        (
+            [("big.cbl", "x" * (MAX_FILE_BYTES + 1))],
+            f"big.cbl is larger than {MAX_FILE_BYTES // 1_000} KB.",
+        ),
         ([("latin.cbl", "é".encode("latin-1"))], "latin.cbl must be UTF-8 text."),
         ([("binary.cbl", "PROGRAM-ID. X.\x00")], "binary.cbl is empty or binary."),
         ([("blank.cbl", "   ")], "blank.cbl is empty or binary."),
