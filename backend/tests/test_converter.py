@@ -161,6 +161,20 @@ def test_translate_and_verify_raises_when_cobol_cannot_convert():
         translate_and_verify("DISPLAY 1.", "1\n")
 
 
+def test_program_id_on_the_next_line_still_converts():
+    """CardDemo writes PROGRAM-ID. and the name on the following line."""
+    source = """IDENTIFICATION DIVISION.
+       PROGRAM-ID.
+           COACTUPC.
+       PROCEDURE DIVISION.
+           DISPLAY "ok".
+           STOP RUN.
+"""
+    draft = translate_program(source)
+    assert draft.program_name == "COACTUPC"
+    assert run_python(draft.python) == "ok\n"
+
+
 # --- Programs outside the sample bank (issue #22) ---------------------------------
 
 

@@ -625,6 +625,11 @@ def join_continued_lines(numbered: list[tuple[int, str]]) -> list[tuple[int, str
             result.append((number, line))
             continue
 
+        # PROGRAM-ID. with the program name alone on the next line.
+        if prev.upper() == "PROGRAM-ID" and re.fullmatch(r"[A-Z][A-Z0-9-]*", line, re.IGNORECASE):
+            result[-1] = (prev_num, f"PROGRAM-ID. {line}")
+            continue
+
         # Storage: PIC line continued with SIGN … or other clauses (no level).
         prev_is_field = bool(_LEVEL_START.match(prev))
         cur_is_level = bool(_LEVEL_START.match(line))

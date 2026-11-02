@@ -279,10 +279,17 @@ def _split_divisions(lines: list[SourceLine]) -> list[Division]:
 
 
 def _extract_program_id(lines: list[SourceLine], fallback: str) -> str:
-    for line in lines:
+    for index, line in enumerate(lines):
         match = _PROGRAM_ID_RE.search(line.text)
         if match:
             return match.group(1).upper()
+        # PROGRAM-ID. with the name alone on the following line.
+        header = re.fullmatch(r"PROGRAM-ID\s*\.", line.text.strip(), re.IGNORECASE)
+        if header and index + 1 < len(lines):
+            following = lines[index + 1].text.strip()
+            name = re.match(r"([A-Z0-9][A-Z0-9-]*)", following, re.IGNORECASE)
+            if name:
+                return name.group(1).upper()
     stem = fallback.rsplit(".", 1)[0]
     return stem.upper() if stem else "UNKNOWN"
 
