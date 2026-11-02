@@ -335,7 +335,7 @@ class ProjectService:
             The new files, in upload order.
 
         Raises:
-            InvalidInputError: If the project would have more than 10 files, a
+            InvalidInputError: If the project would have more than 100 files, a
                 type is not ``.cbl``/``.cob``/``.cpy``/``.dat``, a name is already
                 used (ignoring case), two programs would make the same ``.py``
                 name, or a file fails ``decode_upload``.
