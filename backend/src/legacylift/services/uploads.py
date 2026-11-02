@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from legacylift.errors import InvalidInputError
 from legacylift.models import FileKind
 
-MAX_FILE_BYTES = 100_000
+MAX_FILE_BYTES = 200_000
 MAX_NAME_LENGTH = 255
 # The accepted extensions and the kind of file each one holds.
 KIND_BY_SUFFIX = {
@@ -98,7 +98,7 @@ def decode_upload(upload: RawUpload) -> str:
         The file decoded as UTF-8, without a byte-order mark if it had one.
 
     Raises:
-        InvalidInputError: If the file is over 100 KB, is not UTF-8, is empty
+        InvalidInputError: If the file is over 200 KB, is not UTF-8, is empty
             or only whitespace, or contains a null byte (a sign of binary data).
 
     Example:
@@ -110,7 +110,7 @@ def decode_upload(upload: RawUpload) -> str:
         legacylift.errors.InvalidInputError: a.cbl must be UTF-8 text.
     """
     if len(upload.data) > MAX_FILE_BYTES:
-        raise InvalidInputError(f"{upload.name} is larger than 100 KB.")
+        raise InvalidInputError(f"{upload.name} is larger than {MAX_FILE_BYTES // 1_000} KB.")
     try:
         text = upload.data.decode("utf-8-sig")
     except UnicodeDecodeError as error:

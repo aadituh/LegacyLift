@@ -4,6 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from legacylift.config import Settings
+from legacylift.services.projects import MAX_PROJECT_FILES
+
 from helpers import HELLO, run_python
 
 RECORDED = Path(__file__).parent / "data" / "recorded"
@@ -136,7 +139,10 @@ def test_failed_upload_adds_nothing_and_notes_mean_review(client, base):
         ([("notes.txt", "x")], "notes.txt must be .cbl, .cob, .cpy, or .dat."),
         ([("REVIEW.CBL", HELLO)], "REVIEW.CBL is already in this project."),
         ([("review.cob", HELLO)], "COBOL program names must produce unique Python file names."),
-        ([(f"d{n}.dat", "1") for n in range(10)], "A project needs 1 to 10 files."),
+        (
+            [(f"d{n}.dat", "1") for n in range(MAX_PROJECT_FILES)],
+            f"A project needs 1 to {MAX_PROJECT_FILES} files.",
+        ),
         ([("a" * 252 + ".dat", "1")], "File names must be at most 255 printable characters."),
     ],
 )
@@ -181,6 +187,7 @@ def test_pages_origin_can_call_the_api(client, method):
 def test_welcome_health_and_oversized_request(client):
     assert client.get("/").json()["docs"] == "/docs"
     assert client.get("/health").json() == {"status": "ok"}
-    big = {"files": ("big.cbl", "x" * 1_300_000)}
+    over_limit = Settings.model_fields["max_request_bytes"].default + 1
+    big = {"files": ("big.cbl", b"x" * over_limit)}
     response = client.post("/api/convert", files=big, headers={"Origin": PAGES})
     assert (response.status_code, response.headers["access-control-allow-origin"]) == (413, PAGES)

@@ -53,7 +53,8 @@ function programFilesFromProject(project) {
   return project.files.filter((file) => file.kind === 'program')
 }
 
-const maxProjectFiles = 10
+const maxProjectFiles = 100
+const maxFileBytes = 200_000
 const savedProjectKey = 'legacylift-project-id'
 const savedBatchKey = 'legacylift-batch'
 const savedScreenKey = 'legacylift-screen'
@@ -417,10 +418,10 @@ export default function App() {
       rejectFiles('Choose up to 5 files.')
       return
     }
-    const tooBig = chosen.filter((file) => file.size > 100_000)
+    const tooBig = chosen.filter((file) => file.size > maxFileBytes)
     if (tooBig.length) {
       const names = tooBig.map((file) => file.name).join(', ')
-      rejectFiles(`${names} must be 100 KB or less.`)
+      rejectFiles(`${names} must be ${maxFileBytes / 1000} KB or less.`)
       return
     }
     const wrongType = chosen.filter((file) => !/\.(cbl|cob)$/i.test(file.name))
@@ -778,10 +779,10 @@ export default function App() {
       setError(`A project can take up to ${maxProjectFiles} files. ${roomText}`)
       return
     } 
-    const tooBig = chosen.filter((file) => file.size > 100_000)
+    const tooBig = chosen.filter((file) => file.size > maxFileBytes)
     if (tooBig.length) {
       const names = tooBig.map((file) => file.name).join(', ')
-      setError(`${names} must be 100 KB or less.`)
+      setError(`${names} must be ${maxFileBytes / 1000} KB or less.`)
       return
     }
     try {
@@ -1270,7 +1271,7 @@ export default function App() {
                       Load small sample
                     </button>
                   </div>
-                  <p className="file-limit">Batch: up to 5 UTF-8 .cbl/.cob files (100 KB each) via /api/convert.</p>
+                  <p className="file-limit">Batch: up to 5 UTF-8 .cbl/.cob files ({maxFileBytes / 1000} KB each) via /api/convert.</p>
                 </>
               )}
             </>  
