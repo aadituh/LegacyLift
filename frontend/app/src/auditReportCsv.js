@@ -20,13 +20,40 @@ function csvCell(value) {
   return text
 }
 
+function callerDisplayName(source) {
+  const file = String(source || '').split(':')[0]
+  return file.replace(/\.(cbl|cob)$/i, '')
+}
+
+/**
+ * Programs another program calls, and that verify did not run on their own.
+ * Hidden while the whole run is `not_verified`, matching the verification card.
+ */
+export function calledProgramReports(verification, dependencies) {
+  if (!verification || verification.status === 'not_verified') return []
+  const reported = new Set((verification.files || []).map((file) => file.source_name))
+  const seen = new Set()
+  const reports = []
+  for (const link of dependencies || []) {
+    if (link.kind !== 'call' || !link.target || reported.has(link.target) || seen.has(link.target)) {
+      continue
+    }
+    seen.add(link.target)
+    reports.push({ program: link.target, caller: callerDisplayName(link.source) })
+  }
+  return reports
+}
+
 /**
  * One header row, then one row per output line.
  * `error` is filled on the first row of each program. A program with no
  * output still gets one row so the status and error are in the file.
  */
-export function buildAuditReportCsv(verification) {
+export function buildAuditReportCsv(verification, calledPrograms = []) {
   const rows = [['program', 'status', 'error', 'line', 'cobol', 'python']]
+  for (const called of calledPrograms) {
+    rows.push([called.program, `runs inside ${called.caller}`, '', '', '', ''])
+  }
   for (const file of verification?.files || []) {
     const status = reportFileStatus(verification, file)
     const error = file.error || ''
