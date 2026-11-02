@@ -118,9 +118,9 @@ def get_active_user(
 ) -> SignedIn | None:
     """Return the account id for a Neon Auth token, or for an API token when login is required.
 
-    A Neon Auth token (EdDSA) sets the project owner even when
-    ``LEGACYLIFT_REQUIRE_LOGIN`` is off. With no token, project routes stay
-    open until that flag is turned on.
+    A Neon Auth token (EdDSA) or an API login token sets the project owner
+    even when ``LEGACYLIFT_REQUIRE_LOGIN`` is off. With no token, project
+    routes stay open until that flag is turned on.
 
     Args:
         request: The current request.
@@ -128,10 +128,10 @@ def get_active_user(
         authorization: The raw header.
 
     Returns:
-        The account id, or ``None`` when no Neon token was sent and login is not required.
+        The account id, or ``None`` when no token was sent and login is not required.
 
     Raises:
-        UnauthenticatedError: The Neon token is bad, or login is required and the
+        UnauthenticatedError: The token is bad, or login is required and the
             token is missing or bad (401).
     """
     settings = cast(Settings, request.app.state.settings)
@@ -145,8 +145,6 @@ def get_active_user(
         if neon is None:
             raise UnauthenticatedError("Invalid login token.")
         return SignedIn(neon.user_id(token))
-    if not settings.require_login:
-        return None
     return SignedIn(auth.user_from_token(token).id)
 
 
@@ -175,13 +173,13 @@ def get_project_from_url(
 ) -> Project:
     """Load the project named by ``{project_id}`` in the URL.
 
-    When the caller sent a token, another account's project is the same 404 as a
-    missing one.
+    A project with an owner is visible only to that account. Another account,
+    or a request with no token, gets the same 404 as a missing project.
 
     Args:
         project_id: From the URL.
         service: Injected by FastAPI.
-        user: The signed-in account, or ``None`` when the request had no Neon token
+        user: The signed-in account, or ``None`` when the request had no token
             and login is not required.
 
     Returns:
@@ -191,7 +189,8 @@ def get_project_from_url(
         NotFoundError: If there is no such project, or it belongs to someone else (404).
     """
     project = service.get_project(project_id)
-    if user is not None and project.owner_id != user.id:
+    owner = user.id if user is not None else None
+    if project.owner_id != owner:
         raise NotFoundError("Project not found.")
     return project
 

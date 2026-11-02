@@ -10,8 +10,9 @@ Agreed with the login page (#15), sign-up page (#32), and accounts table (#30):
 - The frontend keeps the token in ``localStorage`` under ``legacylift-token``
   and sends ``Authorization: Bearer <token>``.
 - A password is 8 to 128 characters and includes a letter and a number.
-- Project routes require this token only when ``LEGACYLIFT_REQUIRE_LOGIN`` is on.
-  A Neon Auth token is accepted on those routes whenever the client sends one.
+- Project routes require a token only when ``LEGACYLIFT_REQUIRE_LOGIN`` is on.
+  Either this token or a Neon Auth token, when the client sends one, owns the
+  projects created on that request and hides every other account's projects.
 """
 
 import re

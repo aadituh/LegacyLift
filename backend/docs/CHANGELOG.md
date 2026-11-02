@@ -32,6 +32,7 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Changed
 
+- A signed-in account only sees its own projects. `GET /api/projects` and `/api/projects/{id}` hide every other account's projects (404 for a direct URL). An API login token sets `owner_id` even when `LEGACYLIFT_REQUIRE_LOGIN` is off. Projects created with no token stay unowned and are omitted from signed-in lists.
 - Project routes store the Neon Auth user id (`sub`) on `projects.owner_id` when the request sends that user's EdDSA token. The token is checked against the Neon Auth JWKS. `projects.owner_id` references `neon_auth."user"`. `LEGACYLIFT_REQUIRE_LOGIN` still decides whether a missing token is rejected.
 - Accounts (issue #30): `users.email` must equal `lower(email)`. Projects created while login is off keep a null `owner_id` and are hidden once login is required.
 - Verify runs in the runner container: each main program compiles with the programs it calls, both COBOL and Python get the project's `.dat` files, and each file in the response adds `diff`. Off unless `LEGACYLIFT_ENABLE_RUNNER=true` (Compose turns it on); `not_verified` when off or unreachable. Called programs get no check of their own. `LEGACYLIFT_COBC_PATH` is removed.

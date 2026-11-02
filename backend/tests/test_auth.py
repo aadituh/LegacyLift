@@ -163,7 +163,33 @@ def test_neon_token_owns_the_project_and_hides_it_from_the_other_account(tmp_pat
     assert client.get("/api/projects", headers=ada).json()["projects"][0]["name"] == "Mine"
     assert client.get("/api/projects", headers=other).json() == {"projects": []}
     assert client.get(f"/api/projects/{project_id}", headers=other).status_code == 404
-    assert client.get("/api/projects").json()["projects"][0]["name"] == "Mine"
+    assert client.get("/api/projects").json() == {"projects": []}
+    assert client.get(f"/api/projects/{project_id}").status_code == 404
+
+
+def test_api_token_hides_projects_from_the_other_account_when_login_is_optional(tmp_path):
+    client = make_client(tmp_path, token_secret=SECRET, require_login=False)
+    register(client)
+    token = client.post(
+        "/api/auth/login",
+        json={"email": ACCOUNT["email"], "password": ACCOUNT["password"]},
+    ).json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    created = client.post("/api/projects", json={"name": "Mine"}, headers=headers)
+    assert created.status_code == 201
+    project_id = created.json()["id"]
+
+    register(client, email="other@example.com", display_name="Other")
+    other = client.post(
+        "/api/auth/login",
+        json={"email": "other@example.com", "password": ACCOUNT["password"]},
+    ).json()["token"]
+    other_headers = {"Authorization": f"Bearer {other}"}
+    assert client.get("/api/projects", headers=headers).json()["projects"][0]["name"] == "Mine"
+    assert client.get("/api/projects", headers=other_headers).json() == {"projects": []}
+    assert client.get(f"/api/projects/{project_id}", headers=other_headers).status_code == 404
+    assert client.delete(f"/api/projects/{project_id}", headers=other_headers).status_code == 404
+    assert client.get(f"/api/projects/{project_id}", headers=headers).status_code == 200
 
 
 def test_bad_neon_token_is_401(tmp_path):

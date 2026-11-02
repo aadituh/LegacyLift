@@ -87,8 +87,11 @@ async function rememberBatch(fileList, converted, downloadId) {
   )
 }
 
+function projectStorageKey(userId) {
+  return `${savedProjectKey}:${userId}`
+}
+
 function readSavedBatch() {
-  if (sessionStorage.getItem(savedProjectKey)) return null
   const raw = sessionStorage.getItem(savedBatchKey)
   if (!raw) return null
   try {
@@ -257,8 +260,22 @@ export default function App() {
   }, [savedBatch])
 
   useEffect(() => {
-    const id = sessionStorage.getItem(savedProjectKey)
-    
+    sessionStorage.removeItem(savedProjectKey)
+    setSavedProjects([])
+    setProject(null)
+    setResults([])
+    setDownloadRunId('')
+    setRuns([])
+    setAnalysis(null)
+    setVerification(null)
+    setAiReview(null)
+    setSourceText('')
+    setSelectedFile(0)
+  }, [user?.id])
+
+  useEffect(() => {
+    const id = user?.id ? sessionStorage.getItem(projectStorageKey(user.id)) : null
+
     if (!user || !backendReady || !id) return
     let cancelled = false
     async function restore() {
@@ -298,7 +315,7 @@ export default function App() {
         }
         setStatus(`Opened "${saved.name}" with the saved Python. `)
       } catch (cause) {
-        sessionStorage.removeItem(savedProjectKey)
+        if (user?.id) sessionStorage.removeItem(projectStorageKey(user.id))
         if (!cancelled) setError(cause.message)
       }
     }
@@ -424,6 +441,7 @@ export default function App() {
     setDownloadRunId('')
     setBatchDownloadId('')
     sessionStorage.removeItem(savedProjectKey)
+    if (user?.id) sessionStorage.removeItem(projectStorageKey(user.id))
     clearSavedBatch()
     setResults([])
     setError('')
@@ -439,6 +457,7 @@ export default function App() {
     setDownloadRunId('')
     setBatchDownloadId('')
     sessionStorage.removeItem(savedProjectKey)
+    if (user?.id) sessionStorage.removeItem(projectStorageKey(user.id))
     clearSavedBatch()
     setResults([])
     setError('')
@@ -521,7 +540,8 @@ export default function App() {
   }
 
   function openProject(nextProject) {
-    sessionStorage.setItem(savedProjectKey, nextProject.id)
+    sessionStorage.removeItem(savedProjectKey)
+    if (user?.id) sessionStorage.setItem(projectStorageKey(user.id), nextProject.id)
     clearSavedBatch()
     setProject(nextProject)
     setProjectName(nextProject.name)
@@ -538,6 +558,7 @@ export default function App() {
   function closeProjectIfDeleted(projectId) {
     if (project?.id !== projectId) return
     sessionStorage.removeItem(savedProjectKey)
+    if (user?.id) sessionStorage.removeItem(projectStorageKey(user.id))
     setProject(null)
     setResults([])
     setDownloadRunId('')
@@ -675,12 +696,26 @@ export default function App() {
   async function handleSignIn(event) {
     event.preventDefault()
     setError('')
+    let neonMessage = ''
     try {
+      const result = await authClient.signIn.email({ email, password })
+      if (result && !result.error) {
+        logout()
+        setAccount(null)
+        setPassword('')
+        return
+      }
+      neonMessage = result?.error?.message || ''
+    } catch {
+      // Neon sign-in is unavailable. The API account below still works.
+    }
+    try {
+      await authClient.signOut()
       await login(email, password)
       setAccount(await getMe())
       setPassword('')
     } catch (cause) {
-      setError(cause.message || 'Sign in failed.')
+      setError(neonMessage || cause.message || 'Sign in failed.')
     }
   }
 
@@ -697,6 +732,8 @@ export default function App() {
         setError(signUpError.message)
         return
       }
+      logout()
+      setAccount(null)
       const { data: sessionData } = await authClient.getSession()
       if (!sessionData?.user) {
         setAuthMode('sign-in')

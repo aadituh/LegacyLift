@@ -65,13 +65,18 @@ function failAuth(data) {
 }
 
 async function sessionToken() {
+  // The page treats an API login as the signed-in account when that token is
+  // saved. Sending a leftover Neon token instead would list the other account's
+  // projects.
+  const apiToken = readToken()
+  if (apiToken) return apiToken
   try {
     const token = await neonAccessToken()
     if (token) return token
   } catch {
-    // Signed out, or the auth host did not answer. The API token below still works.
+    // Signed out, or the auth host did not answer.
   }
-  return readToken()
+  return ''
 }
 
 async function withAuth(options) {

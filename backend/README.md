@@ -154,7 +154,7 @@ Agreed with the accounts table (#30), the login page (#15), and the sign-up page
 | Password | 8 to 128 characters, at least one letter and one number. Message: `Password must be 8 to 128 characters and include a letter and a number.` |
 | Email | Stored lowercase. The same address cannot register twice |
 | Display name | 1 to 100 characters |
-| Routes that need login | `/api/projects` requires a token only when `LEGACYLIFT_REQUIRE_LOGIN=true`. A Neon Auth token on those routes still sets `projects.owner_id` and limits the list to that account. `/api/auth/*`, `/api/convert`, `/health` stay open. Projects created with no token have no owner |
+| Routes that need login | `/api/projects` requires a token only when `LEGACYLIFT_REQUIRE_LOGIN=true`. A Neon Auth token or an API login token still sets `projects.owner_id` and limits the list and project URLs to that account. Another account gets an empty list and 404. `/api/auth/*`, `/api/convert`, `/health` stay open. Projects created with no token have no owner and are hidden from signed-in accounts |
 | Wrong login | Unknown email and wrong password both return `{"detail": "Invalid email or password."}` |
 | Expired token | `{"detail": "Please log in again."}` |
 
