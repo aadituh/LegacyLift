@@ -175,6 +175,7 @@ class NeonProjectStore:
             max_projects: How many projects to keep.
         """
         self.max_projects = max_projects
+        self._owner_table_is_stub: bool | None = None
         self._pool = ConnectionPool(
             connection_string(database_url),
             min_size=1,
@@ -316,6 +317,7 @@ class NeonProjectStore:
             project: The new project.
         """
         with self._rows() as connection:
+            self._ensure_owner(connection, project.owner_id)
             connection.execute(
                 """
                 INSERT INTO projects (id, name, created_at, files_added, owner_id)
@@ -359,6 +361,49 @@ class NeonProjectStore:
         """Lend a connection whose rows are dictionaries."""
         with self._pool.connection() as connection:
             yield cast(ProjectConnection, connection)
+
+    def _ensure_owner(self, connection: ProjectConnection, owner_id: str | None) -> None:
+        """Make a local stand-in ``neon_auth.user`` row so the owner foreign key accepts this id.
+
+        Neon's own ``neon_auth.user`` already has the signed-up account, and that
+        table requires a name and email, so this insert runs only for the
+        id-only table Compose creates. Without the row, Postgres rejects the
+        project and the account never becomes the owner.
+
+        Args:
+            connection: The open transaction that will insert the project.
+            owner_id: Neon Auth user id, or ``None`` for a project with no owner.
+        """
+        if owner_id is None:
+            return
+        found = connection.execute(
+            'SELECT 1 FROM neon_auth."user" WHERE id = %s',
+            (owner_id,),
+        ).fetchone()
+        if found is not None or not self._owner_table_is_local_stub(connection):
+            return
+        connection.execute(
+            'INSERT INTO neon_auth."user" (id) VALUES (%s) ON CONFLICT (id) DO NOTHING',
+            (owner_id,),
+        )
+
+    def _owner_table_is_local_stub(self, connection: ProjectConnection) -> bool:
+        """Return whether ``neon_auth.user`` is the id-only table from Compose."""
+        if self._owner_table_is_stub is not None:
+            return self._owner_table_is_stub
+        rows = connection.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'neon_auth'
+              AND table_name = 'user'
+              AND is_nullable = 'NO'
+              AND column_default IS NULL
+            """
+        ).fetchall()
+        required = {str(row["column_name"]) for row in rows}
+        self._owner_table_is_stub = required <= {"id"}
+        return self._owner_table_is_stub
 
     def _apply_schema(self, connection: ProjectConnection) -> None:
         """Create the tables and the ID counter if they are not there yet."""

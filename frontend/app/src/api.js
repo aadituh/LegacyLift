@@ -1,4 +1,4 @@
-import { neonAccessToken } from './auth'
+import { authClient, clearNeonAccessToken, neonAccessToken } from './auth'
 
 /**
  * HTTP client for the LegacyLift FastAPI backend.
@@ -64,7 +64,7 @@ function failAuth(data) {
   throw new Error(message)
 }
 
-async function sessionToken() {
+async function sessionToken(path) {
   // The page treats an API login as the signed-in account when that token is
   // saved. Sending a leftover Neon token instead would list the other account's
   // projects.
@@ -76,13 +76,25 @@ async function sessionToken() {
   } catch {
     // Signed out, or the auth host did not answer.
   }
+  // A Neon session with no JWT used to create a project with no owner, so
+  // every account saw the same list. Refuse that instead of saving it.
+  if (typeof path === 'string' && path.startsWith('/api/projects')) {
+    try {
+      const { data } = await authClient.getSession()
+      if (data?.user) {
+        throw new Error('Sign in again so this project is saved to your account.')
+      }
+    } catch (cause) {
+      if (cause instanceof Error && cause.message.startsWith('Sign in again')) throw cause
+    }
+  }
   return ''
 }
 
-async function withAuth(options) {
+async function withAuth(path, options) {
   const headers = { ...(options.headers || {}) }
   if (!headers.Authorization && !headers.authorization) {
-    const token = await sessionToken()
+    const token = await sessionToken(path)
     if (token) headers.Authorization = `Bearer ${token}`
   }
   return { ...options, headers }
@@ -91,8 +103,9 @@ async function withAuth(options) {
 async function request(path, options = {}) {
   let response
   try {
-    response = await fetch(endpoint(path), await withAuth(options))
-  } catch {
+    response = await fetch(endpoint(path), await withAuth(path, options))
+  } catch (cause) {
+    if (cause instanceof Error && cause.message.startsWith('Sign in again')) throw cause
     throw new Error('Cannot reach the LegacyLift backend. Check the API connection and try again.')
   }
 
@@ -146,8 +159,9 @@ export async function convertFiles(files) {
 export async function downloadPythonFile(path, fileName) {
   let response
   try {
-    response = await fetch(endpoint(path), await withAuth({}))
-  } catch {
+    response = await fetch(endpoint(path), await withAuth(path, {}))
+  } catch (cause) {
+    if (cause instanceof Error && cause.message.startsWith('Sign in again')) throw cause
     throw new Error('Cannot reach the LegacyLift backend. Check the API connection and try again.')
   }
   if (response.status === 401) {
@@ -279,6 +293,7 @@ export async function login(email, password) {
 /** Drop the saved token. The next request is logged out. */
 export function logout() {
   clearToken()
+  clearNeonAccessToken()
 }
 
 /** GET /api/auth/me, using the saved token. */
