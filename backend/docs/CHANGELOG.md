@@ -4,6 +4,12 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ## Unreleased
 
+### Changed
+
+- AI review and describe use `gemini-3.5-flash-lite`.
+- `docker compose` passes `LEGACYLIFT_GEMINI_API_KEY` to the API from the root `.env`.
+- `POST /api/projects/demo` and **Load demo project** create `October close`, with the 10 sample bank files.
+
 ### Removed
 
 - Local `cobol/gnucobol.py` and `cobol/equivalence.py` (and `tests/test_equivalence.py`): verify uses the runner container since #37 (issue #99).

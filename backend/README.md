@@ -28,7 +28,7 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `POST /api/convert` | 1–5 `.cbl`/`.cob` files in multipart field `files` | Python for each file, plus `download_id`. Not saved as a project |
 | `GET /api/projects` | none | Every project, newest first: id, name, file counts, last run (no file contents) |
 | `POST /api/projects` | `{"name": "Demo"}` | New empty project (201) |
-| `POST /api/projects/demo` | none | New project with 3 sample files (201) |
+| `POST /api/projects/demo` | none | New project with the 10 sample bank files (201) |
 | `GET /api/projects/{id}` | none | The project and its files |
 | `DELETE /api/projects/{id}` | none | Deletes the project, its files, and its runs (204) |
 | `POST /api/projects/{id}/files` | files in multipart field `files` | The files that were added |
@@ -83,7 +83,7 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_TOKEN_TTL_SECONDS` | `86400` | How long a login token stays valid (24 hours). |
 | `LEGACYLIFT_REQUIRE_LOGIN` | `false` | When `true`, every `/api/projects` route requires `Authorization: Bearer <token>`. A Neon Auth token still sets the owner and limits the list when this is off. |
 | `LEGACYLIFT_NEON_AUTH_URL` | this project's Neon Auth URL | JWKS base URL. An EdDSA bearer token from the web app is checked here, and its `sub` is saved as `projects.owner_id`. |
-| `LEGACYLIFT_GEMINI_API_KEY` | unset | Gemini API key for `POST /api/projects/{id}/describe` and `POST /api/projects/{id}/ai-review`. Keep it in `backend/.env`. |
+| `LEGACYLIFT_GEMINI_API_KEY` | unset | Gemini API key for `POST /api/projects/{id}/describe` and `POST /api/projects/{id}/ai-review`. Keep it in `backend/.env`, or in the root `.env` for `docker compose`. |
 | `LEGACYLIFT_GEMINI_TIMEOUT_SECONDS` | `30` | How long one Gemini request may wait. |
 
 ## Code layout

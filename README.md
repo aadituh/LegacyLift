@@ -26,6 +26,8 @@ docker compose up --build
 
 This starts PostgreSQL, the API, the GnuCOBOL runner, and the web app. Open <http://localhost:8080> for the web app and <http://localhost:8000/docs> for the API. Projects are kept in the `db-data` volume; `docker compose down -v` deletes them (do this once if the API stops with `schema "neon_auth" does not exist`). Stop with `Ctrl+C` or `docker compose down`.
 
+To use AI review, put `LEGACYLIFT_GEMINI_API_KEY=<your key>` in a `.env` file at the repository root before starting.
+
 ### Without Docker
 
 You need [uv](https://docs.astral.sh/uv/) and Node.js 24. Open two terminals at the repository root.

@@ -26,6 +26,8 @@ services:
       DATABASE_URL: postgresql://legacylift:legacylift@db:5432/legacylift
       LEGACYLIFT_ENABLE_RUNNER: "true"
       LEGACYLIFT_RUNNER_URL: http://runner:8001
+      # No value: Compose passes it from the root .env or the shell, if it is set.
+      LEGACYLIFT_GEMINI_API_KEY:
     ports:
       - "8000:8000"
     networks: [default, runner]

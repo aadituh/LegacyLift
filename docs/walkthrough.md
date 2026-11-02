@@ -20,7 +20,7 @@ All ten are in [`backend/src/legacylift/data/`](../backend/src/legacylift/data/)
 
 Start everything with `docker compose up --build` and open <http://localhost:8080>.
 
-1. **Upload:** choose **Project**, create a project named `October close`, then **Upload project files** and select all ten files.
+1. **Upload:** choose **Project** and click **Load demo project**. Or create a project named `October close`, then **Upload project files** and select all ten files.
 2. **Analyze:** the dependency list shows `BANKMAIN` calling `TXNPOST` and `INTCALC`, the copybooks each program copies, and `MONTHEND` copying `FEERATES`.
 3. **Convert:** click **Convert project**. `MONTHEND`, `FEESCHED`, and `TXNPOST` convert with no review notes; `BANKMAIN` and `INTCALC` have review notes for lines the converter doesn't handle yet, such as file reads and edited pictures (`Z,ZZ9.99`).
 4. **Verify:** runs after Convert. Each main program runs as COBOL in the runner and as Python with the same `.dat` files.
