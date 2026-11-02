@@ -23,7 +23,7 @@ import {
   setUnauthorizedHandler,
 } from './api'
 import './App.css'
-import { buildAuditReportCsv } from './auditReportCsv'
+import { buildAuditReportCsv, calledProgramReports } from './auditReportCsv'
 import { authClient } from './auth'
 import BackgroundFx from './BackgroundFx'
 
@@ -831,7 +831,7 @@ export default function App() {
 
   function downloadAuditReport() {
     if (!verification) return
-    const csv = buildAuditReportCsv(verification)
+    const csv = buildAuditReportCsv(verification, calledProgramReports(verification, analysis?.dependencies))
     const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -885,6 +885,7 @@ export default function App() {
         : callerName
           ? `runs inside ${callerName}`
           : ''
+  const calledPrograms = calledProgramReports(verification, analysis?.dependencies)
   
   const cobolLines = programCheck?.cobol_stdout
     ? programCheck.cobol_stdout.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n')
@@ -1529,7 +1530,13 @@ export default function App() {
                   ) : !verification ? (
                     <p>Convert this project before viewing the report.</p>
                   ) : (
-                    (verification.files || []).map((file) => {
+                    <>
+                      {calledPrograms.map((called) => (
+                        <p className="report-called" key={called.program}>
+                          {called.program} runs inside {called.caller}
+                        </p>
+                      ))}
+                      {(verification.files || []).map((file) => {
                       const cobol = outputLines(file.cobol_stdout)
                       const python = outputLines(file.python_stdout)
                       const count = Math.max(cobol.length, python.length)
@@ -1560,7 +1567,8 @@ export default function App() {
                           </div>
                         </div>
                       )
-                    })
+                    })}
+                    </>
                   )}
                 </section>
               )}
