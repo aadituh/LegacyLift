@@ -53,7 +53,7 @@ function programFilesFromProject(project) {
   return project.files.filter((file) => file.kind === 'program')
 }
 
-const maxProjectFiles = 10
+const maxProjectFiles = 100
 const savedProjectKey = 'legacylift-project-id'
 const savedBatchKey = 'legacylift-batch'
 const savedScreenKey = 'legacylift-screen'

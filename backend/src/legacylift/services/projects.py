@@ -46,7 +46,7 @@ from legacylift.services.uploads import KIND_BY_SUFFIX, RawUpload, decode_upload
 from legacylift.services.verification import Runner, verify_project
 from legacylift.storage import ProjectRepository, ProjectStore  # noqa: F401
 
-MAX_PROJECT_FILES = 10
+MAX_PROJECT_FILES = 100
 
 
 def program_summaries(parsed: list[ParsedProgram]) -> list[ProgramSummary]:
