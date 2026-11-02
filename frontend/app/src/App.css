@@ -383,6 +383,12 @@ textarea.code-editor {
   margin-top: 28px;
 }
 
+.report-called {
+  margin: 0 0 8px;
+  color: #eadbad;
+  font-size: 13px;
+}
+
 .review-notes ul {
   margin: 0;
   padding-left: 20px;
