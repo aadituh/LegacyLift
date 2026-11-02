@@ -66,11 +66,15 @@ def create_project(
 
 @router.get("")
 def list_projects(service: ProjectServiceDep, user: ActiveUserDep) -> ProjectListResponse:
-    """List every project, newest first, with file counts and its last run.
+    """List this account's projects, newest first, with file counts and the last run.
 
-    When the request has a Neon Auth token, only that account's projects are listed.
+    Another account's projects are left out. With no token, only projects that
+    have no owner are listed.
     """
-    owner_id = user.id if user is not None else None
+    if user is None:
+        projects = [project for project in service.list_projects() if project.owner_id is None]
+    else:
+        projects = service.list_projects(user.id)
     summaries = [
         ProjectSummary(
             id=project.id,
@@ -79,7 +83,7 @@ def list_projects(service: ProjectServiceDep, user: ActiveUserDep) -> ProjectLis
             last_run=project.runs[-1] if project.runs else None,
             **file_counts(project).model_dump(),
         )
-        for project in service.list_projects(owner_id)
+        for project in projects
     ]
     return ProjectListResponse(projects=summaries)
 
