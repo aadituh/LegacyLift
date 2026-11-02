@@ -476,12 +476,13 @@ textarea.code-editor {
 
 .diff-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 28px;
 }
 
 .diff-row span {
   margin: 0;
-  padding: 2px 12px;
+  padding: 8px 16px;
   background: #a5a5a5;
   color: #263b2c;
   font: 12px/1.6 Consolas, 'Courier New', monospace;
