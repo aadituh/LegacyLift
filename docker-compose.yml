@@ -28,6 +28,7 @@ services:
       LEGACYLIFT_RUNNER_URL: http://runner:8001
       # No value: Compose passes it from the root .env or the shell, if it is set.
       LEGACYLIFT_GEMINI_API_KEY:
+      LEGACYLIFT_TOKEN_SECRET:
     ports:
       - "8000:8000"
     networks: [default, runner]
@@ -63,9 +64,12 @@ services:
       retries: 20
 
   web:
-    build: frontend/app
+    build:
+      context: frontend/web
+      args:
+        NEXT_PUBLIC_NEON_AUTH_URL: ${NEXT_PUBLIC_NEON_AUTH_URL:-}
     ports:
-      - "8080:80"
+      - "8080:3000"
     depends_on:
       api:
         condition: service_healthy
