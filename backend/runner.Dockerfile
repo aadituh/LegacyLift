@@ -1,7 +1,7 @@
 # LegacyLift runner image: GnuCOBOL + Python. Runs uploaded COBOL and generated Python.
 # Build from the repository root:
 #   docker build -f backend/runner.Dockerfile -t legacylift-runner .
-FROM python:3.12-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gnucobol \

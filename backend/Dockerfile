@@ -1,6 +1,6 @@
 # LegacyLift API image. Build from the repository root (the API also needs database/schema.sql):
 #   docker build -f backend/Dockerfile -t legacylift-api .
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.7 /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
