@@ -87,14 +87,14 @@ it("synchronizes account changes from another browser tab", async () => {
   const { result } = renderHook(() => useAuth(), { wrapper });
   await waitFor(() => expect(result.current.isPending).toBe(false));
   localStorage.setItem("legacylift-token", "other-tab-token");
-  await act(async () =>
-    window.dispatchEvent(
-      new StorageEvent("storage", {
-        key: "legacylift-token",
-        newValue: "other-tab-token",
-      }),
-    ),
-  );
+  const storageEvent = new Event("storage");
+  Object.defineProperty(storageEvent, "key", {
+    value: "legacylift-token",
+  });
+  Object.defineProperty(storageEvent, "newValue", {
+    value: "other-tab-token",
+  });
+  await act(async () => window.dispatchEvent(storageEvent));
   await waitFor(() => expect(result.current.user?.id).toBe("user-1"));
   expect(auth.syncStoredToken).toHaveBeenCalledWith("other-tab-token");
 });
