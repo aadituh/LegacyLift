@@ -176,7 +176,7 @@ Build and start only the runner: `docker compose up --build runner`. Tests that 
 
 ### Recorded COBOL output
 
-[`tests/data/recorded/`](tests/data/recorded/) holds what GnuCOBOL printed: `FEESCHED.out`, and `bank/<case>/BANKMAIN.out` for the cases `sample` (the files in `src/legacylift/data/`), `normal`, `overdraft`, and `closed` (each with its own `accounts.dat` and `transactions.dat`). Re-record after changing a case or a sample program, from the repository root:
+[`tests/data/recorded/`](tests/data/recorded/) holds what GnuCOBOL printed: `FEESCHED.out`, `MONTHEND.out`, `INTCALC_alice_30d.out` (via `INTDRV.cbl` calling `INTCALC`, because `INTCALC` has a `LINKAGE SECTION`), and `bank/<case>/BANKMAIN.out` for the cases `sample` (the files in `src/legacylift/data/`), `normal`, `overdraft`, and `closed` (each with its own `accounts.dat` and `transactions.dat`). Re-record after changing a case or a sample program, from the repository root:
 
 ```bash
 docker compose run --rm --no-deps -v ./backend:/backend runner python /backend/scripts/record_cobol_output.py

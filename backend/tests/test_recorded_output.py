@@ -92,3 +92,18 @@ def test_gnucobol_still_prints_the_recorded_program_output(
     assert result.ok, result.stderr
     expected = (BANK.parent / f"{Path(program).stem}.out").read_text(encoding="utf-8")
     assert result.stdout == expected
+
+
+@needs_cobc
+def test_gnucobol_intcalc_alice_matches_recorded_via_intdrv():
+    """INTCALC cannot run alone; INTDRV CALLs it and DISPLAYs Alice's 30-day interest (#98)."""
+    result = run_cobol(
+        read(SAMPLE, "INTDRV.cbl", "INTCALC.cbl"),
+        main="INTDRV.cbl",
+        copybooks=read(SAMPLE, "ACCTDEF.cpy"),
+        data_files=read(SAMPLE, "accounts.dat"),
+    )
+    assert result.ok, result.stderr
+    expected = (BANK.parent / "INTCALC_alice_30d.out").read_text(encoding="utf-8")
+    assert result.stdout == expected
+    assert result.stdout.strip() == "+0000025.69"

@@ -53,6 +53,9 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Fixed
 
+- Issue #98: `INTCALC_alice_30d.out` is real GnuCOBOL stdout from `INTDRV` calling
+  `INTCALC` (Alice balance `12500.50` → interest DISPLAY `+0000025.69`). Docs and
+  `test_runtime` match; re-record with `scripts/record_cobol_output.py`.
 - A deleted project stays deleted, even if a request on it finishes afterwards.
 
 ## Backend v2 — 2026-10-01
