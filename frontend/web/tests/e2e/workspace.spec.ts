@@ -58,6 +58,12 @@ async function screenshot(page: Page, name: string) {
   });
 }
 async function accessible(page: Page) {
+  // Theme changes fade button colours for 150 ms; scan the settled colours.
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every((a) => !(a instanceof CSSTransition) || a.playState !== "running"),
+  );
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
