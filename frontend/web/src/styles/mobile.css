@@ -1,0 +1,212 @@
+@media (max-width: 767px) {
+  .main-content {
+    padding: 27px 20px;
+    gap: 21px;
+  }
+  .workspace-footer {
+    padding: 15px 20px;
+    font-size: 14px;
+    flex-direction: column;
+  }
+  .workspace-footer > span:last-child {
+    display: none;
+  }
+  h1 {
+    font-size: 28px;
+    letter-spacing: -1px;
+  }
+  .page-heading .eyebrow {
+    font-size: 14px;
+    letter-spacing: 0.9px;
+  }
+  .page-description {
+    font-size: 14px;
+  }
+  .upload-aside {
+    grid-template-columns: 1fr;
+    gap: 21px;
+  }
+  .upload-aside .progress-steps {
+    flex-direction: row;
+  }
+  .upload-aside .progress-steps li {
+    flex: 1;
+  }
+  .progress-heading,
+  .upload-aside .progress-heading {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .progress-steps {
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .progress-steps li {
+    flex-direction: column;
+    text-align: center;
+  }
+  .step-chevron {
+    display: none;
+  }
+  .step-icon {
+    width: 37px;
+    height: 37px;
+  }
+  .progress-steps strong {
+    line-height: 1.5;
+  }
+  .progress-card,
+  .card {
+    padding: 20px;
+  }
+  .card-heading {
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+  .card-heading .actions {
+    gap: 5px;
+  }
+  .card-heading .eyebrow {
+    font-size: 14px;
+    letter-spacing: 0.8px;
+  }
+  .demo-card {
+    padding: 25px;
+  }
+  .demo-card h2 {
+    font-size: 23px;
+  }
+  .demo-file-stack div span {
+    font-size: 14px;
+  }
+  .project-list > li {
+    gap: 11px;
+  }
+  .project-info {
+    min-width: 0;
+    flex-basis: calc(100% - 60px);
+  }
+  .project-list > li > .actions {
+    margin-left: auto;
+  }
+  .project-info h3 {
+    font-size: 15px;
+  }
+  .file-list li {
+    gap: 7px;
+  }
+  .file-list li > .badge {
+    font-size: 14px;
+    padding: 2px 5px;
+  }
+  .file-list .file-icon {
+    width: 29px;
+  }
+  .file-list li .button {
+    padding: 6px;
+  }
+  .file-list-summary {
+    flex-direction: column;
+    gap: 3px;
+  }
+  .file-tabs button {
+    padding-inline: 13px;
+    max-width: 210px;
+  }
+  .conversion-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .conversion-toolbar > .actions {
+    justify-content: space-between;
+  }
+  .conversion-toolbar .button {
+    flex: 1;
+  }
+  .code-panel > header {
+    padding: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .code-panel header h2 {
+    max-width: 190px;
+  }
+  .code-panel header .eyebrow {
+    font-size: 14px;
+    letter-spacing: 0.4px;
+  }
+  .code-panel footer {
+    flex-direction: column;
+    gap: 3px;
+    padding-inline: 14px;
+  }
+  .source-editor,
+  .python-editor,
+  .code-empty {
+    min-height: 320px;
+  }
+  .python-editor {
+    height: 350px;
+  }
+  .dependency-links li {
+    flex-wrap: wrap;
+  }
+  .dependency-links .hint {
+    margin-left: 0;
+  }
+  .download-list li,
+  .report-download {
+    flex-wrap: wrap;
+    padding-inline: 0;
+    gap: 11px;
+  }
+  .download-list li > div,
+  .report-download > div {
+    flex-basis: calc(100% - 55px);
+  }
+  .download-list .button,
+  .report-download .button {
+    width: 100%;
+  }
+  .run-list li {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .run-list strong {
+    flex: 1;
+  }
+  .run-list time {
+    width: 100%;
+    margin-left: 45px;
+  }
+  .run-list li > .hint {
+    display: none;
+  }
+  .batch-actions {
+    align-items: stretch;
+  }
+  .batch-actions > .button,
+  .batch-actions > label {
+    flex: 1 1 100%;
+  }
+}
+@media (max-width: 380px) {
+  .main-content {
+    padding-inline: 16px;
+  }
+  .card,
+  .progress-card {
+    padding: 17px;
+  }
+  .connection {
+    font-size: 14px;
+  }
+  .conversion-toolbar .button {
+    width: 100%;
+    flex-basis: 100%;
+  }
+}

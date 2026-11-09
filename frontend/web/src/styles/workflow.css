@@ -1,0 +1,218 @@
+.main-content,
+.app-header-inner,
+.workspace-context {
+  max-width: 1920px;
+}
+.main-content,
+.app-header-inner,
+.workspace-context {
+  padding-inline: clamp(20px, 2.5vw, 48px);
+}
+.convert-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.main-content:has(.convert-workspace) {
+  gap: 16px;
+  padding-top: 22px;
+}
+.convert-workspace .page-heading {
+  margin: 0;
+}
+.convert-workspace .page-heading h1 {
+  font-size: clamp(25px, 2vw, 32px);
+}
+.convert-workspace .progress-card {
+  padding: 14px 20px;
+}
+.convert-workspace .progress-heading {
+  display: none;
+}
+.convert-workspace .progress-steps {
+  margin-top: 0;
+}
+.convert-workspace .progress-note {
+  margin-top: 12px;
+  padding-top: 9px;
+  font-size: 13px;
+}
+.project-files.compact .card {
+  padding: 12px 20px;
+}
+.project-files.compact .card-heading {
+  margin-bottom: 0;
+}
+.project-files.compact .card-heading h2 {
+  font-size: 15px;
+}
+.project-files.compact .project-file-details {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+.project-files.compact .project-file-details > summary {
+  font-size: 13px;
+}
+.project-files.compact .project-drop {
+  margin-top: 12px;
+}
+.project-file-counts {
+  font-size: 13px;
+  color: var(--muted);
+  margin-right: 6px;
+}
+.convert-workspace .file-tabs {
+  margin-bottom: -18px;
+}
+.convert-workspace .file-tabs button {
+  padding: 11px 16px;
+}
+.file-review-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: -6px;
+}
+.file-review-summary a {
+  color: var(--accent);
+  font-weight: 700;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.file-review-summary a:hover {
+  text-decoration: underline;
+}
+.review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.review-dependencies,
+.review-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.review-checks .review-groups {
+  grid-template-columns: minmax(0, 1fr);
+}
+.review-checks .card,
+.review-dependencies .card {
+  padding: 22px;
+}
+.review-checks .reverify {
+  padding: 0 4px;
+}
+.review-findings {
+  scroll-margin-top: 130px;
+}
+.review-checks .review-group {
+  padding: 13px 15px;
+}
+.review-checks .review-group li {
+  padding: 12px 0;
+}
+.review-checks .review-group summary {
+  font-size: 13px;
+}
+.review-layout .dependency-legend {
+  gap: 8px;
+}
+.review-layout .dependency-legend > div {
+  padding: 11px;
+}
+.review-layout .dependency-legend strong {
+  font-size: 13px;
+}
+.review-layout .dependency-legend p {
+  font-size: 13px;
+}
+.review-layout .dependency-map {
+  height: 420px;
+}
+@media (min-width: 1500px) {
+  .main-content {
+    padding-top: 28px;
+  }
+  .upload-grid {
+    grid-template-columns: minmax(0, 1fr) 370px;
+  }
+}
+@media (max-width: 1250px) {
+  .review-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  .main-content,
+  .workspace-context {
+    padding-inline: 20px;
+  }
+  .app-header-inner {
+    padding-inline: 14px;
+  }
+  .convert-workspace .progress-card {
+    padding: 14px;
+  }
+  .convert-workspace .progress-note {
+    margin-top: 10px;
+  }
+  .convert-workspace .progress-steps strong,
+  .convert-workspace .progress-steps small {
+    font-size: 12px;
+  }
+  .project-file-counts {
+    display: none;
+  }
+  .project-files.compact .card {
+    padding: 14px;
+  }
+  .review-checks .card,
+  .review-dependencies .card {
+    padding: 20px;
+  }
+  .review-layout {
+    gap: 18px;
+  }
+}
+.app-shell .app-header {
+  background: var(--surface);
+}
+.export-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 350px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.export-layout > .card {
+  padding: 20px;
+}
+.export-layout .download-list li,
+.export-layout .report-download {
+  flex-wrap: wrap;
+  padding-inline: 0;
+  gap: 10px;
+}
+.export-layout .download-list li > div,
+.export-layout .report-download > div {
+  flex-basis: calc(100% - 55px);
+}
+.export-layout .download-list .button {
+  flex: 1;
+}
+.export-layout .export-preview {
+  min-width: 0;
+}
+@media (max-width: 1000px) {
+  .export-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

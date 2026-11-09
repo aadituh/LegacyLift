@@ -1,0 +1,156 @@
+.upload-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+.main-content:has(.upload-surface) {
+  max-width: 1640px;
+}
+.upload-surface .page-description,
+.upload-surface .muted {
+  max-width: 75ch;
+}
+.upload-surface .create-form {
+  max-width: 900px;
+}
+.upload-surface .create-card .card-heading .eyebrow {
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.upload-surface .compact-create {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 24px;
+}
+.upload-surface .compact-create .card-heading {
+  margin: 0;
+}
+.upload-surface .compact-create .card-heading > .decor-icon,
+.upload-surface .compact-create > .muted {
+  display: none;
+}
+.upload-surface .compact-create h2 {
+  font-size: 15px;
+}
+.upload-surface .compact-create .create-form {
+  margin: 0;
+  max-width: initial;
+}
+.upload-surface .compact-create .field {
+  flex: 1;
+  flex-basis: auto;
+}
+.upload-surface .compact-create .field > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.upload-surface .compact-create .create-form > .button {
+  width: auto;
+}
+.upload-surface .compact-dropzone {
+  flex-direction: row;
+  justify-content: space-between;
+  text-align: left;
+  padding: 17px;
+  gap: 16px;
+}
+.compact-dropzone > svg {
+  color: var(--accent);
+}
+.compact-dropzone > div {
+  flex: 1;
+}
+.compact-dropzone h3 {
+  font-size: 15px;
+}
+.compact-dropzone p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+  max-width: 75ch;
+}
+.compact-dropzone .button {
+  margin: 0;
+}
+.file-browser-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.file-browser-tools label {
+  min-width: 0;
+}
+.file-browser-tools input,
+.file-browser-tools select {
+  font-size: 14px;
+  min-height: 38px;
+}
+.has-project .demo-file-stack {
+  display: none;
+}
+.has-project .demo-card h2 {
+  margin-top: 14px;
+  font-size: 20px;
+}
+.has-project .demo-card > .button {
+  margin-top: 20px;
+}
+.upload-surface .upload-placeholder {
+  min-height: 220px;
+}
+.upload-surface .project-list > li {
+  padding-block: 15px;
+}
+.upload-surface .project-info time {
+  font-size: 12px;
+}
+.large-file-list li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
+}
+.workspace-footer {
+  padding-inline: clamp(20px, 2.5vw, 48px);
+}
+.code-workbench:fullscreen {
+  --editor-height: calc(100svh - 235px);
+}
+.file-dialog {
+  overscroll-behavior: contain;
+}
+@media (max-width: 767px) {
+  .upload-surface .compact-create {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 18px;
+  }
+  .upload-surface .compact-create .create-form {
+    flex-wrap: wrap;
+  }
+  .upload-surface .compact-create .create-form .field {
+    flex-basis: 100%;
+  }
+  .upload-surface .compact-create .create-form > .button {
+    width: 100%;
+  }
+  .upload-surface .compact-dropzone {
+    flex-wrap: wrap;
+  }
+  .compact-dropzone > div {
+    flex-basis: calc(100% - 45px);
+  }
+  .compact-dropzone > .button {
+    width: 100%;
+  }
+  .file-browser-tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
