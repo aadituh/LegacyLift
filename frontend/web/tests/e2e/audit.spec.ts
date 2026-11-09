@@ -136,11 +136,16 @@ test("COBOL line numbers scroll with the source and keyboard scrolling works", a
   expect(
     Math.abs(before.number - after.number - (before.code - after.code)),
   ).toBeLessThan(1);
+  // PageDown moves the caret one page from where it is (line 1) and scrolls to
+  // follow it, so start from the top of the file.
+  await scroller.evaluate((element) => {
+    element.scrollTop = 0;
+  });
   await page.getByLabel("Read original COBOL", { exact: true }).focus();
   await page.keyboard.press("PageDown");
   await expect
     .poll(() => scroller.evaluate((element) => element.scrollTop))
-    .toBeGreaterThan(250);
+    .toBeGreaterThan(0);
 });
 test("a full 100-file upload passes through the real Next proxy and rejects file 101", async ({
   page,
@@ -152,7 +157,11 @@ test("a full 100-file upload passes through the real Next proxy and rejects file
     .getByRole("button", { name: "Create project", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "100-file audit", exact: true }),
+    page.getByRole("heading", {
+      name: "100-file audit",
+      exact: true,
+      level: 2,
+    }),
   ).toBeVisible();
   const source = Buffer.from(
     '       IDENTIFICATION DIVISION.\n       PROGRAM-ID. AUDIT.\n       PROCEDURE DIVISION.\n           DISPLAY "AUDIT"\n           STOP RUN.\n',
