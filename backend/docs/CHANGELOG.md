@@ -6,6 +6,7 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 
 ### Changed
 
+- `GET /api/auth/me` accepts a Neon Auth token and returns that account (id from `sub`, email and name from the token), so web sign-in through Neon works.
 - AI review and describe use `gemini-3.5-flash-lite`.
 - `docker compose` passes `LEGACYLIFT_GEMINI_API_KEY` to the API from the root `.env`.
 - `POST /api/projects/demo` and **Load demo project** create `October close`, with the 10 sample bank files.

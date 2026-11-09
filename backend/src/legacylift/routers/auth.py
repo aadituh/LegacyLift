@@ -3,12 +3,12 @@
 Register, log in, and read the current account. Passwords are not written to
 the response or the log. Project routes use these tokens only when
 ``LEGACYLIFT_REQUIRE_LOGIN`` is on. A Neon Auth token is accepted on project
-routes whenever the client sends one.
+routes and on ``/me`` whenever the client sends one.
 """
 
 from fastapi import APIRouter
 
-from legacylift.dependencies import AuthServiceDep, CurrentUserDep
+from legacylift.dependencies import AccountDep, AuthServiceDep
 from legacylift.models import User
 from legacylift.schemas import LoginRequest, LoginResponse, RegisterRequest, UserResponse
 
@@ -53,11 +53,13 @@ def login(body: LoginRequest, auth: AuthServiceDep) -> LoginResponse:
 
 
 @router.get("/me", response_model=UserResponse)
-def me(user: CurrentUserDep) -> UserResponse:
+def me(account: AccountDep) -> UserResponse:
     """Return the account for a valid token.
 
     \f
+    Accepts an API login token or a Neon Auth token.
+
     Raises:
         UnauthenticatedError: The token is missing, wrong, or expired (401).
     """
-    return _public_user(user)
+    return account

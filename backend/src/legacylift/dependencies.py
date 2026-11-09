@@ -14,7 +14,8 @@ from fastapi import Depends, Header, Request
 
 from legacylift.config import Settings
 from legacylift.errors import NotFoundError, UnauthenticatedError
-from legacylift.models import Project, User
+from legacylift.models import Project
+from legacylift.schemas import UserResponse
 from legacylift.services.auth import AuthService
 from legacylift.services.batch_downloads import BatchDownloadStore
 from legacylift.services.neon_auth import NeonAuth
@@ -65,29 +66,52 @@ def _bearer_token(authorization: str | None) -> str | None:
     return token.strip()
 
 
-def get_current_user(
+def get_account(
+    request: Request,
     auth: AuthServiceDep,
     authorization: Annotated[str | None, Header()] = None,
-) -> User:
+) -> UserResponse:
     """Return the account for ``Authorization: Bearer <token>``.
 
+    An API login token names an account in storage. A Neon Auth token (EdDSA)
+    names a Neon account; its email and name come from the token.
+
     Args:
-        auth: The auth service.
+        request: The current request.
+        auth: The auth service. Used for the API's own login tokens.
         authorization: The raw header, or ``None`` when the client omitted it.
 
     Returns:
-        The account.
+        The account, without a password hash.
 
     Raises:
-        UnauthenticatedError: The token is missing, wrong, or expired (401).
+        UnauthenticatedError: The token is missing, wrong, or expired, or it is a
+            Neon token and Neon Auth is not configured (401).
     """
     token = _bearer_token(authorization)
     if token is None:
         raise UnauthenticatedError("Missing login token.")
-    return auth.user_from_token(token)
+    if _jwt_algorithm(token) == "EdDSA":
+        neon = cast(NeonAuth | None, getattr(request.app.state, "neon_auth", None))
+        if neon is None:
+            raise UnauthenticatedError("Invalid login token.")
+        account = neon.account(token)
+        return UserResponse(
+            id=account.id,
+            email=account.email,
+            display_name=account.display_name,
+            created_at=account.created_at,
+        )
+    user = auth.user_from_token(token)
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        created_at=user.created_at,
+    )
 
 
-CurrentUserDep = Annotated[User, Depends(get_current_user)]
+AccountDep = Annotated[UserResponse, Depends(get_account)]
 
 
 @dataclass(frozen=True, slots=True)

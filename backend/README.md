@@ -24,7 +24,7 @@ Try every route at <http://127.0.0.1:8000/docs>.
 | `GET /health` | none | `{"status": "ok"}` |
 | `POST /api/auth/register` | `{"email", "password", "display_name"}` | New account without the password or its hash (201). Used email is 409. A weak password is 422 |
 | `POST /api/auth/login` | `{"email", "password"}` | `{"token", "token_type": "bearer", "expires_in"}`. A wrong email or password is the same 401 |
-| `GET /api/auth/me` | `Authorization: Bearer <token>` | The account for that token. Missing, wrong, or expired token is 401 |
+| `GET /api/auth/me` | `Authorization: Bearer <token>` | The account for an API login token or a Neon Auth token (email and name from the token). Missing, wrong, or expired token is 401 |
 | `POST /api/convert` | 1–5 `.cbl`/`.cob` files in multipart field `files` | Python for each file, plus `download_id`. Not saved as a project |
 | `GET /api/projects` | none | Every project, newest first: id, name, file counts, last run (no file contents) |
 | `POST /api/projects` | `{"name": "Demo"}` | New empty project (201) |
