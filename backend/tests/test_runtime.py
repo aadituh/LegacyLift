@@ -69,19 +69,37 @@ def test_decimal_truncate_versus_rounded():
     assert display_number(rounded, integers=1, decimals=2) == "1.24"
 
 
+def test_alice_accounts_dat_balance_matches_acctdef():
+    """Alice's +001250050 under SIGN LEADING SEPARATE is 12500.50, not 1250.05 (#98)."""
+    line = (DATA / "accounts.dat").read_text(encoding="utf-8").splitlines()[0]
+    assert len(line) == 43
+    assert line[0:6] == "100001"
+    assert line[26] == "S" and line[27] == "A"
+    balance_field = line[28:38]  # PIC S9(7)V99 SIGN LEADING SEPARATE
+    assert balance_field == "+001250050"
+    # Sign + seven integer digits + two implied decimals → 12500.50
+    assert Decimal(balance_field[0] + balance_field[1:8] + "." + balance_field[8:10]) == Decimal(
+        "12500.50"
+    )
+    rate_field = line[38:43]  # PIC 9V9999
+    assert rate_field == "00250"
+    assert Decimal(rate_field[0] + "." + rate_field[1:]) == Decimal("0.0250")
+
+
 def test_intcalc_alice_interest_matches_recorded_output():
-    """INTCALC formula for Alice @ 30 days equals recorded GnuCOBOL interest."""
+    """INTCALC for Alice @ 30 days matches GnuCOBOL DISPLAY in the recorded fixture."""
     recorded = (RECORDED / "INTCALC_alice_30d.out").read_text(encoding="utf-8-sig").strip()
+    # Recorded via INTDRV CALL INTCALC (issue #98); not a hand-computed string.
     interest = cobol_number(
-        Decimal("1250.05") * Decimal("0.0250") * Decimal(30) / Decimal(365),
+        Decimal("12500.50") * Decimal("0.0250") * Decimal(30) / Decimal(365),
         integers=7,
         decimals=2,
         signed=True,
         rounded=True,
     )
-    assert recorded == "2.57"
-    assert interest == Decimal(recorded)
-    assert display_number(interest, integers=7, decimals=2, signed=True) == "+0000002.57"
+    assert recorded == "+0000025.69"
+    assert interest == Decimal("25.69")
+    assert display_number(interest, integers=7, decimals=2, signed=True) == recorded
 
 
 def test_feesched_matches_recorded_gnucobol_stdout():

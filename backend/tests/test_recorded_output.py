@@ -12,6 +12,7 @@ from legacylift.runner.sandbox import run_cobol
 
 BACKEND = Path(__file__).resolve().parents[1]
 SAMPLE = BACKEND / "src" / "legacylift" / "data"
+DRIVERS = BACKEND / "tests" / "data" / "cobol"
 BANK = BACKEND / "tests" / "data" / "recorded" / "bank"
 CASES = ["sample", "normal", "overdraft", "closed"]
 RECORD_WIDTHS = {"accounts.dat": 43, "transactions.dat": 16}
@@ -92,3 +93,19 @@ def test_gnucobol_still_prints_the_recorded_program_output(
     assert result.ok, result.stderr
     expected = (BANK.parent / f"{Path(program).stem}.out").read_text(encoding="utf-8")
     assert result.stdout == expected
+
+
+@needs_cobc
+def test_gnucobol_intcalc_alice_matches_recorded_via_intdrv():
+    """INTCALC cannot run alone; INTDRV CALLs it and DISPLAYs Alice's 30-day interest (#98)."""
+    programs = {**read(DRIVERS, "INTDRV.cbl"), **read(SAMPLE, "INTCALC.cbl")}
+    result = run_cobol(
+        programs,
+        main="INTDRV.cbl",
+        copybooks=read(SAMPLE, "ACCTDEF.cpy"),
+        data_files=read(SAMPLE, "accounts.dat"),
+    )
+    assert result.ok, result.stderr
+    expected = (BANK.parent / "INTCALC_alice_30d.out").read_text(encoding="utf-8")
+    assert result.stdout == expected
+    assert result.stdout.strip() == "+0000025.69"

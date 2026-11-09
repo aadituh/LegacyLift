@@ -19,15 +19,24 @@ scripts noted in issue #36.
 | 8 | `PIC 9V99` ROUNDED 1.235 | `1.24` | Half away from zero |
 | 9 | FEESCHED `PIC 9(3)` fee 35 | `035` | Sample bank fee line |
 | 10 | FEESCHED `PIC 9(4)` total 65 | `0065` | After ADD of three fees |
-| 11 | INTCALC interest (see below) | `2.57` | `COMPUTE … ROUNDED` |
+| 11 | INTCALC interest (see below) | DISPLAY `+0000025.69` | `COMPUTE … ROUNDED`; signed `+` |
 
-## INTCALC interest (BANKMAIN path)
+## INTCALC interest (Alice @ 30 days)
 
-For Alice’s account in `accounts.dat`:
+`INTCALC` has a `LINKAGE SECTION`, so it cannot run alone. Record stdout with
+`tests/data/cobol/INTDRV.cbl` (CALLs `INTCALC`) through
+`scripts/record_cobol_output.py` in the runner image. Fixture:
+`tests/data/recorded/INTCALC_alice_30d.out`. The driver stays under `tests/` so
+the demo sample set in `src/legacylift/data/` remains 10 files.
 
-- balance `1250.05`, rate `0.0250`, days `30`, year `365`
-- `interest = balance * rate * days / 365` with `ROUNDED` to `S9(7)V99`
-- Result: **`2.57`**
+Alice’s first line in `accounts.dat` against `ACCTDEF.cpy`:
+
+- `ACCT-BALANCE` `PIC S9(7)V99 SIGN LEADING SEPARATE` bytes `+001250050` → **`12500.50`**
+  (the leading `+` is the sign; do not read this as `1250.05`)
+- `ACCT-RATE` `PIC 9V9999` bytes `00250` → `0.0250`
+- days `30`, year `365`
+- `interest = balance * rate * days / 365` with `ROUNDED` to `S9(7)V99` → **`25.69`**
+- GnuCOBOL plain `DISPLAY` of that field: **`+0000025.69`**
 
 ## FEESCHED recorded stdout
 

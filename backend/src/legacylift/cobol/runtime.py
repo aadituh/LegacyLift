@@ -18,9 +18,12 @@ These ten cases are the team's written record of real COBOL behaviour
 9. ``PIC 9(3)`` ``VALUE 35`` **DISPLAY**s ``035`` (FEESCHED overdraft fee).
 10. ``PIC 9(4)`` total ``65`` **DISPLAY**s ``0065`` (FEESCHED all-fees line).
 
-INTCALC interest (case used by BANKMAIN): for balance ``1250.05``, rate
-``0.0250``, ``30`` days, ``365``-day year, ``COMPUTE … ROUNDED`` to
-``S9(7)V99`` yields ``2.57``.
+INTCALC interest (Alice / ``INTCALC_alice_30d.out``): Alice's
+``accounts.dat`` balance is ``+001250050`` under ``PIC S9(7)V99 SIGN
+LEADING SEPARATE`` → ``12500.50`` (not ``1250.05``). With rate
+``0.0250``, ``30`` days, and a ``365``-day year, ``COMPUTE … ROUNDED`` to
+``S9(7)V99`` yields ``25.69``; plain ``DISPLAY`` prints ``+0000025.69``
+(recorded via ``tests/data/cobol/INTDRV.cbl`` calling ``INTCALC`` — issue #98).
 
 Generated drafts import::
 
