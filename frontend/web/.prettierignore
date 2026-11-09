@@ -1,0 +1,7 @@
+.next
+node_modules
+openapi.json
+src/types/api-schema.d.ts
+test-results
+playwright-report
+
