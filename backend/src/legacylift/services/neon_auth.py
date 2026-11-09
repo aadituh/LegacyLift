@@ -1,4 +1,4 @@
-"""Verify a Neon Auth JWT and return the signed-in user id.
+"""Verify a Neon Auth JWT and return the signed-in user.
 
 The web app signs in with Neon Auth and sends ``Authorization: Bearer`` from
 ``authClient.token()``. That token is EdDSA, not the API's own HS256 login
@@ -9,6 +9,8 @@ the ``sub`` claim, which matches ``neon_auth."user".id``.
 
 import threading
 import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 from urllib.error import URLError
 from urllib.parse import urlparse
@@ -17,6 +19,23 @@ import jwt
 from jwt.exceptions import PyJWKClientError
 
 from legacylift.errors import UnauthenticatedError
+
+
+@dataclass(frozen=True, slots=True)
+class NeonAccount:
+    """The account a verified Neon Auth token names.
+
+    Attributes:
+        id: Lowercase UUID from ``sub``.
+        email: Lowercase email from the ``email`` claim, or ``""``.
+        display_name: The ``name`` claim, else the part of the email before ``@``.
+        created_at: The ``createdAt`` claim, else the token's issue time (UTC).
+    """
+
+    id: str
+    email: str
+    display_name: str
+    created_at: datetime
 
 
 class SigningKeys(Protocol):
@@ -75,6 +94,39 @@ class NeonAuth:
         Raises:
             UnauthenticatedError: The token is wrong or expired (401).
         """
+        return _user_id(self._claims(token))
+
+    def account(self, token: str) -> NeonAccount:
+        """Return the account named by a valid token.
+
+        Args:
+            token: The JWT, without the ``Bearer`` prefix.
+
+        Returns:
+            The account built from the token's claims.
+
+        Raises:
+            UnauthenticatedError: The token is wrong or expired (401).
+
+        Example:
+            >>> account = neon.account(token)  # doctest: +SKIP
+            >>> account.email  # doctest: +SKIP
+            'ada@example.com'
+        """
+        claims = self._claims(token)
+        email = claims.get("email")
+        email = email.strip().lower() if isinstance(email, str) else ""
+        name = claims.get("name")
+        display_name = name.strip() if isinstance(name, str) and name.strip() else ""
+        return NeonAccount(
+            id=_user_id(claims),
+            email=email,
+            display_name=display_name or email.partition("@")[0],
+            created_at=_created_at(claims),
+        )
+
+    def _claims(self, token: str) -> dict[str, Any]:
+        """Check the signature, issuer, audience, and expiry, then return the claims."""
         try:
             with self._lock:
                 signing_key = self._jwks.get_signing_key_from_jwt(token)
@@ -91,10 +143,33 @@ class NeonAuth:
             raise UnauthenticatedError("Please log in again.") from error
         except (jwt.PyJWTError, PyJWKClientError, URLError, TimeoutError) as error:
             raise UnauthenticatedError("Invalid login token.") from error
-        sub = payload.get("sub") if isinstance(payload, dict) else None
-        if not isinstance(sub, str):
+        if not isinstance(payload, dict):
             raise UnauthenticatedError("Invalid login token.")
+        return payload
+
+
+def _user_id(claims: dict[str, Any]) -> str:
+    """Return ``sub`` as a lowercase UUID string, or raise a 401."""
+    sub = claims.get("sub")
+    if not isinstance(sub, str):
+        raise UnauthenticatedError("Invalid login token.")
+    try:
+        return str(uuid.UUID(sub))
+    except ValueError as error:
+        raise UnauthenticatedError("Invalid login token.") from error
+
+
+def _created_at(claims: dict[str, Any]) -> datetime:
+    """Return ``createdAt`` as UTC, else the issue time, else now."""
+    created = claims.get("createdAt")
+    if isinstance(created, str):
         try:
-            return str(uuid.UUID(sub))
-        except ValueError as error:
-            raise UnauthenticatedError("Invalid login token.") from error
+            parsed = datetime.fromisoformat(created)
+        except ValueError:
+            parsed = None
+        if parsed is not None:
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    issued = claims.get("iat")
+    if isinstance(issued, int | float):
+        return datetime.fromtimestamp(issued, UTC)
+    return datetime.now(UTC)

@@ -5,8 +5,10 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import jwt
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from legacylift.errors import UnauthenticatedError
+from legacylift.services.neon_auth import NeonAuth
 
 from helpers import make_client
 
@@ -220,3 +222,52 @@ def test_projects_made_before_login_have_no_owner_and_stay_hidden(tmp_path):
     headers = {"Authorization": f"Bearer {token}"}
     assert locked.get("/api/projects", headers=headers).json() == {"projects": []}
     assert locked.get("/api/projects/1", headers=headers).status_code == 404
+
+
+class _LocalJWKS:
+    """Hands back one local public key instead of fetching the network JWKS."""
+
+    def __init__(self, key: object) -> None:
+        self.key = key
+
+    def get_signing_key_from_jwt(self, token: str) -> "_LocalJWKS":
+        return self
+
+
+def test_me_returns_the_neon_account_for_a_neon_token(tmp_path):
+    client = make_client(tmp_path)
+    private = Ed25519PrivateKey.generate()
+    origin = "https://auth.example"
+    client.app.state.neon_auth = NeonAuth(
+        f"{origin}/neondb/auth", jwks_client=_LocalJWKS(private.public_key())
+    )
+    token = jwt.encode(
+        {
+            "sub": ADA_ID,
+            "iss": origin,
+            "aud": origin,
+            "email": "ada@example.com",
+            "name": "Ada Lovelace",
+            "createdAt": "2026-11-09T01:30:00Z",
+            "exp": datetime.now(UTC) + timedelta(minutes=5),
+        },
+        private,
+        algorithm="EdDSA",
+    )
+    response = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": ADA_ID,
+        "email": "ada@example.com",
+        "display_name": "Ada Lovelace",
+        "created_at": "2026-11-09T01:30:00Z",
+    }
+
+
+def test_me_rejects_a_neon_token_when_neon_auth_is_off(tmp_path):
+    client = make_client(tmp_path)
+    client.app.state.neon_auth = None
+    response = client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {_eddsa_token(ADA_ID)}"}
+    )
+    assert (response.status_code, response.json()["detail"]) == (401, "Invalid login token.")
