@@ -1,52 +1,57 @@
 # Developer guide
 
-How the frontend and backend connect, where to make changes, and how the app is hosted. Commands are in the [root README](../README.md#quick-start); routes and rules are in the [backend README](../backend/README.md).
+LegacyLift has a FastAPI backend, a Next.js frontend, PostgreSQL or JSON storage, and an isolated GnuCOBOL/Python runner.
 
-## How a conversion travels
+## Web application
 
-```text
-App.jsx ──api.js──▶ FastAPI router ──▶ service ──▶ cobol/converter.py
-   ▲                                       │
-   └────── JSON: Python + review notes ◀───┘
-```
+The frontend is in [frontend/web](../frontend/web/README.md). Start it with `npm ci && npm run dev`; PowerShell uses `npm.cmd`. Open http://localhost:3000. Start the API separately on port 8000.
 
-1. On page load, [`App.jsx`](../frontend/app/src/App.jsx) calls `GET /health` through [`api.js`](../frontend/app/src/api.js). Convert stays disabled until the API answers.
-2. The app has three screens: **Upload**, **Convert**, **Export**.
-3. **Batch:** on Upload → **Batch files**, **Choose COBOL files** or **Load small sample**; on Convert, **Convert files** calls `POST /api/convert`. Nothing is saved.
-4. **Project:** on Upload → **Project**, **Create project** or **Load demo project** creates a project and **Upload project files** adds files; on Convert, **Convert project** calls `POST /api/projects/{id}/convert`. The result is saved.
-5. Convert shows COBOL and Python side by side with review notes. Export **Download .py** fetches that file from the API.
-6. **Verify (projects):** `POST /api/projects/{id}/verify` sends each main program and its generated Python to the runner container (`services/verification.py` → `runner/server.py`), runs both with the project's `.dat` files, and returns per-file outputs and a `diff` (`verified` / `mismatch` / `not_verified` when the runner is off or unreachable).
-7. Errors come back as `{"detail": "message"}`, and `api.js` shows the message.
+Next.js rewrites `/api/*` and `/health` to the server-only `API_URL` (default http://127.0.0.1:8000). Browser requests stay same-origin. Set the origin before building; rewrites are compiled into the build.
 
-The browser checks files for quick feedback; the backend checks everything again.
+Pages set metadata and render feature screens. Hooks manage workflows; `useWorkspace` keeps project state and Python edits across navigation. `src/lib/api` owns HTTP calls. `src/types/api-schema.d.ts` is generated from the backend OpenAPI snapshot.
 
-## Where to edit
-
-| Change | Where |
+| Change | Location |
 | --- | --- |
-| Screen, buttons, display | [`frontend/app/src/App.jsx`](../frontend/app/src/App.jsx) |
-| Frontend HTTP calls | [`frontend/app/src/api.js`](../frontend/app/src/api.js) |
-| Anything in the backend | See the [backend code layout](../backend/README.md#code-layout) |
+| Screen behavior | `frontend/web/src/components/{upload,convert,export,batch}` |
+| Shared workspace and operations | `frontend/web/src/hooks` |
+| API calls and errors | `frontend/web/src/lib/api` |
+| CSV, downloads, validation | `frontend/web/src/lib` |
+| Colors, typography, responsive styles | `frontend/web/src/styles`, `src/app/globals.css` |
+| Backend routes | `backend/src/legacylift/routers` |
+| Conversion | `backend/src/legacylift/cobol` |
 
-If you change a route's JSON, update `api.js` and `App.jsx` in the same pull request.
+## Accounts
 
-## Making a change
+Configure either:
+- API accounts: a random, persistent `LEGACYLIFT_TOKEN_SECRET` on the API; leave `NEXT_PUBLIC_NEON_AUTH_URL` empty.
+- Neon Auth: set `NEXT_PUBLIC_NEON_AUTH_URL` on the web build to match the backend's `LEGACYLIFT_NEON_AUTH_URL`.
 
-1. Branch from `main`.
-2. Add or update a test in [`backend/tests/`](../backend/tests/) for any backend change.
-3. Run the checks: `pytest`, `ruff`, and `mypy` in `backend/`; `npm run lint` and `npm run build` in `frontend/app/`.
-4. Add a line to the [backend changelog](../backend/docs/CHANGELOG.md).
-5. Open a pull request. GitHub Actions runs the backend and frontend checks, CodeQL, and the dependency review.
+Both use bearer tokens; project ownership is enforced by the API. Never expose database credentials or Gemini keys through public frontend variables.
+
+## Saved results and edits
+
+The latest conversion, dependency analysis, and subsequent verification/AI review restore from saved runs. New uploads and deletions invalidate visible drafts. Python edits survive route navigation within the workspace and downloads save the current text. Edits are local only; refresh, sign-out, or conversion discards them. Verification and AI review describe the saved generated draft.
 
 ## Configuration and hosting
 
-| Piece | Host | Notes |
+| Setting | Location | Purpose |
 | --- | --- | --- |
-| Web app | GitHub Pages | [`pages.yml`](../.github/workflows/pages.yml) builds it on every push to `main` and copies `docs/` to `/course/`. In GitHub, **Settings → Pages → Source** must be **GitHub Actions**. |
-| API address used by the web app | Actions variable `VITE_API_URL` | The API's HTTPS origin, without `/api`. Default: `https://legacylift-api.onrender.com`. |
-| API | Render | Set up in the Render dashboard. With `DATABASE_URL` set to the Neon connection string, projects are stored in PostgreSQL; without it, saved projects are lost on every redeploy or restart. Set `LEGACYLIFT_TOKEN_SECRET` on this service before anyone can log in. Leave `LEGACYLIFT_REQUIRE_LOGIN` unset until the login pages are ready. |
-| Allowed frontend origins | `LEGACYLIFT_CORS_ORIGINS` on the API | Local Vite and `https://aadituh.github.io` are always allowed. |
+| `API_URL` | Web server/build | Same-origin backend proxy |
+| `NEXT_PUBLIC_API_URL` | Web build, optional | Direct browser API origin; requires API CORS |
+| `NEXT_PUBLIC_NEON_AUTH_URL` | Web build, optional | Neon Auth endpoint |
+| `LEGACYLIFT_TOKEN_SECRET` | API only | Sign API account tokens |
+| `DATABASE_URL` | API only | PostgreSQL storage; unset uses JSON |
+| `LEGACYLIFT_GEMINI_API_KEY` | API only | AI review and descriptions |
+| `LEGACYLIFT_ENABLE_RUNNER` | API only | Enable isolated execution |
 
-The web app stays on GitHub Pages (decided in #38). Pages has no pull-request previews; check a frontend branch locally with `npm run dev` or `docker compose up --build`.
+Docker Compose builds the Next.js standalone Node server on port 8080, API on 8000, PostgreSQL and the internal runner. Configure the authentication setting in the root `.env` before starting. The web Docker build points its proxy to `http://api:8000`.
 
-Locally, Vite forwards `/api` and `/health` to `http://127.0.0.1:8000` ([`vite.config.js`](../frontend/app/vite.config.js)), so no address or CORS setup is needed.
+For Vercel, select `frontend/web` as the root and set the build variables above. No Vercel deployment has been configured by this refactor. Next.js dynamic project URLs and the API proxy require a Node host; the app is not exported to GitHub Pages. The Pages workflow deploys the course website from `docs` at the repository root and `/course/`.
+
+## Checks
+
+Run `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run test:run`, and `npm run build` in `frontend/web`. The [web README](../frontend/web/README.md) explains the isolated browser suite and screenshots.
+
+Backend checks remain `uv run --frozen pytest`, `uv run --frozen ruff check src tests`, `uv run --frozen ruff format --check src tests`, and `uv run --frozen mypy`.
+
+Work on a feature branch, run the checks, and open a reviewed pull request to main as described in [CONTRIBUTING](../CONTRIBUTING.md).

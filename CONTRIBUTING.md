@@ -10,7 +10,7 @@ Work is tracked as GitHub issues on the team's GitHub Projects board, grouped by
 - Each pull request comes from its own branch. Feature work closes an issue; small cleanups (typos, doc fixes, removing unused files) can be a pull request without one.
 - A teammate reviews it. Every other member is requested automatically ([`.github/CODEOWNERS`](.github/CODEOWNERS)), and one review from anyone is enough. Approval is not required to merge, but every member has at least one pull request reviewed and approved during each demo.
 - Review comments are resolved before merging.
-- The checks pass. The backend checks run automatically on pull requests that touch `backend/`; for a frontend change, run `npm run lint` and `npm run build` in `frontend/app/`.
+- The checks pass. The backend checks run automatically on pull requests that touch `backend/`; for a frontend change, run `npm run lint` and `npm run build` in `frontend/web/`.
 - The author merges and deletes the branch.
 
 GitHub enforces this on `main` with a ruleset (**Settings → Rules → Rulesets**): a pull request with resolved comments is required, and force pushes and deleting `main` are blocked.
