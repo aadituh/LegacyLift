@@ -1,0 +1,150 @@
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 16px;
+  background: #ecf6f7;
+  border: 1px solid #bfdee1;
+  color: #285c64;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.notice svg {
+  margin-top: 3px;
+}
+.notice.danger {
+  background: #fff0f2;
+  border-color: #e7b9c2;
+  color: #942c3b;
+}
+.notice.warning {
+  background: #fffae9;
+  border-color: #e8d5a4;
+  color: #77500e;
+}
+.notice.success {
+  color: #23633f;
+  background: #ecf7ed;
+  border-color: #c1dbc4;
+}
+.empty-state {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 35px 20px;
+  color: var(--muted);
+}
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #f1f5f8;
+  color: #688297;
+}
+.spinner {
+  display: inline-block;
+  width: 17px;
+  height: 17px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+.skeleton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 35px;
+  background: #edf2f6;
+  border-radius: 10px;
+  color: var(--muted);
+}
+.error-page {
+  min-height: 75vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 22px;
+  padding: 35px;
+  text-align: center;
+}
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: 20px;
+  padding: 12px 20px;
+  background: white;
+  color: var(--text);
+  z-index: 100;
+}
+.skip-link:focus {
+  top: 15px;
+}
+.file-input {
+  position: relative;
+  cursor: pointer;
+}
+.file-input:focus-within {
+  outline: 3px solid #1796ab;
+  outline-offset: 4px;
+}
+.session-loading {
+  max-width: 500px;
+  padding: 12vh 30px;
+  margin: auto;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+details {
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+  padding-top: 14px;
+}
+summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #3c586f;
+}
+details > ul,
+details > p {
+  margin-top: 12px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .spinner {
+    animation: spin 900ms linear infinite;
+  }
+  .main-content {
+    animation: enter 230ms ease-out;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes enter {
+    from {
+      opacity: 0.6;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

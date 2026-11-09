@@ -11,7 +11,7 @@ updates:
         patterns: ["*"]
 
   - package-ecosystem: npm
-    directories: [/frontend/app, /database]
+    directories: [/frontend/web, /database]
     schedule:
       interval: weekly
     groups:
@@ -20,7 +20,7 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: docker
-    directories: [/backend, /frontend/app]
+    directories: [/backend, /frontend/web]
     schedule:
       interval: weekly
 

@@ -1,0 +1,285 @@
+.project-files,
+#verification,
+.export-preview {
+  scroll-margin-top: 160px;
+}
+.project-drop {
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  padding: 17px 20px;
+  background: var(--surface-2);
+  display: grid;
+  gap: 5px;
+}
+.project-drop.dragging {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+.project-file-details .file-list {
+  margin-top: 12px;
+}
+.file-dialog {
+  width: min(1000px, 94vw);
+  max-height: 88vh;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 24px;
+  margin: auto;
+}
+.file-dialog::backdrop {
+  background: #071827a8;
+  backdrop-filter: blur(3px);
+}
+.dialog-heading,
+.preview-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+.preview-toolbar strong {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.text-preview pre {
+  white-space: pre;
+  overflow: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  max-height: 480px;
+  line-height: 1.9;
+  margin: 0;
+}
+.preview-hint {
+  margin-bottom: 18px;
+}
+.source-line {
+  display: inline;
+}
+.focused-line {
+  background: var(--diff);
+  color: var(--text);
+  outline: 2px solid var(--warning);
+}
+.progress-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.dependency-legend {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.dependency-legend > div {
+  border: 1px solid var(--border);
+  border-left: 4px solid currentColor;
+  padding: 14px;
+  border-radius: 8px;
+}
+.dependency-legend p {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 7px;
+}
+.legend-copy {
+  color: #70529f;
+}
+.legend-call {
+  color: #24628e;
+}
+.legend-perform {
+  color: #815d17;
+}
+.dependency-map {
+  height: 390px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.dependency-map .react-flow__node {
+  width: 235px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--accent);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-align: left;
+}
+.react-flow__node small,
+.react-flow__node strong,
+.react-flow__node span {
+  display: block;
+}
+.react-flow__node small {
+  color: var(--muted);
+  font: 700 11px var(--font-sans);
+  margin-bottom: 5px;
+}
+.react-flow__node strong {
+  overflow-wrap: anywhere;
+}
+.react-flow__node span {
+  font: 12px var(--font-sans);
+  color: var(--muted);
+  margin-top: 4px;
+}
+.dependency-map .map-source {
+  background: var(--nav);
+  color: #eef8fc;
+}
+.dependency-map .map-source small {
+  color: #9edcde;
+}
+.dependency-map .map-copy {
+  border-left-color: #8b6fc5;
+}
+.dependency-map .map-call {
+  border-left-color: #418abe;
+}
+.dependency-map .map-perform {
+  border-left-color: #b48a32;
+}
+.dependency-map .map-missing {
+  border: 2px dashed var(--danger);
+}
+.dependency-map .react-flow__controls button {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+  fill: currentColor;
+  width: 32px;
+  height: 32px;
+}
+.dependency-map .react-flow__attribution {
+  background: var(--surface);
+  color: var(--muted);
+}
+.dependency-map .react-flow__attribution a {
+  color: var(--muted);
+}
+.dependency-map .react-flow__controls svg {
+  fill: var(--text);
+}
+.map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.dependency-health {
+  margin-top: 16px;
+}
+.dependency-health li,
+.connection-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.connection-list,
+.dependency-health ul {
+  list-style: none;
+  padding: 0;
+}
+.connection-list code {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.kind-label {
+  font-size: 12px;
+  font-weight: 800;
+  min-width: 65px;
+}
+.review-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 18px;
+  align-items: start;
+}
+.review-group {
+  margin: 0;
+  padding: 17px;
+  border: 1px solid var(--border);
+  border-top: 3px solid #b48a32;
+  border-radius: 8px;
+  background: var(--surface-2);
+  min-width: 0;
+}
+.review-group summary {
+  color: var(--text);
+}
+.review-group summary svg {
+  display: inline;
+  vertical-align: middle;
+  color: var(--warning);
+  margin-inline: 5px;
+}
+.review-group ul {
+  list-style: none;
+  padding: 0;
+}
+.review-group li {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.review-group code {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.download-list li > .button {
+  flex-shrink: 0;
+}
+@media (max-width: 767px) {
+  .dependency-legend,
+  .review-groups {
+    grid-template-columns: 1fr;
+  }
+  .dependency-legend {
+    gap: 8px;
+  }
+  .dependency-legend > div {
+    padding: 11px 14px;
+  }
+  .dependency-map {
+    height: 340px;
+  }
+  .project-files .card-heading,
+  .export-preview .card-heading {
+    flex-wrap: wrap;
+  }
+  .file-preview-label {
+    display: none;
+  }
+  .file-dialog {
+    padding: 18px;
+  }
+  .download-list li {
+    flex-wrap: wrap;
+  }
+  .download-list li > div {
+    flex-basis: calc(100% - 55px);
+  }
+}

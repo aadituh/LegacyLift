@@ -1,0 +1,61 @@
+.route-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.main-content {
+  animation: none;
+}
+.segmented button {
+  position: relative;
+  isolation: isolate;
+}
+.segmented button[aria-pressed="true"],
+[data-theme] .segmented button[aria-pressed="true"] {
+  background: transparent;
+  box-shadow: none;
+}
+.segment-indicator {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--surface);
+  border-radius: 5px;
+  box-shadow: 0 1px 4px #102a4318;
+}
+.nav-item {
+  position: relative;
+  isolation: isolate;
+}
+a.nav-item.active,
+[data-theme] a.nav-item.active {
+  background: transparent;
+}
+.nav-active-indicator {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 7px;
+  background: #e8f4f5;
+}
+[data-theme="dark"] .nav-active-indicator {
+  background: #203d49;
+}
+@media (prefers-reduced-motion: no-preference) {
+  details[open] > .guide-content,
+  .ai-file-group[open] > :not(summary),
+  .review-group[open] > :not(summary) {
+    animation: reveal-content 160ms ease-out;
+  }
+  @keyframes reveal-content {
+    from {
+      opacity: 0;
+      transform: translateY(-3px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

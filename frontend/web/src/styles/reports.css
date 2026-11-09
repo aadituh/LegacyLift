@@ -1,0 +1,246 @@
+.dependency-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+.dependency-grid h3 {
+  margin-bottom: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dependency-links {
+  list-style: none;
+  padding: 0;
+  max-height: 300px;
+  overflow: auto;
+}
+.dependency-links li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 0;
+  border-bottom: 1px solid #edf1f5;
+}
+.dependency-links code {
+  overflow-wrap: anywhere;
+  min-width: 0;
+  flex: 1;
+}
+.dependency-links .hint {
+  white-space: nowrap;
+}
+.inventory {
+  list-style: none;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+}
+.inventory li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.inventory code {
+  overflow-wrap: anywhere;
+}
+.inventory span {
+  font-size: 14px;
+  color: var(--muted);
+}
+.unresolved {
+  color: var(--danger);
+  margin-bottom: 7px;
+  overflow-wrap: anywhere;
+}
+.resolved-note {
+  color: #326b53;
+}
+.verification-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+.output-table-wrap {
+  overflow: auto;
+  max-height: 450px;
+  margin-top: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.output-table {
+  border-collapse: collapse;
+  font-size: 14px;
+  width: 100%;
+}
+.output-table th,
+.output-table td {
+  padding: 7px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.output-table thead {
+  position: sticky;
+  top: 0;
+  background: #eaf1f6;
+  color: #3c586f;
+}
+.output-table tbody th {
+  color: #576b7f;
+  font-weight: 500;
+}
+.output-table pre {
+  margin: 0;
+  font-size: 14px;
+}
+.diff-row {
+  background: var(--diff);
+}
+.reverify {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+.review-file {
+  padding-top: 20px;
+}
+.review-file h3 {
+  margin-bottom: 10px;
+}
+.review-file ul,
+.review-notes {
+  padding-left: 20px;
+}
+.review-file li,
+.review-notes li {
+  padding: 8px 0;
+  overflow-wrap: anywhere;
+}
+.review-notes {
+  max-height: 320px;
+  overflow-y: auto;
+  color: #775411;
+}
+.supported-note {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 0 3px;
+}
+.run-list,
+.download-list {
+  list-style: none;
+  padding: 0;
+}
+.run-list {
+  max-height: 520px;
+  overflow: auto;
+}
+.run-list li {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 14px 0;
+  border-top: 1px solid #e5ebf1;
+}
+.run-list li:first-child {
+  border-top: 0;
+}
+.run-icon {
+  width: 35px;
+  height: 35px;
+  border: 1px solid #d7e3eb;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #4a778c;
+  background: #f4f8fb;
+  flex-shrink: 0;
+}
+.run-list strong {
+  min-width: 80px;
+}
+.run-list time {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--muted);
+}
+.download-list li,
+.report-download {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 19px 12px;
+  border-top: 1px solid #e5ebf1;
+}
+.download-list li:first-child {
+  border-top: 0;
+}
+.download-list li > div,
+.report-download > div {
+  flex: 1;
+  min-width: 0;
+}
+.download-list h3,
+.report-download h3 {
+  font: 600 14px var(--font-mono);
+  margin-bottom: 5px;
+  overflow-wrap: anywhere;
+}
+.download-list .selected {
+  background: #f5fafb;
+  border-radius: 6px;
+}
+.report-download {
+  margin-top: 14px;
+  padding-top: 22px;
+}
+.batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  margin-bottom: 15px;
+}
+.batch-actions > .button-primary {
+  margin-left: auto;
+}
+.conversion-progress {
+  border: 1px solid #bcdae1;
+  border-radius: 9px;
+  background: #edf7f9;
+  padding: 18px 22px;
+  color: #276173;
+}
+.conversion-progress p {
+  margin: 4px 0 15px;
+  font-size: 14px;
+}
+.progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #c9e0e6;
+}
+.progress-track > span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  background: var(--accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .indeterminate > span {
+    animation: loading 1.6s ease-in-out infinite alternate;
+  }
+  @keyframes loading {
+    to {
+      transform: translateX(185%);
+    }
+  }
+}
