@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import * as api from "@/lib/api/projects";
 import type { ProjectSummary } from "@/types/api";
 import { useWorkspace } from "./useWorkspace";
+import { projectUrl } from "@/lib/routes";
 export function useSavedProjects() {
   const { state, setState, activeId, lock, closeProject } = useWorkspace();
   const [projects, setProjects] = useState<ProjectSummary[]>([]),
@@ -83,8 +84,7 @@ export function useSavedProjects() {
     error,
     refresh,
     open: (id: string) => {
-      if (state.ready && !lock.current)
-        router.push(`/projects/${encodeURIComponent(id)}/convert`);
+      if (state.ready && !lock.current) router.push(projectUrl("convert", id));
     },
     remove: (id: string) => remove([id]),
     clearAll: () => remove(projects.map((p) => p.id)),

@@ -173,7 +173,7 @@ test("create, upload, analyze, delete file, project not found, and project remov
   await expect(
     page.getByRole("link", { name: "Continue to Convert" }),
   ).toHaveCount(0);
-  await page.goto("/projects/999999/convert");
+  await page.goto("/convert?project=999999");
   await expect(
     page.getByRole("heading", { name: "Project not found" }),
   ).toBeVisible();

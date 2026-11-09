@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { projectUrl } from "@/lib/routes";
 import { ArrowLeft, Info, CheckCircle2 } from "lucide-react";
 import { useProject } from "@/hooks/useProject";
 import { useConversion } from "@/hooks/useConversion";
@@ -14,11 +16,12 @@ import { RunHistory } from "./RunHistory";
 import { DownloadList } from "./DownloadList";
 import { ExportPreview } from "./ExportPreview";
 import { ReadingGuide } from "@/components/guide/ReadingGuide";
-export function ExportScreen({ projectId }: { projectId: string }) {
-  const p = useProject(projectId),
+export function ExportScreen() {
+  const projectId = useSearchParams().get("project") ?? "";
+  const p = useProject(projectId || undefined),
     c = useConversion(),
     history = useRuns(projectId);
-  if (p.notFound) return <ProjectNotFound />;
+  if (!projectId || p.notFound) return <ProjectNotFound />;
   if (!p.project || p.project.id !== projectId)
     return p.error && !p.loadingId ? (
       <Card title="Couldn’t open this project">
@@ -39,7 +42,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
             <ReadingGuide />
             <Link
               className="button button-secondary"
-              href={`/projects/${projectId}/convert`}
+              href={projectUrl("convert", projectId)}
             >
               <ArrowLeft size={16} aria-hidden="true" />
               Back to Convert

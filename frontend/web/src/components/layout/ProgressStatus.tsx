@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { getProgress } from "@/lib/progress";
+import { projectUrl } from "@/lib/routes";
 export function ProgressStatus() {
   const { state } = useWorkspace();
   const batch = usePathname() === "/batch";
@@ -75,7 +76,11 @@ export function ProgressStatus() {
                       href={
                         i === 0
                           ? `/upload?project=${state.project.id}`
-                          : `/projects/${state.project.id}/convert${i === 2 ? "#verification" : ""}`
+                          : projectUrl(
+                              "convert",
+                              state.project.id,
+                              i === 2 ? "verification" : undefined,
+                            )
                       }
                     >
                       <strong>{label}</strong>

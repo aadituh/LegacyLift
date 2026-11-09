@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { FileInputButton } from "@/components/ui/FileInputButton";
 import { TextPreview } from "@/components/ui/TextPreview";
 import { Button } from "@/components/ui/Button";
+import { projectUrl } from "@/lib/routes";
 import { FileList } from "./FileList";
 export function OpenProject({
   project,
@@ -91,7 +92,7 @@ export function OpenProject({
           {programs > 0 && (
             <Link
               className="button button-primary"
-              href={`/projects/${project.id}/convert`}
+              href={projectUrl("convert", project.id)}
             >
               Continue to Convert
               <ArrowRight size={17} aria-hidden="true" />

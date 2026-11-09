@@ -3,6 +3,8 @@ import { useState } from "react";
 import { ProjectFiles } from "@/components/upload/ProjectFiles";
 import { ProjectReview } from "./ProjectReview";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { projectUrl } from "@/lib/routes";
 import {
   ArrowRight,
   ArrowRightLeft,
@@ -26,8 +28,9 @@ import { AuditReport } from "./AuditReport";
 import { formatRunStatus } from "@/lib/format";
 import { ReadingGuide } from "@/components/guide/ReadingGuide";
 type View = "both" | "cobol" | "python" | "report";
-export function ConvertScreen({ projectId }: { projectId: string }) {
-  const p = useProject(projectId),
+export function ConvertScreen() {
+  const projectId = useSearchParams().get("project") ?? "";
+  const p = useProject(projectId || undefined),
     c = useConversion();
   const [view, setView] = useState<View>("both");
   const [focusLine, setFocusLine] = useState<{
@@ -43,7 +46,7 @@ export function ConvertScreen({ projectId }: { projectId: string }) {
       sourceKey: `${projectId}:${source?.name}`,
     }));
   }
-  if (p.notFound) return <ProjectNotFound />;
+  if (!projectId || p.notFound) return <ProjectNotFound />;
   if (!p.project || p.project.id !== projectId)
     return p.error && !p.loadingId ? (
       <Card title="Couldn’t open this project">
@@ -74,7 +77,7 @@ export function ConvertScreen({ projectId }: { projectId: string }) {
             {c.results.length > 0 && (
               <Link
                 className="button button-secondary"
-                href={`/projects/${projectId}/export`}
+                href={projectUrl("export", projectId)}
               >
                 Go to Export <ArrowRight size={17} aria-hidden="true" />
               </Link>
