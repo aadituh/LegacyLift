@@ -35,7 +35,7 @@ export function UploadScreen() {
       });
   }, [p.project, p.loadingId, params, router]);
   function showProject(id: string | undefined) {
-    if (id && window.location.pathname === "/upload")
+    if (id && window.location.pathname.replace(/\/$/, "").endsWith("/upload"))
       router.replace(`/upload?project=${encodeURIComponent(id)}`, {
         scroll: false,
       });

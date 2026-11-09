@@ -47,7 +47,7 @@ The Next proxy accepts the same 24,000,000-byte request limit as FastAPI. API re
 
 ## Structure and decisions
 
-- `src/app`: server pages, metadata, route boundaries; dynamic project URLs; Upload's open project uses `?project=`.
+- `src/app`: server pages, metadata, route boundaries; Upload, Convert, and Export take the open project as `?project=`.
 - `src/components`: focused screens and reusable UI; pages contain no business logic.
 - `src/hooks`: auth, shared workspace, project and conversion workflows. Workspace resets when the user changes.
 - `src/lib/api`: authenticated HTTP client, account and project routes.
@@ -56,7 +56,7 @@ The Next proxy accepts the same 24,000,000-byte request limit as FastAPI. API re
 - `src/styles`: semantic color roles, light/dark/system themes, scoped component styles and responsive rules. Tailwind v4 uses PostCSS.
 - `tests/e2e`: real-backend browser workflows; runner and Gemini display outcomes additionally use explicit test fixtures.
 
-Auth uses Neon's browser adapter and bearer tokens, with the API's account implementation as fallback. Hosting uses a Node server (Docker standalone or Vercel), not a static GitHub Pages export. The course site remains on Pages. Batch is intentionally transient. Conversion progress is indeterminate. The decorative background is CSS-only on authentication pages.
+Auth uses Neon's browser adapter and bearer tokens, with the API's account implementation as fallback. Hosting: GitHub Pages serves a static build (`GITHUB_PAGES=true npm run build` writes `out/`, served under `/LegacyLift`); Docker and Vercel run it as a Node server. Batch is intentionally transient. Conversion progress is indeterminate. The decorative background is CSS-only on authentication pages.
 
 ## Checks
 

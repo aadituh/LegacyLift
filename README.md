@@ -87,8 +87,8 @@ Work is tracked on the [project board](https://github.com/users/aadituh/projects
 
 | Part | Where | URL |
 | --- | --- | --- |
-| Web app | Next.js Node server (Docker; Vercel-ready) | Local: <http://localhost:8080>; hosted deployment is not configured |
+| Web app | GitHub Pages | <https://aadituh.github.io/LegacyLift/> |
 | Course website | GitHub Pages | <https://aadituh.github.io/LegacyLift/course/> |
 | API | Render | <https://legacylift-api.onrender.com> |
 
-The course site redeploys through Pages on changes to `docs/` on `main`. See [Configuration and hosting](docs/developer.md#configuration-and-hosting) for settings.
+Pages redeploys on every push to `main` that changes `frontend/web/` or `docs/`. See [Configuration and hosting](docs/developer.md#configuration-and-hosting) for settings.

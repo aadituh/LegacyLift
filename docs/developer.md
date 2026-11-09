@@ -38,6 +38,7 @@ The latest conversion, dependency analysis, and subsequent verification/AI revie
 | --- | --- | --- |
 | `API_URL` | Web server/build | Same-origin backend proxy |
 | `NEXT_PUBLIC_API_URL` | Web build, optional | Direct browser API origin; requires API CORS |
+| `GITHUB_PAGES` | Web build, optional | `true` builds static files for GitHub Pages under `/LegacyLift` |
 | `NEXT_PUBLIC_NEON_AUTH_URL` | Web build, optional | Neon Auth endpoint |
 | `LEGACYLIFT_TOKEN_SECRET` | API only | Sign API account tokens |
 | `DATABASE_URL` | API only | PostgreSQL storage; unset uses JSON |
@@ -46,7 +47,9 @@ The latest conversion, dependency analysis, and subsequent verification/AI revie
 
 Docker Compose builds the Next.js standalone Node server on port 8080, API on 8000, PostgreSQL and the internal runner. Configure the authentication setting in the root `.env` before starting. The web Docker build points its proxy to `http://api:8000`.
 
-For Vercel, select `frontend/web` as the root and set the build variables above. No Vercel deployment has been configured by this refactor. Next.js dynamic project URLs and the API proxy require a Node host; the app is not exported to GitHub Pages. The Pages workflow deploys the course website from `docs` at the repository root and `/course/`.
+GitHub Pages: [`pages.yml`](../.github/workflows/pages.yml) builds the web app with `GITHUB_PAGES=true` on pushes to `main` and copies `docs/` to `/course/`. The static build has no `/api` proxy, so the browser calls `NEXT_PUBLIC_API_URL` (Actions variable; default `https://legacylift-api.onrender.com`). The Neon Auth endpoint comes from the `NEXT_PUBLIC_NEON_AUTH_URL` Actions variable, or `VITE_NEON_AUTH_URL` if that is unset. In GitHub, **Settings → Pages → Source** must be **GitHub Actions**.
+
+Vercel: select `frontend/web` as the root and set the build variables above. It runs the same app as a Node server, with the `/api` proxy.
 
 ## Checks
 

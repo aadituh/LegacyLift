@@ -1,18 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
-export function AuthForm({
-  mode,
-  notice,
-}: {
-  mode: "sign-in" | "sign-up";
-  notice?: string;
-}) {
+export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const signup = mode === "sign-up";
+  const created = useSearchParams().get("created") === "1";
+  const notice =
+    !signup && created
+      ? "Account created. Sign in to open your workspace."
+      : undefined;
   const {
     user,
     signIn,

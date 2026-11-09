@@ -10,7 +10,7 @@ export function Logo({
     <span className="brand">
       <span className="brand-mark" style={{ width: size, height: size }}>
         <Image
-          src="/logo.png"
+          src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logo.png`}
           width={size}
           height={size}
           alt={showName ? "" : "LegacyLift"}

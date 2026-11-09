@@ -1,23 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthForm } from "@/components/auth/AuthForm";
 export const metadata: Metadata = { title: "Sign in" };
-export default async function SignIn({
-  searchParams,
-}: {
-  searchParams: Promise<{ created?: string }>;
-}) {
-  const query = await searchParams;
+export default function SignIn() {
   return (
     <AuthLayout>
-      <AuthForm
-        mode="sign-in"
-        notice={
-          query.created === "1"
-            ? "Account created. Sign in to open your workspace."
-            : undefined
-        }
-      />
+      <Suspense>
+        <AuthForm mode="sign-in" />
+      </Suspense>
     </AuthLayout>
   );
 }
