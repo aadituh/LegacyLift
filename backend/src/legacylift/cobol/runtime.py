@@ -23,7 +23,7 @@ INTCALC interest (Alice / ``INTCALC_alice_30d.out``): Alice's
 LEADING SEPARATE`` → ``12500.50`` (not ``1250.05``). With rate
 ``0.0250``, ``30`` days, and a ``365``-day year, ``COMPUTE … ROUNDED`` to
 ``S9(7)V99`` yields ``25.69``; plain ``DISPLAY`` prints ``+0000025.69``
-(recorded via ``INTDRV`` calling ``INTCALC`` — issue #98).
+(recorded via ``tests/data/cobol/INTDRV.cbl`` calling ``INTCALC`` — issue #98).
 
 Generated drafts import::
 

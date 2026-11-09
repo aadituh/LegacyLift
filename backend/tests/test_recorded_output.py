@@ -12,6 +12,7 @@ from legacylift.runner.sandbox import run_cobol
 
 BACKEND = Path(__file__).resolve().parents[1]
 SAMPLE = BACKEND / "src" / "legacylift" / "data"
+DRIVERS = BACKEND / "tests" / "data" / "cobol"
 BANK = BACKEND / "tests" / "data" / "recorded" / "bank"
 CASES = ["sample", "normal", "overdraft", "closed"]
 RECORD_WIDTHS = {"accounts.dat": 43, "transactions.dat": 16}
@@ -97,8 +98,9 @@ def test_gnucobol_still_prints_the_recorded_program_output(
 @needs_cobc
 def test_gnucobol_intcalc_alice_matches_recorded_via_intdrv():
     """INTCALC cannot run alone; INTDRV CALLs it and DISPLAYs Alice's 30-day interest (#98)."""
+    programs = {**read(DRIVERS, "INTDRV.cbl"), **read(SAMPLE, "INTCALC.cbl")}
     result = run_cobol(
-        read(SAMPLE, "INTDRV.cbl", "INTCALC.cbl"),
+        programs,
         main="INTDRV.cbl",
         copybooks=read(SAMPLE, "ACCTDEF.cpy"),
         data_files=read(SAMPLE, "accounts.dat"),

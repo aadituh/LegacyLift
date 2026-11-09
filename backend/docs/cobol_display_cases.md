@@ -24,8 +24,10 @@ scripts noted in issue #36.
 ## INTCALC interest (Alice @ 30 days)
 
 `INTCALC` has a `LINKAGE SECTION`, so it cannot run alone. Record stdout with
-`INTDRV.cbl` (CALLs `INTCALC`) through `scripts/record_cobol_output.py` in the
-runner image. Fixture: `tests/data/recorded/INTCALC_alice_30d.out`.
+`tests/data/cobol/INTDRV.cbl` (CALLs `INTCALC`) through
+`scripts/record_cobol_output.py` in the runner image. Fixture:
+`tests/data/recorded/INTCALC_alice_30d.out`. The driver stays under `tests/` so
+the demo sample set in `src/legacylift/data/` remains 10 files.
 
 Alice’s first line in `accounts.dat` against `ACCTDEF.cpy`:
 
