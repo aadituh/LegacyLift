@@ -1,4 +1,4 @@
-Author(s): Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Welcome to LegacyLift
 > "AI Pipeline for Legacy Code Modernization"

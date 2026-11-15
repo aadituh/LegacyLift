@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Convert Page
 Convert turns each program into a Python draft and lists review notes. The design presentation’s Convert screen shows COBOL beside Python and lets the reviewer switch between Both, COBOL only, and Python only.

@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Upload Page
 Welcome to the **Upload Page** guide for LegacyLift!

@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Project Upload and Analysis
 Users create or open a project and add COBOL programs, copybooks, and data files. LegacyLift stores the project with the owning account and can list structure and dependency links so reviewers see how files connect.

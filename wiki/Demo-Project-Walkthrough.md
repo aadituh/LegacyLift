@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Demo Project Walkthrough
 The built-in scenario is a small bank’s October month-end close: an accountant moves COBOL to Python and checks that the Python prints the same numbers.

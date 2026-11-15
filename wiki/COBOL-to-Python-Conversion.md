@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # COBOL to Python Conversion
 Conversion walks each program and emits a Python draft. Supported constructs become runnable Python; unsupported lines become review notes so humans know what still needs work. The same COBOL with the same copybooks always produces the same Python—nothing is guessed by the rule engine.

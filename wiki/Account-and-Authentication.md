@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Account and Authentication
 LegacyLift ties projects to accounts so each user only sees their own work. Passwords are stored only as salted hashes. Neon Auth and API email/password paths support the demo’s private-projects story.

@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Login and Registration
 Users register and sign in so projects stay private to their account. The design presentation keeps login simple so demo time stays on the GnuCOBOL proof.

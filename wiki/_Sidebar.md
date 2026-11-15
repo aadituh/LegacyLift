@@ -22,16 +22,19 @@
    [[Analyze Page|Analyze-Page]]  
    [[Convert Page|Convert-Page]]  
    [[Export Page|Export-Page]]  
+   [[Batch Conversion Page|Batch-Conversion-Page]]  
    [[Login and Registration|Login-and-Registration]]  
 </details>
 
 <details open>
 <summary><h2>Tasks</h2></summary>
 
+   [[Run LegacyLift Locally|Run-LegacyLift-Locally]]  
    [[Load Demo Project|Load-Demo-Project]]  
    [[Upload Project Files|Upload-Project-Files]]  
    [[Convert a Project|Convert-a-Project]]  
    [[Verify COBOL and Python Output|Verify-COBOL-and-Python-Output]]  
    [[Download Generated Python|Download-Generated-Python]]  
+   [[Convert Standalone Programs|Convert-Standalone-Programs]]  
    [[Create an Account and Sign In|Create-an-Account-and-Sign-In]]  
 </details>

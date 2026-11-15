@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Processes
 Key processes users and operators engage with in LegacyLift. Each linked page describes a workflow from the product requirements and design presentation.
