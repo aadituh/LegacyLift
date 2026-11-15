@@ -28,6 +28,8 @@ test("project URL and workspace agree after browser back navigation", async ({
   await expect(
     page.getByRole("heading", { name: "Project A", exact: true, level: 2 }),
   ).toBeVisible();
+  await expect(page).toHaveURL(/\/upload\?project=/);
+  const firstUrl = page.url();
   await page.getByLabel("Project name").fill("Project B");
   await page
     .getByRole("button", { name: "Create project", exact: true })
@@ -35,6 +37,7 @@ test("project URL and workspace agree after browser back navigation", async ({
   await expect(
     page.getByRole("heading", { name: "Project B", exact: true, level: 2 }),
   ).toBeVisible();
+  await expect(page).not.toHaveURL(firstUrl);
   const secondUrl = page.url();
   await page
     .locator(".project-list > li")
