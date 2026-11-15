@@ -3,7 +3,7 @@ name: Publish LegacyLift to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['frontend/web/**', 'docs/**', '.github/workflows/pages.yml']
+    paths: ['frontend/web/**', 'wiki/**', 'docs/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:

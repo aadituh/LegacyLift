@@ -65,7 +65,8 @@ services:
 
   web:
     build:
-      context: frontend/web
+      context: .
+      dockerfile: frontend/web/Dockerfile
       args:
         NEXT_PUBLIC_NEON_AUTH_URL: ${NEXT_PUBLIC_NEON_AUTH_URL:-}
     ports:

@@ -66,12 +66,18 @@
 .account-nav {
   display: flex;
   align-items: center;
-  gap: 30px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px 30px;
   font-size: 14px;
   font-weight: 700;
   color: #435c70;
 }
-.account-nav a:not(.button):hover {
+.account-nav a {
+  white-space: nowrap;
+}
+.account-nav a:not(.button):hover,
+.account-nav a.is-active {
   color: var(--accent-hover);
 }
 .auth-content {
@@ -210,9 +216,11 @@
   .site-header-inner {
     padding: 16px 22px;
     min-height: 78px;
+    flex-wrap: wrap;
+    row-gap: 12px;
   }
   .account-nav {
-    gap: 18px;
+    gap: 10px 16px;
   }
   .auth-workflow-link {
     display: none;
@@ -241,7 +249,7 @@
   }
 }
 @media (max-width: 480px) {
-  .auth-signin-link {
+  .auth-layout:not(.manual-layout) .auth-signin-link {
     display: none;
   }
   .site-header-inner {

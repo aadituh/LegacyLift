@@ -3,9 +3,16 @@ import { Code2, GitBranch, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Backdrop } from "@/components/brand/Backdrop";
 import { ThemeMenu } from "@/components/ui/ThemeMenu";
-export function AuthLayout({ children }: { children: React.ReactNode }) {
+export function AuthLayout({
+  children,
+  variant = "card",
+}: {
+  children: React.ReactNode;
+  variant?: "card" | "manual";
+}) {
+  const manual = variant === "manual";
   return (
-    <div className="auth-layout">
+    <div className={manual ? "auth-layout manual-layout" : "auth-layout"}>
       <Backdrop />
       <header className="site-header">
         <div className="site-header-inner">
@@ -14,9 +21,14 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
           </Link>
           <nav aria-label="Account" className="account-nav">
             <ThemeMenu />
-            <a href="#workflow" className="auth-workflow-link">
-              How it works
-            </a>
+            <Link href="/manual" className={manual ? "is-active" : undefined}>
+              User manual
+            </Link>
+            {manual ? null : (
+              <a href="#workflow" className="auth-workflow-link">
+                How it works
+              </a>
+            )}
             <Link href="/sign-in" className="auth-signin-link">
               Sign in
             </Link>
@@ -26,29 +38,35 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="auth-content">
-        <section className="auth-card">{children}</section>
-        <section
-          id="workflow"
-          className="auth-benefits"
-          aria-label="How LegacyLift works"
-        >
-          <div>
-            <GitBranch size={20} aria-hidden="true" />
-            <h2>Understand your source</h2>
-            <p>See how your programs connect.</p>
-          </div>
-          <div>
-            <Code2 size={20} aria-hidden="true" />
-            <h2>Review the next chapter</h2>
-            <p>Shape clear, editable Python drafts.</p>
-          </div>
-          <div>
-            <ShieldCheck size={20} aria-hidden="true" />
-            <h2>Verify the behavior</h2>
-            <p>Compare outputs before moving forward.</p>
-          </div>
-        </section>
+      <main className={manual ? "manual-content" : "auth-content"}>
+        {manual ? (
+          children
+        ) : (
+          <>
+            <section className="auth-card">{children}</section>
+            <section
+              id="workflow"
+              className="auth-benefits"
+              aria-label="How LegacyLift works"
+            >
+              <div>
+                <GitBranch size={20} aria-hidden="true" />
+                <h2>Understand your source</h2>
+                <p>See how your programs connect.</p>
+              </div>
+              <div>
+                <Code2 size={20} aria-hidden="true" />
+                <h2>Review the next chapter</h2>
+                <p>Shape clear, editable Python drafts.</p>
+              </div>
+              <div>
+                <ShieldCheck size={20} aria-hidden="true" />
+                <h2>Verify the behavior</h2>
+                <p>Compare outputs before moving forward.</p>
+              </div>
+            </section>
+          </>
+        )}
       </main>
       <footer className="auth-footer">
         <p>© {new Date().getFullYear()} LegacyLift · ODU CS 411W</p>
