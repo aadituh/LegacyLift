@@ -24,4 +24,4 @@
     1. [[Download Generated Python|Download-Generated-Python]]
     1. [[Create an Account and Sign In|Create-an-Account-and-Sign-In]]
 
-> **Placeholder:** Expand this outline with deep links and figure numbers once Lab 3 screenshots and final page titles are locked.
+Design presentation topics mapped into this wiki include the solution process flow, major functional components, Upload / Convert / Export GUI, GnuCOBOL proof, and AI review as advice on top of verification.

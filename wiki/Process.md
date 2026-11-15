@@ -1,12 +1,13 @@
 **Author(s):** Spencer Peloquin
 
 # Processes
-Place key processes users will engage here. Each linked page describes a LegacyLift workflow from the user’s point of view.
+Key processes users and operators engage with in LegacyLift. Each linked page describes a workflow from the product requirements and design presentation.
 
-* [[Project Upload and Analysis|Project-Upload-and-Analysis]]
-* [[COBOL to Python Conversion|COBOL-to-Python-Conversion]]
-* [[Verification Against GnuCOBOL|Verification-Against-GnuCOBOL]]
-* [[Demo Project Walkthrough|Demo-Project-Walkthrough]]
-* [[Account and Authentication|Account-and-Authentication]]
+* [[Project Upload and Analysis|Project-Upload-and-Analysis]] — create projects, upload files, list divisions/fields/dependencies  
+* [[COBOL to Python Conversion|COBOL-to-Python-Conversion]] — rule-based translation, review notes, optional Gemini assist  
+* [[Verification Against GnuCOBOL|Verification-Against-GnuCOBOL]] — run both programs, compare stdout, interpret statuses  
+* [[Demo Project Walkthrough|Demo-Project-Walkthrough]] — October month-end close sample bank  
+* [[Account and Authentication|Account-and-Authentication]] — register, login, private projects  
 
-> **Placeholder:** Expand this hub with swimlane diagrams and RACI notes in a later revision.
+## Solution process flow (design presentation)
+Legacy source → upload checks → project service → analysis / conversion → storage → output check (and optional AI review) → download. The API is the only layer that touches the converter and the database; uploaded code runs only in the runner service.
