@@ -2,8 +2,10 @@
 
 # Create an Account and Sign In
 ## Steps
-1. Open the registration page and enter email and password.
-2. Submit registration (password must meet the API strength rules).
-3. Sign in with the same credentials to see only your projects.
+1. Open the registration page and enter a username (3–30 characters: letters, digits, underscores) and password (8–128 characters).  
+2. Submit registration; fix any rule named in an error message.  
+3. Sign in with the same credentials.  
+4. Create projects—only your account will see them.  
+5. Choose Log Out when finished; the session ends and the login page returns.
 
-> **Placeholder:** Add Neon Auth alternate path screenshots when that flow is required for Lab 3 demos.
+After five failed login attempts, wait 30 minutes before trying again.

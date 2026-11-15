@@ -1,23 +1,41 @@
 **Author(s):** Spencer Peloquin
 
-**Analyze:** The step that lists COPY, CALL, and PERFORM links between project files so you can see how programs and copybooks depend on each other.
+Definitions drawn from Lab 1 and the product requirements / design presentation.
 
-**COBOL:** A long-lived business programming language still used in banking and government batch systems; LegacyLift accepts COBOL sources for conversion.
+**Common Business-Oriented Language (COBOL):** A language popular on corporate mainframes in the 1970s and 1980s; still embedded in finance, government, and healthcare. LegacyLift’s primary input language.
 
-**Converter:** The LegacyLift component that turns supported COBOL statements into Python drafts and leaves unsupported lines as review notes.
+**Docker:** Platform for containerizing applications. LegacyLift starts the database, API, runner, and web app with Docker Compose for local development.
 
-**Copybook:** A shared COBOL fragment (often a record layout) included with `COPY`; in LegacyLift these appear as `.cpy` files.
+**Functional equivalence:** New code produces identical outputs and behavior to the legacy code for the same inputs. Verify marks a program matching when COBOL and Python print exactly the same text.
 
-**GnuCOBOL:** The open-source COBOL compiler (`cobc`) used in the runner container to compile and run original programs during verification.
+**Gemini:** Google’s AI model used for AI-assisted translation of review notes and for AI review of converted programs.
 
-**Legacy code:** Existing production software that is hard to change; here it usually means COBOL programs and their data files.
+**GnuCOBOL (`cobc`):** Open-source COBOL compiler used in the runner container to compile and run original programs during verification.
 
-**Linkage section:** COBOL data passed into a called program; programs with only linkage cannot run alone without a CALL driver.
+**Hallucination:** An LLM error that produces output that looks valid but is logically wrong; RAG and rule-based conversion reduce this risk.
 
-**Placeholder term:** *Replace this definition with the official Lab 3 glossary entry when terminology is finalized.*
+**Integrated Development Environment (IDE):** Collection of tools for coding, debugging, and production in one application.
 
-**Project:** A named set of up to ten uploaded files (programs, copybooks, and data) that you analyze, convert, and verify together.
+**Job Control Language (JCL):** Scripting language used alongside COBOL on enterprise mainframes.
 
-**Runner:** The isolated Docker service that compiles COBOL and executes both COBOL and Python with time and output limits.
+**Large Language Model (LLM):** Software capable of generative reasoning over large datasets; used in LegacyLift for assisted translation and review, not as the sole converter.
 
-**Verification:** Comparing stdout from GnuCOBOL and from generated Python on the same inputs to see if they match (`verified`, `mismatch`, or `not_verified`).
+**Node Package Manager (NPM):** Content distribution framework for web packages (Lab 1 packaging discussion).
+
+**Object-Oriented Programming (OOP):** Style that organizes code into modular classes rather than linear procedures.
+
+**Python:** Interpreted language used for LegacyLift’s converter output and API (Python 3.12 + FastAPI).
+
+**Retrieval-Augmented Generation (RAG):** Technique that retrieves relevant code, documentation, and patterns before generation so the model sees real context instead of guessing.
+
+**Review note:** A COBOL line the rule-based converter cannot translate, kept as a comment with the original text and line number for human (or AI-assisted) follow-up.
+
+**Runner:** Isolated Docker service with GnuCOBOL and Python; the only place uploaded COBOL and generated Python execute.
+
+**Structured Query Language (SQL):** Default format for enterprise databases such as PostgreSQL (Neon hosts LegacyLift accounts and projects).
+
+**Technical debt:** Accumulated cost of maintaining outdated code; inherent in legacy systems that need specialized knowledge to operate.
+
+**Vector database:** Store optimized for semantic search of embeddings (used with RAG / pgvector for similar verified examples).
+
+**Verification:** Running COBOL and Python on the same project data files and comparing printed output (`verified`, `mismatch`, or `not_verified`).
