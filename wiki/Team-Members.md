@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 Roles from the formal design presentation; contact details from the project team page.
 

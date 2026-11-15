@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Export Page
 Export lets users download generated `.py` files and review run history after conversion (and verification).

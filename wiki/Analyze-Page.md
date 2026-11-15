@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Analyze Page
 The Analyze view shows how files in the current project depend on each other—COPY, CALL, and PERFORM links—plus program structure (divisions, fields, paragraphs). Unresolved references are flagged when the target is missing from the project.

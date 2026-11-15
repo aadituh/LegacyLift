@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin
 
 # Load Demo Project
 This tutorial walks through loading the October month-end close demo used in the design presentation.

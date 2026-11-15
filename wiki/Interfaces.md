@@ -1,4 +1,4 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin, Aaditya Ghimire
 
 # Interfaces
 Dedicated pages for each primary interface in the LegacyLift web app. The design presentation describes three main project screens—Upload, Convert, and Export—plus login. Analyze surfaces dependency and program structure results from the API.
@@ -7,6 +7,7 @@ Dedicated pages for each primary interface in the LegacyLift web app. The design
 * [[Analyze Page|Analyze-Page]]  
 * [[Convert Page|Convert-Page]]  
 * [[Export Page|Export-Page]]  
+* [[Batch Conversion Page|Batch-Conversion-Page]]  
 * [[Login and Registration|Login-and-Registration]]  
 
 ## Tech stack (design presentation)

@@ -1,13 +1,15 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin, Aaditya Ghimire
 
 # Tasks
 Instructions for specific tasks within each interface, aligned with the functional requirements and the live demo script.
 
+* [[Run LegacyLift Locally|Run-LegacyLift-Locally]]  
 * [[Load Demo Project|Load-Demo-Project]]  
 * [[Upload Project Files|Upload-Project-Files]]  
 * [[Convert a Project|Convert-a-Project]]  
 * [[Verify COBOL and Python Output|Verify-COBOL-and-Python-Output]]  
 * [[Download Generated Python|Download-Generated-Python]]  
+* [[Convert Standalone Programs|Convert-Standalone-Programs]]  
 * [[Create an Account and Sign In|Create-an-Account-and-Sign-In]]  
 
 ## Live demo sequence (design presentation)

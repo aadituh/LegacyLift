@@ -1,31 +1,49 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin, Aaditya Ghimire
 
 # Verification Against GnuCOBOL
-After convert, LegacyLift can run each main program as COBOL in the runner and as Python with the same `.dat` files, then compare stdout. Verify is proof for that data; AI review is separate advice.
+Verification answers one question: does the Python draft print the same text as the original COBOL? LegacyLift compiles and runs each main program with GnuCOBOL, runs its Python draft with the same data files, and compares what the two print.
 
-## Output comparison (requirements §3.1.8)
-* Run each main COBOL program and its generated Python on the same project data files.  
-* Compile called programs together with the main program.  
-* Report matching when printed outputs are exactly the same.  
-* For differing outputs, show a line-by-line difference.  
-* For compile/run failures, report not matching with the reason.  
-* Mark the verify run `verified`, `mismatch`, or `not_verified` accordingly.
+## When it runs
+* Automatically after **Convert project** on the Convert page.
+* Again whenever you choose **Run verification again**.
+* Only for saved projects. Batch conversion is not verified.
 
-## Runner and safety (requirements §3.2.2, §3.3.3)
-* Uploaded COBOL and generated Python run only in a separate runner service, never in the API process.  
-* Compile timeout 60 seconds; run timeout 10 seconds; max output 256,000 bytes.  
-* When the runner is unavailable, mark the run `not_verified`.
+## What is compared
+* Each main program and its Python draft read the project's `.dat` files.
+* Programs that a main program calls are compiled with it and checked through its output. They have no result of their own.
+* The printed output must be exactly the same, including spaces and leading zeros.
+* Verification always uses the saved generated draft. Edits you make to the Python in the browser are not included.
 
-## Sample bank results (design presentation)
+## Results
+| Status on the page | Meaning |
+| --- | --- |
+| **Verified** | COBOL and Python printed the same output. |
+| **Mismatch** | The outputs differ, or one program did not compile or finish. The table marks each differing line and a message gives the reason for a failure. |
+| **Not compared** | Verification is not available where the app is running, so nothing was run. |
+
+A **Verified** result covers the data files in the project. Add data files for other cases you want to check.
+
+## Where the programs run
+Uploaded COBOL and generated Python run only in the runner, a separate service with no internet access. The API does not run them.
+
+| Limit | Value |
+| --- | --- |
+| Compile time | 60 seconds |
+| Run time for each program | 10 seconds |
+| Printed output | 256,000 bytes |
+
+The runner starts with `docker compose up` (see [[Run LegacyLift Locally|Run-LegacyLift-Locally]]). Where it is not running, every result is **Not compared**.
+
+## Sample bank results
 | Program | Result | Notes |
 | --- | --- | --- |
-| MONTHEND | Verified | 8 lines match, including leading zeros |
-| FEESCHED | Verified | 5 lines match |
-| BANKMAIN | Mismatch | File reads / some formats still review notes; diff shows missing lines |
-| TXNPOST / INTCALC | (inside BANKMAIN) | No separate result |
+| `MONTHEND` | Verified | 8 lines match, ending `TOTAL BALANCE:   000016140.37` |
+| `FEESCHED` | Verified | 5 lines match |
+| `BANKMAIN` | Mismatch | The table shows the statement lines the draft does not print yet |
+| `TXNPOST`, `INTCALC` | Checked inside `BANKMAIN` | No separate result |
 
-MONTHEND example ending line: `TOTAL BALANCE: 000016140.37` (GnuCOBOL 3.1.2).
+## Verification and AI review
+* **Verification** runs both programs and reports Verified or Mismatch. It is the evidence for the data you supplied.
+* **AI review** reads the COBOL, the Python, and the review notes, and lists matches and concerns by line. It is advice for the reviewer and never changes the verification status.
 
-## Verify vs AI review
-* **Verify (GnuCOBOL):** runs both programs → verified or mismatch with a line diff → trust as proof for this data.  
-* **AI review (Gemini):** reads COBOL, Python, and notes → matches and concerns by line → advice a person still checks; never changes the verify status.
+Steps: [[Verify COBOL and Python Output|Verify-COBOL-and-Python-Output]].

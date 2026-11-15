@@ -1,6 +1,6 @@
-**Author(s):** Spencer Peloquin
+**Authors:** Spencer Peloquin, Aaditya Ghimire
 
-References from Lab 1 and the formal design presentation.
+References from Lab 1, the Lab 2 requirements specification, and the formal design presentation.
 
 [1] Bennett, T. (2026). DreamFactory — Legacy system modernization statistics. https://www.dreamfactory.com/hub/legacy-system-modernization-statistics
 
@@ -25,3 +25,9 @@ References from Lab 1 and the formal design presentation.
 [11] LegacyLift Team. Product requirements §3 (functional, non-functional, design constraints). Old Dominion University CS411W.
 
 [12] LegacyLift Team. Formal design presentation (MFCD, process flow, GUI, verify vs AI review). Old Dominion University CS411W.
+
+[13] IEEE. (1998). IEEE recommended practice for software requirements specifications (IEEE Std 830-1998).
+
+[14] LegacyLift Team. (2026). CS 411W formal design demo 1 [Presentation]. Old Dominion University CS411W.
+
+[15] LegacyLift Team. (2026). LegacyLift [GitHub repository]. https://github.com/aadituh/LegacyLift
