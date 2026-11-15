@@ -18,6 +18,7 @@
 @import "../styles/motion.css";
 @import "../styles/dependencies.css";
 @import "../styles/guide.css";
+@import "../styles/manual.css";
 @import "../styles/refinement.css";
 :root {
   --bg: #f5f7fa;

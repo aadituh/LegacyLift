@@ -2,7 +2,7 @@ name: Frontend checks
 on:
   push:
     branches: [main]
-    paths: ['frontend/web/**', 'backend/**', '.github/workflows/frontend.yml']
+    paths: ['frontend/web/**', 'wiki/**', 'backend/**', '.github/workflows/frontend.yml']
   pull_request:
   workflow_dispatch:
 permissions:
