@@ -42,6 +42,12 @@ class AIReviewError(LegacyLiftError):
     status_code = 502
 
 
+class ProviderLimitError(LegacyLiftError):
+    """A provider cap blocked the call before it was sent (429)."""
+
+    status_code = 429
+
+
 class NotFoundError(LegacyLiftError):
     """The requested project does not exist (404)."""
 

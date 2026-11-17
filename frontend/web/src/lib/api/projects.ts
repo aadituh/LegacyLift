@@ -1,3 +1,4 @@
+import type { ModelSelection } from "@/lib/model-selection";
 import { request } from "./client";
 import type {
   ProjectResponse,
@@ -41,8 +42,20 @@ export const analyzeProject = (id: string) =>
   request<AnalyzeResponse>(`${path(id)}/analyze`, post);
 export const verifyProject = (id: string) =>
   request<VerifyResponse>(`${path(id)}/verify`, post);
-export const reviewProject = (id: string) =>
-  request<AIReviewResponse>(`${path(id)}/ai-review`, post);
+export const reviewProject = (id: string, selection?: ModelSelection) => {
+  const params = new URLSearchParams();
+  if (selection) {
+    params.set("mode", selection.mode);
+    if (selection.groqModel) params.set("groq_model", selection.groqModel);
+    if (selection.openrouterModel)
+      params.set("openrouter_model", selection.openrouterModel);
+  }
+  const query = params.toString();
+  return request<AIReviewResponse>(
+    `${path(id)}/ai-review${query ? `?${query}` : ""}`,
+    post,
+  );
+};
 export const describeProject = (id: string) =>
   request<DescribeResponse>(`${path(id)}/describe`, post);
 export const listRuns = (id: string, signal?: AbortSignal) =>

@@ -1,7 +1,8 @@
 """Project routes under ``/api/projects``.
 
 List, create, read, and delete projects; upload and remove files; analyze,
-describe, convert, verify, and ask Gemini for a second review; read runs.
+describe, convert, verify, and ask a translation provider for a second review;
+read runs. Gemini remains the default provider.
 
 Each route reads the request, calls one ``ProjectService`` method, and returns
 a body from ``schemas.py``. Service errors become 4xx responses through the
@@ -12,15 +13,17 @@ for developers only. Every route with ``{project_id}`` gets the project through
 ``ProjectDep``, which answers 404 when it does not exist.
 """
 
+from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import APIRouter, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
-from legacylift.cobol.ai_review import GEMINI_MODEL
 from legacylift.dependencies import ActiveUserDep, ProjectDep, ProjectServiceDep
 from legacylift.models import Project, Run, RunStatus
+from legacylift.providers.router import parse_model_choice
+from legacylift.providers.types import GroqSnapshot
 from legacylift.responses import python_attachment
 from legacylift.schemas import (
     AIReviewResponse,
@@ -29,6 +32,7 @@ from legacylift.schemas import (
     CreateProjectRequest,
     DescribeResponse,
     FileEquivalenceResponse,
+    GroqUsageResponse,
     ProjectListResponse,
     ProjectResponse,
     ProjectSummary,
@@ -234,14 +238,23 @@ def analyze_project(project: ProjectDep, service: ProjectServiceDep) -> AnalyzeR
 
 
 @router.post("/{project_id}/describe")
-def describe_project(project: ProjectDep, service: ProjectServiceDep) -> DescribeResponse:
+def describe_project(
+    project: ProjectDep,
+    service: ProjectServiceDep,
+    mode: str = "auto",
+    groq_model: str | None = None,
+    openrouter_model: str | None = None,
+) -> DescribeResponse:
     """Describe how the project's programs fit together.
+
+    ``mode`` chooses auto routing or one provider. Large descriptions stay on Gemini.
 
     \f
     Raises:
         ProjectStateError: The project has no programs, or the API key is unset (400).
+        InvalidInputError: ``mode`` or a model id is not usable (400).
     """
-    described = service.describe(project)
+    described = service.describe(project, parse_model_choice(mode, groq_model, openrouter_model))
     return DescribeResponse(project_id=project.id, **described.model_dump())
 
 
@@ -305,25 +318,44 @@ def verify_project(project: ProjectDep, service: ProjectServiceDep) -> VerifyRes
 
 
 @router.post("/{project_id}/ai-review")
-def review_project(project: ProjectDep, service: ProjectServiceDep) -> AIReviewResponse:
-    """Compare each program with its Python using Gemini.
+def review_project(
+    project: ProjectDep,
+    service: ProjectServiceDep,
+    mode: str = "auto",
+    groq_model: str | None = None,
+    openrouter_model: str | None = None,
+) -> AIReviewResponse:
+    """Compare each program with its Python.
 
-    Returns matches and concerns. Each one lists the COBOL lines, the Python
-    lines, and a one-sentence detail. Status is `clear` or `concerns`.
+    ``mode=auto`` is the default: small prompts can use Groq, and Gemini remains
+    the fallback. Returns matches and concerns. Status is `clear` or `concerns`.
+    ``routing_note`` says which provider was chosen.
 
     \f
     Raises:
         ProjectStateError: The API key is unset, or the project has not been converted (400).
-        AIReviewError: Gemini timed out or returned an unexpected body (502).
+        InvalidInputError: ``mode`` or a model id is not usable (400).
+        ProviderLimitError: OpenRouter was selected and the local cap is already spent (429).
+        AIReviewError: Every provider in the order failed (502).
     """
-    run = service.ai_review(project)
+    outcome = service.ai_review(project, parse_model_choice(mode, groq_model, openrouter_model))
     return AIReviewResponse(
         project_id=project.id,
-        run_id=run.id,
-        status=run.status,
-        model=GEMINI_MODEL,
-        files=run.reviews,
+        run_id=outcome.run.id,
+        status=outcome.run.status,
+        model=outcome.model,
+        files=outcome.run.reviews,
+        provider=outcome.provider,
+        routing_note=outcome.routing_note,
+        groq_usage=_groq_usage(outcome.groq_usage),
     )
+
+
+def _groq_usage(snapshot: GroqSnapshot | None) -> GroqUsageResponse | None:
+    """Copy a Groq snapshot into the response model."""
+    if snapshot is None:
+        return None
+    return GroqUsageResponse.model_validate(asdict(snapshot))
 
 
 @router.get("/{project_id}/runs")

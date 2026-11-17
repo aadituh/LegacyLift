@@ -311,7 +311,7 @@ test("verification matches, mismatches, AI findings, and report stay in sync", a
   await expect(page.getByText("EXPECTED", { exact: true })).toBeVisible();
   await expect(page.getByText("Differs", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Side by side", exact: true }).click();
-  await page.route("**/api/projects/*/ai-review", async (route) =>
+  await page.route("**/api/projects/*/ai-review*", async (route) =>
     route.fulfill({
       json: {
         project_id: "1",

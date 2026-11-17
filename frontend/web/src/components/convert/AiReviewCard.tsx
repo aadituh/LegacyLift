@@ -29,6 +29,9 @@ export function AiReviewCard({
               </Badge>
               {review?.model && <span className="muted">{review.model}</span>}
             </div>
+            {review?.routing_note && (
+              <p className="hint routing-note">{review.routing_note}</p>
+            )}
             <p className="hint">
               AI findings support human review. They do not prove equivalence.
             </p>

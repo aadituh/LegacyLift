@@ -25,7 +25,12 @@ STOP RUN.
 
 def make_client(data_dir: Path | None, **settings: object) -> TestClient:
     """A client for a new app that ignores .env and saves projects to data_dir."""
-    values: dict[str, object] = {"database_url": None, **settings}
+    values: dict[str, object] = {
+        "database_url": None,
+        "groq_api_key": None,
+        "openrouter_api_key": None,
+        **settings,
+    }
     return TestClient(create_app(Settings(_env_file=None, data_dir=data_dir, **values)))
 
 

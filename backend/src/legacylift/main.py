@@ -21,7 +21,8 @@ from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 from legacylift.config import Settings
 from legacylift.errors import LegacyLiftError
 from legacylift.neon_store import NeonProjectStore
-from legacylift.routers import auth, convert, projects
+from legacylift.providers import Translator
+from legacylift.routers import auth, convert, projects, providers
 from legacylift.services.auth import AuthService
 from legacylift.services.batch_downloads import BatchDownloadStore
 from legacylift.services.neon_auth import NeonAuth
@@ -91,12 +92,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     else:
         store = ProjectStore(settings.data_dir, settings.max_projects)
     runner = RunnerClient(settings.runner_url) if settings.enable_runner else None
+    translator = Translator.from_settings(settings)
     app.state.settings = settings
+    app.state.translator = translator
     app.state.project_service = ProjectService(
         store,
         runner=runner,
         gemini_api_key=settings.gemini_api_key,
         gemini_timeout_seconds=settings.gemini_timeout_seconds,
+        translator=translator,
     )
     app.state.auth_service = AuthService(
         store,
@@ -110,6 +114,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(projects.router)
     app.include_router(convert.router)
+    app.include_router(providers.router)
 
     @app.get("/")
     def home() -> dict[str, str]:

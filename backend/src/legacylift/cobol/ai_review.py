@@ -11,6 +11,8 @@ into the prompt or the response.
 """
 
 import json
+import re
+import time
 import urllib.error
 import urllib.request
 from typing import cast
@@ -116,16 +118,51 @@ def request_gemini_review(prompt: str, *, api_key: str, timeout: float) -> Progr
         headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
         method="POST",
     )
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                raw = response.read().decode()
+        except TimeoutError as error:
+            raise AIReviewError("The AI review timed out.") from error
+        except urllib.error.HTTPError as error:
+            # One wait, then a single retry. A 503 from demand usually clears quickly.
+            if error.code == 503 and attempt == 1:
+                time.sleep(2)
+                continue
+            detail = _http_error_detail(error)
+            message = "Gemini rejected the AI review request."
+            if detail:
+                message = f"{message} {detail}"
+            raise AIReviewError(message) from error
+        except urllib.error.URLError as error:
+            raise AIReviewError("The AI review could not reach Gemini.") from error
+        return _parse_model_response(raw)
+    raise AIReviewError("Gemini rejected the AI review request.")
+
+
+def _http_error_detail(error: urllib.error.HTTPError) -> str:
+    """Return a short status and provider message, never an API key."""
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            raw = response.read().decode()
-    except TimeoutError as error:
-        raise AIReviewError("The AI review timed out.") from error
-    except urllib.error.HTTPError as error:
-        raise AIReviewError("Gemini rejected the AI review request.") from error
-    except urllib.error.URLError as error:
-        raise AIReviewError("The AI review could not reach Gemini.") from error
-    return _parse_model_response(raw)
+        raw = error.read().decode(errors="replace")
+    except (AttributeError, OSError, UnicodeError):
+        return ""
+    message = ""
+    try:
+        payload = cast(object, json.loads(raw))
+    except json.JSONDecodeError:
+        payload = None
+    if isinstance(payload, dict):
+        detail = payload.get("error")
+        if isinstance(detail, dict) and isinstance(detail.get("message"), str):
+            message = detail["message"]
+        elif isinstance(detail, str):
+            message = detail
+    message = " ".join(message.split())
+    if len(message) > 180:
+        message = f"{message[:180]}..."
+    if message:
+        return f"(HTTP {error.code}: {message})"
+    return ""
 
 
 def _numbered(source: str) -> str:
@@ -162,11 +199,106 @@ def _review_text(payload: object) -> str:
 
 
 def _parse_findings(text: str) -> ProgramFindings:
-    """Validate the JSON object Gemini was asked to return."""
+    """Validate the JSON object the model was asked to return."""
     cleaned = text.strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    for candidate in (cleaned, _json_object(cleaned)):
+        if not candidate:
+            continue
+        normalized = _load_findings(candidate)
+        if normalized is None:
+            continue
+        try:
+            return ProgramFindings.model_validate(normalized)
+        except ValidationError:
+            continue
+    raise AIReviewError("The model returned a review that was not the expected JSON.")
+
+
+def _load_findings(text: str) -> dict[str, list[dict[str, object]]] | None:
+    """Read a review object, including a fenced or loosely shaped one."""
+    repaired = re.sub(r",\s*([}\]])", r"\1", text)
     try:
-        return ProgramFindings.model_validate(cast(object, json.loads(cleaned)))
-    except (json.JSONDecodeError, ValidationError) as error:
-        raise AIReviewError("Gemini returned a review that was not the expected JSON.") from error
+        payload = cast(object, json.loads(repaired))
+    except json.JSONDecodeError:
+        return None
+    return _normalize_findings(payload)
+
+
+def _normalize_findings(payload: object) -> dict[str, list[dict[str, object]]] | None:
+    """Map a model's review object onto matches and concerns."""
+    if isinstance(payload, list):
+        return {"matches": [], "concerns": _finding_items(payload)}
+    if not isinstance(payload, dict):
+        return None
+    lowered = {str(key).lower(): value for key, value in payload.items()}
+    for wrapper in ("review", "result", "data", "output"):
+        inner = lowered.get(wrapper)
+        if isinstance(inner, dict):
+            nested = _normalize_findings(inner)
+            if nested is not None and (nested["matches"] or nested["concerns"]):
+                return nested
+    if "matches" not in lowered and "concerns" not in lowered:
+        return None
+    return {
+        "matches": _finding_items(lowered.get("matches")),
+        "concerns": _finding_items(lowered.get("concerns")),
+    }
+
+
+def _finding_items(value: object) -> list[dict[str, object]]:
+    """Turn strings or objects into review findings."""
+    if isinstance(value, dict):
+        value = [value]
+    if not isinstance(value, list):
+        return []
+    items: list[dict[str, object]] = []
+    for item in value:
+        if isinstance(item, str) and item.strip():
+            items.append({"cobol_lines": [], "python_lines": [], "detail": item.strip()})
+            continue
+        if not isinstance(item, dict):
+            continue
+        data = {str(key).lower(): field for key, field in item.items()}
+        detail = data.get("detail") or data.get("description") or data.get("text") or data.get("reason")
+        if not isinstance(detail, str) or not detail.strip():
+            continue
+        items.append(
+            {
+                "cobol_lines": _line_numbers(data.get("cobol_lines", data.get("cobol_line"))),
+                "python_lines": _line_numbers(data.get("python_lines", data.get("python_line"))),
+                "detail": detail.strip(),
+            }
+        )
+    return items
+
+
+def _line_numbers(value: object) -> list[int]:
+    """Keep integer line numbers and drop labels such as ``DISPLAY``."""
+    if isinstance(value, bool):
+        return []
+    if isinstance(value, int):
+        return [value]
+    if isinstance(value, str) and value.strip().isdigit():
+        return [int(value.strip())]
+    if not isinstance(value, list):
+        return []
+    numbers: list[int] = []
+    for item in value:
+        if isinstance(item, bool):
+            continue
+        if isinstance(item, int):
+            numbers.append(item)
+        elif isinstance(item, str) and item.strip().isdigit():
+            numbers.append(int(item.strip()))
+    return numbers
+
+
+def _json_object(text: str) -> str:
+    """Return the outermost JSON object in ``text``, or an empty string."""
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end <= start:
+        return ""
+    return text[start : end + 1]

@@ -1,8 +1,8 @@
 """Project workflow: ``ProjectService`` and its helpers.
 
 Create, list, and delete projects; add and remove files; record analyze,
-convert, and verify runs. Describe asks Gemini for a plain-language map of
-the analyze links and does not save a run.
+convert, and verify runs. Describe and AI review call the translation router.
+Gemini remains the default provider. Describe does not save a run.
 
 Every change follows the same pattern: change the ``Project``, then
 ``store.save(project)``. A lock makes changes happen one at a time, because
@@ -17,11 +17,19 @@ records whether stdout matches (``verified`` / ``mismatch``), or
 """
 
 import threading
+from dataclasses import dataclass
 
-from legacylift.cobol.ai_review import build_prompt, request_gemini_review
+from legacylift.cobol import describe as describe_module
+from legacylift.cobol.ai_review import (
+    GEMINI_MODEL,
+    ProgramFindings,
+    build_prompt,
+    request_gemini_review,
+)
 from legacylift.cobol.dependencies import find_dependencies
 from legacylift.cobol.describe import DependencyMap, describe_map
 from legacylift.cobol.parser import ParsedProgram, parse_program
+from legacylift.config import Settings
 from legacylift.errors import InvalidInputError, NotFoundError, ProjectStateError
 from legacylift.models import (
     AnalyzedField,
@@ -40,6 +48,8 @@ from legacylift.models import (
     SourceFile,
     UnresolvedDependency,
 )
+from legacylift.providers import ModelChoice, TranslationRequest, Translator
+from legacylift.providers.types import GroqSnapshot, TranslationResponse
 from legacylift.sample_data import DEMO_FILES, DEMO_NAME
 from legacylift.services.conversion import conversion_status, convert_file, python_file_name
 from legacylift.services.uploads import KIND_BY_SUFFIX, RawUpload, decode_upload
@@ -47,6 +57,25 @@ from legacylift.services.verification import Runner, verify_project
 from legacylift.storage import ProjectRepository, ProjectStore  # noqa: F401
 
 MAX_PROJECT_FILES = 100
+
+
+@dataclass
+class AIReviewOutcome:
+    """A saved AI review plus the routing note for the UI.
+
+    Attributes:
+        run: The saved review run.
+        model: Model id that produced the findings.
+        provider: ``gemini``, ``groq``, or ``openrouter``.
+        routing_note: One line per program, including any fallback.
+        groq_usage: Latest Groq snapshot, if the translator recorded one.
+    """
+
+    run: Run
+    model: str
+    provider: str
+    routing_note: str
+    groq_usage: GroqSnapshot | None
 
 
 def program_summaries(parsed: list[ParsedProgram]) -> list[ProgramSummary]:
@@ -111,6 +140,29 @@ def file_counts(project: Project) -> FileCounts:
     )
 
 
+def _settings_for(gemini_api_key: str | None, timeout: float) -> Settings:
+    """Build settings for a service that was not given a translator.
+
+    Explicit ``None`` keys keep a developer machine's Groq or OpenRouter key
+    from changing docstring examples and direct ``ProjectService`` calls.
+
+    Args:
+        gemini_api_key: Gemini key, or ``None``.
+        timeout: Seconds one Gemini request may wait.
+
+    Returns:
+        Settings that do not read ``.env``.
+    """
+    return Settings(
+        _env_file=None,
+        database_url=None,
+        gemini_api_key=gemini_api_key,
+        gemini_timeout_seconds=timeout,
+        groq_api_key=None,
+        openrouter_api_key=None,
+    )
+
+
 class ProjectService:
     """The project workflow: create, list, upload, analyze, describe, convert, verify, review, delete.
 
@@ -134,6 +186,7 @@ class ProjectService:
         runner: Runner | None = None,
         gemini_api_key: str | None = None,
         gemini_timeout_seconds: float = 30,
+        translator: Translator | None = None,
     ) -> None:
         """Create the service.
 
@@ -143,11 +196,16 @@ class ProjectService:
             gemini_api_key: Key for the dependency description and AI review.
                 ``None`` rejects those routes.
             gemini_timeout_seconds: How long one Gemini request may wait.
+            translator: Shared router. ``None`` builds one with only the Gemini
+                key, which is what the docstring examples use.
         """
         self.store = store
         self.runner = runner
         self.gemini_api_key = gemini_api_key
         self.gemini_timeout_seconds = gemini_timeout_seconds
+        self.translator = translator or Translator.from_settings(
+            _settings_for(gemini_api_key, gemini_timeout_seconds)
+        )
         self._lock = threading.Lock()
 
     def create_project(self, name: str, owner_id: str | None = None) -> Project:
@@ -446,11 +504,13 @@ class ProjectService:
         )
         return run, file_counts(project)
 
-    def describe(self, project: Project) -> DependencyMap:
+    def describe(self, project: Project, choice: ModelChoice | None = None) -> DependencyMap:
         """Describe each program and the data they share.
 
         Args:
             project: The project to describe.
+            choice: Auto, or a provider the user selected. ``None`` is auto.
+                Large prompts still use the existing Gemini description client.
 
         Returns:
             The plain-language map.
@@ -466,7 +526,21 @@ class ProjectService:
             raise ProjectStateError("Upload a .cbl or .cob program before describing it.")
         parsed = [parse_program(file.name, file.content) for file in programs]
         catalog = [file.name for file in project.files]
-        return describe_map(parsed, catalog, api_key=self.gemini_api_key)
+        selected = choice or ModelChoice()
+
+        def send(prompt: str, api_key: str) -> str:
+            response = self.translator.translate(
+                TranslationRequest(prompt=prompt, purpose="text"),
+                selected,
+                gemini=lambda request: TranslationResponse(
+                    text=describe_module.complete(request.prompt, api_key),
+                    provider="gemini",
+                    model=describe_module.GEMINI_MODEL,
+                ),
+            )
+            return response.text
+
+        return describe_map(parsed, catalog, api_key=self.gemini_api_key, complete_prompt=send)
 
     def convert(self, project: Project) -> Run:
         """Convert every program in a project and save the results in a convert run.
@@ -543,27 +617,31 @@ class ProjectService:
         status, checks = verify_project(self.runner, project, latest.files)
         return self._save_run(project, RunKind.VERIFY, status, checks=checks)
 
-    def ai_review(self, project: Project) -> Run:
-        """Ask Gemini to compare each converted program with its Python draft.
+    def ai_review(self, project: Project, choice: ModelChoice | None = None) -> AIReviewOutcome:
+        """Compare each converted program with its Python draft.
 
-        The prompt includes the COBOL, the Python, and the converter's review
-        notes. Status is ``clear`` when no file has concerns, otherwise ``concerns``.
+        Auto mode sends a small prompt to Groq when Groq has budget, and
+        otherwise uses OpenRouter or Gemini. Gemini still goes through
+        ``request_gemini_review``. Status is ``clear`` when no file has
+        concerns, otherwise ``concerns``.
 
         Args:
             project: The project to review. It must already have a convert run.
+            choice: Auto, or a provider the user selected. ``None`` is auto.
 
         Returns:
-            The saved AI review run. ``run.reviews`` holds one result per program.
+            The saved run and the routing note. ``run.reviews`` holds one result
+            per program.
 
         Raises:
             ProjectStateError: The project has not been converted, or the API key is unset.
-            AIReviewError: Gemini timed out or returned something other than the JSON shape.
+            AIReviewError: Every selected provider failed, or Gemini timed out.
         """
         convert_runs = [run for run in project.runs if run.kind == RunKind.CONVERT]
         if not convert_runs:
             raise ProjectStateError("Convert the project before requesting an AI review.")
-        if self.gemini_api_key is None:
-            raise ProjectStateError("Set LEGACYLIFT_GEMINI_API_KEY before requesting an AI review.")
+        selected = choice or ModelChoice()
+        self._require_provider_key(selected)
 
         latest = convert_runs[-1]
         if not latest.files:
@@ -571,17 +649,25 @@ class ProjectService:
 
         by_id = {file.id: file for file in project.files}
         reviews: list[FileReview] = []
+        notes: list[str] = []
+        models: list[str] = []
+        providers: list[str] = []
+        usage: GroqSnapshot | None = None
         for converted in latest.files:
             source = by_id.get(converted.source_file_id)
             if source is None or source.kind != FileKind.PROGRAM:
                 raise ProjectStateError(
                     f"Source program {converted.source_name!r} is missing from the project."
                 )
-            findings = request_gemini_review(
-                build_prompt(source.content, converted.python, converted.notes),
-                api_key=self.gemini_api_key,
-                timeout=self.gemini_timeout_seconds,
+            response = self.translator.translate(
+                TranslationRequest(
+                    prompt=build_prompt(source.content, converted.python, converted.notes),
+                    purpose="review",
+                ),
+                selected,
+                gemini=self._gemini_review,
             )
+            findings = ProgramFindings.model_validate_json(response.text)
             reviews.append(
                 FileReview(
                     source_name=converted.source_name,
@@ -590,10 +676,64 @@ class ProjectService:
                     concerns=findings.concerns,
                 )
             )
+            notes.append(f"{converted.source_name}: {response.routing_note}")
+            models.append(response.model)
+            providers.append(response.provider)
+            usage = response.rate_limit_state or usage
 
         has_concerns = any(review.concerns for review in reviews)
         status = RunStatus.CONCERNS if has_concerns else RunStatus.CLEAR
-        return self._save_run(project, RunKind.AI_REVIEW, status, reviews=reviews)
+        run = self._save_run(project, RunKind.AI_REVIEW, status, reviews=reviews)
+        unique_models = list(dict.fromkeys(models))
+        unique_providers = list(dict.fromkeys(providers))
+        return AIReviewOutcome(
+            run=run,
+            model=unique_models[0] if len(unique_models) == 1 else ", ".join(unique_models),
+            provider=unique_providers[0] if len(unique_providers) == 1 else ", ".join(unique_providers),
+            routing_note="\n".join(notes),
+            groq_usage=usage,
+        )
+
+    def _require_provider_key(self, choice: ModelChoice) -> None:
+        """Reject a review when the selected provider has no key.
+
+        Auto still accepts Groq or OpenRouter when Gemini is unset. Gemini is
+        required for an explicit Gemini choice, and for auto when it is the
+        only configured provider.
+
+        Raises:
+            ProjectStateError: The provider that would run has no API key.
+        """
+        groq_key = self.translator.groq.api_key
+        openrouter_key = self.translator.openrouter.api_key
+        if choice.mode == "groq" and groq_key is None:
+            raise ProjectStateError("Set LEGACYLIFT_GROQ_API_KEY before requesting an AI review.")
+        if choice.mode == "openrouter" and openrouter_key is None:
+            raise ProjectStateError(
+                "Set LEGACYLIFT_OPENROUTER_API_KEY before requesting an AI review."
+            )
+        gemini_needed = choice.mode == "gemini" or (
+            choice.mode == "auto" and groq_key is None and openrouter_key is None
+        )
+        if gemini_needed and self.gemini_api_key is None:
+            raise ProjectStateError("Set LEGACYLIFT_GEMINI_API_KEY before requesting an AI review.")
+
+    def _gemini_review(self, request: TranslationRequest) -> TranslationResponse:
+        """Call the existing Gemini review client.
+
+        The name ``request_gemini_review`` is looked up on this module so tests
+        can replace it.
+        """
+        findings = request_gemini_review(
+            request.prompt,
+            api_key=self.gemini_api_key or "",
+            timeout=self.gemini_timeout_seconds,
+        )
+        return TranslationResponse(
+            text=findings.model_dump_json(),
+            provider="gemini",
+            model=GEMINI_MODEL,
+        )
 
     def _attach_file(self, project: Project, name: str, kind: FileKind, content: str) -> SourceFile:
         """Add a file with the project's next file ID. The caller holds the lock and saves.
