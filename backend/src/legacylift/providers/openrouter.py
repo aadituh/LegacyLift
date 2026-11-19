@@ -400,8 +400,8 @@ class OpenRouterProvider:
         if blocked is not None:
             raise ProviderCallError("openrouter", blocked, kind="limited")
         excerpt = reasoning.strip()
-        if len(excerpt) > 1200:
-            excerpt = excerpt[-1200:]
+        if len(excerpt) > 800:
+            excerpt = excerpt[-800:]
         prompt = (
             "Output only this JSON and nothing else, using integer line numbers: "
             '{"matches":[{"cobol_lines":[1],"python_lines":[1],"detail":"text"}],'
@@ -414,7 +414,7 @@ class OpenRouterProvider:
                 {
                     "model": request.openrouter_model,
                     "temperature": 0,
-                    "max_tokens": 2000,
+                    "max_tokens": 4000,
                     "messages": [{"role": "user", "content": prompt}],
                 }
             ).encode(),
@@ -440,8 +440,17 @@ class OpenRouterProvider:
             raise ProviderCallError(
                 "openrouter", "OpenRouter returned a body that was not JSON.", kind="malformed"
             ) from error
+        try:
+            text = _message_text(payload)
+            findings = _parse_findings(text)
+        except (ProviderCallError, AIReviewError) as error:
+            raise ProviderCallError(
+                "openrouter",
+                "The model returned a review that was not the expected JSON.",
+                kind="malformed",
+            ) from error
         return TranslationResponse(
-            text=_message_text(payload),
+            text=findings.model_dump_json(),
             provider="openrouter",
             model=request.openrouter_model,
             usage=_usage(payload),
@@ -497,7 +506,7 @@ def _message_text(payload: object) -> str:
     if isinstance(content, str) and content.strip():
         return content
     reasoning = message.get("reasoning")
-    if isinstance(reasoning, str) and '"matches"' in reasoning:
+    if isinstance(reasoning, str) and _is_findings(reasoning):
         return reasoning
     if isinstance(reasoning, str) and reasoning.strip():
         raise ProviderCallError(
