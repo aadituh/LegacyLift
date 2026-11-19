@@ -83,8 +83,10 @@ Environment variables, or `backend/.env` (copy [`.env.example`](.env.example)). 
 | `LEGACYLIFT_TOKEN_TTL_SECONDS` | `86400` | How long a login token stays valid (24 hours). |
 | `LEGACYLIFT_REQUIRE_LOGIN` | `false` | When `true`, every `/api/projects` route requires `Authorization: Bearer <token>`. A Neon Auth token still sets the owner and limits the list when this is off. |
 | `LEGACYLIFT_NEON_AUTH_URL` | this project's Neon Auth URL | JWKS base URL. An EdDSA bearer token from the web app is checked here, and its `sub` is saved as `projects.owner_id`. |
-| `LEGACYLIFT_GEMINI_API_KEY` | unset | Gemini API key for `POST /api/projects/{id}/describe` and `POST /api/projects/{id}/ai-review`. Keep it in `backend/.env`, or in the root `.env` for `docker compose`. |
-| `LEGACYLIFT_GEMINI_TIMEOUT_SECONDS` | `30` | How long one Gemini request may wait. |
+| `LEGACYLIFT_GEMINI_API_KEY` | unset | Gemini API key for `POST /api/projects/{id}/describe` and `POST /api/projects/{id}/ai-review`. Keep it in `backend/.env`, or in the root `.env` for `docker compose`. Gemini stays the default provider. |
+| `LEGACYLIFT_GEMINI_TIMEOUT_SECONDS` | `30` | How long one provider request may wait. Groq and OpenRouter use this same timeout. |
+| `LEGACYLIFT_GROQ_API_KEY` | unset | Groq key for small translations. Unset leaves Groq out of auto routing. |
+| `LEGACYLIFT_OPENROUTER_API_KEY` | unset | OpenRouter key. Unset leaves OpenRouter out of auto routing. Daily and per-minute caps live in `providers/config.py`. |
 
 ## Code layout
 

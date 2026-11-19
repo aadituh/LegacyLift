@@ -302,6 +302,81 @@ class VerifyResponse(BaseModel):
     files: list[FileEquivalenceResponse] = []
 
 
+class GroqUsageResponse(BaseModel):
+    """Groq TPM and RPD state for one model.
+
+    Attributes:
+        model: Groq model id.
+        limit_tokens: TPM limit. ``None`` until a response includes the header.
+        remaining_tokens: TPM remaining.
+        reset_tokens: TPM reset delay, such as ``7.66s``.
+        limit_requests: RPD limit.
+        remaining_requests: RPD remaining.
+        reset_requests: RPD reset delay, such as ``2m59.56s``.
+        session_requests: Calls counted in this process.
+        session_tokens: Tokens counted in this process.
+        has_header_data: False until Groq has sent a limit header.
+        low_budget: Remaining TPM or RPD is under the configured fraction.
+        rate_limited_until: Epoch seconds. ``None`` when Groq is not in a 429 window.
+        warning: A short warning, or an empty string.
+    """
+
+    model: str
+    limit_tokens: int | None = None
+    remaining_tokens: int | None = None
+    reset_tokens: str | None = None
+    limit_requests: int | None = None
+    remaining_requests: int | None = None
+    reset_requests: str | None = None
+    session_requests: int = 0
+    session_tokens: int = 0
+    has_header_data: bool = False
+    low_budget: bool = False
+    rate_limited_until: float | None = None
+    warning: str = ""
+
+
+class ProviderModelResponse(BaseModel):
+    """One model the UI can put in a dropdown.
+
+    Attributes:
+        id: Model id sent back on the next review.
+        name: Label shown to the user.
+    """
+
+    id: str
+    name: str
+
+
+class ProviderOptionsResponse(BaseModel):
+    """Model lists, OpenRouter caps, and Groq usage. API keys are not included.
+
+    Attributes:
+        gemini_model: The existing Gemini model id.
+        groq_configured: True when ``LEGACYLIFT_GROQ_API_KEY`` is set.
+        openrouter_configured: True when ``LEGACYLIFT_OPENROUTER_API_KEY`` is set.
+        groq_models: Models returned by Groq for this key.
+        openrouter_models: The free OpenRouter models this app is allowed to use.
+        openrouter_requests_per_day: Local daily cap. This app does not track
+            OpenRouter with a progress bar.
+        openrouter_requests_per_minute: Local per-minute cap.
+        low_budget_fraction: Share of TPM or RPD that triggers a Groq warning.
+        groq_usage: One snapshot per Groq model that has been listed or called.
+        catalog_error: Empty, or a short reason a model list could not be loaded.
+    """
+
+    gemini_model: str
+    groq_configured: bool
+    openrouter_configured: bool
+    groq_models: list[ProviderModelResponse] = []
+    openrouter_models: list[ProviderModelResponse] = []
+    openrouter_requests_per_day: int
+    openrouter_requests_per_minute: int
+    low_budget_fraction: float
+    groq_usage: list[GroqUsageResponse] = []
+    catalog_error: str = ""
+
+
 class AIReviewResponse(BaseModel):
     """Response from ``POST /api/projects/{id}/ai-review``.
 
@@ -309,9 +384,15 @@ class AIReviewResponse(BaseModel):
         project_id: The project.
         run_id: ID of the saved AI review run.
         status: ``clear`` when every program has no concerns, otherwise ``concerns``.
-        model: The Gemini model that produced the review.
+        model: The model id that produced the review. Gemini stays
+            ``gemini-3.5-flash-lite`` when that provider answers.
         files: One comparison per program, each with ``matches`` and ``concerns``.
             Every finding has ``cobol_lines``, ``python_lines``, and ``detail``.
+        provider: ``gemini``, ``groq``, or ``openrouter``.
+        routing_note: Why that provider was chosen, including a fallback.
+        groq_usage: Latest Groq snapshot for the Groq model on the request.
+            ``None`` is not used; a snapshot with ``has_header_data`` false means
+            Groq has not answered yet.
     """
 
     project_id: str
@@ -319,6 +400,9 @@ class AIReviewResponse(BaseModel):
     status: RunStatus
     model: str
     files: list[FileReview] = []
+    provider: str = "gemini"
+    routing_note: str = ""
+    groq_usage: GroqUsageResponse | None = None
 
 
 class RunsResponse(BaseModel):

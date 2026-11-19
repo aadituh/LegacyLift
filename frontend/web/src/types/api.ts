@@ -1,3 +1,4 @@
+import type { GroqUsage } from "@/lib/api/providers";
 import type { components } from "./api-schema";
 export type UserResponse = components["schemas"]["UserResponse"];
 export type LoginResponse = components["schemas"]["LoginResponse"];
@@ -21,7 +22,11 @@ export type ProgramSummary = components["schemas"]["ProgramSummary"];
 export type VerifyResponse = components["schemas"]["VerifyResponse"];
 export type FileEquivalenceResponse =
   components["schemas"]["FileEquivalenceResponse"];
-export type AIReviewResponse = components["schemas"]["AIReviewResponse"];
+export type AIReviewResponse = components["schemas"]["AIReviewResponse"] & {
+  provider?: string;
+  routing_note?: string;
+  groq_usage?: GroqUsage | null;
+};
 export type FileReview = components["schemas"]["FileReview"];
 export type RunsResponse = components["schemas"]["RunsResponse"];
 export type RunSummary = components["schemas"]["RunSummary"];

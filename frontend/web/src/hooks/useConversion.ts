@@ -4,6 +4,7 @@ import { downloadFile } from "@/lib/api/client";
 import { saveText } from "@/lib/download";
 import { buildAuditReportCsv, calledProgramReports } from "@/lib/audit-report";
 import { useWorkspace } from "./useWorkspace";
+import { readModelSelection } from "@/lib/model-selection";
 import { writeStored } from "@/lib/storage";
 export function useConversion() {
   const { state, setState, activeId, lock, revision } = useWorkspace();
@@ -89,7 +90,7 @@ export function useConversion() {
     });
   const review = () =>
     execute("reviewing", async (id, version) => {
-      const review = await api.reviewProject(id);
+      const review = await api.reviewProject(id, readModelSelection());
       if (activeId.current === id && revision.current === version)
         setState((s) => ({
           ...s,

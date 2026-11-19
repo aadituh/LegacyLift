@@ -8,6 +8,7 @@ from unittest.mock import patch
 from legacylift.cobol.ai_review import (
     GEMINI_MODEL,
     ProgramFindings,
+    _parse_findings,
     build_prompt,
     request_gemini_review,
 )
@@ -59,6 +60,24 @@ def test_request_parses_mocked_gemini_json():
     assert parsed.matches[0].cobol_lines == [9]
     assert parsed.concerns[0].python_lines == []
     assert parsed.concerns[0].detail == "PERFORM was not proven."
+
+
+def test_parse_findings_accepts_a_wrapped_review_and_string_items():
+    text = '{"result": {"concerns": ["The interest math is missing."], "matches": []}}'
+    parsed = _parse_findings(text)
+    assert parsed.concerns[0].detail == "The interest math is missing."
+    assert parsed.concerns[0].cobol_lines == []
+
+
+def test_parse_findings_drops_non_numeric_line_labels():
+    text = (
+        '{"matches":[{"cobol_lines":["DISPLAY"],"python_lines":["12"],'
+        '"detail":"DISPLAY prints."}],"concerns":[]}'
+    )
+    parsed = _parse_findings(text)
+    assert parsed.matches[0].cobol_lines == []
+    assert parsed.matches[0].python_lines == [12]
+    assert parsed.matches[0].detail == "DISPLAY prints."
 
 
 def test_request_turns_a_timeout_into_an_api_error():
@@ -172,6 +191,28 @@ def test_missing_api_key_does_not_call_the_model(tmp_path, monkeypatch):
     assert (response.status_code, response.json()["detail"]) == (
         400,
         "Set LEGACYLIFT_GEMINI_API_KEY before requesting an AI review.",
+    )
+
+
+def test_groq_and_openrouter_do_not_ask_for_the_gemini_key(tmp_path, monkeypatch):
+    client = make_client(tmp_path)
+    created = client.post("/api/projects", json={"name": "Hello"}).json()
+    project = f"/api/projects/{created['id']}"
+    client.post(f"{project}/files", files=[("files", ("hello.cbl", HELLO))])
+    client.post(f"{project}/convert")
+
+    def fail(*args, **kwargs):
+        raise AssertionError("the model must not be called without an API key")
+
+    monkeypatch.setattr("legacylift.services.projects.request_gemini_review", fail)
+    groq = client.post(f"{project}/ai-review?mode=groq")
+    openrouter = client.post(f"{project}/ai-review?mode=openrouter")
+    assert groq.status_code == 400
+    assert groq.json()["detail"] == "Set LEGACYLIFT_GROQ_API_KEY before requesting an AI review."
+    assert openrouter.status_code == 400
+    assert (
+        openrouter.json()["detail"]
+        == "Set LEGACYLIFT_OPENROUTER_API_KEY before requesting an AI review."
     )
 
 

@@ -24,6 +24,7 @@ import { ProjectNotFound } from "@/components/layout/ProjectNotFound";
 import { FileTabs } from "./FileTabs";
 import { CodePanel } from "./CodePanel";
 import { ConversionProgress } from "./ConversionProgress";
+import { ModelSelector } from "./ModelSelector";
 import { AuditReport } from "./AuditReport";
 import { formatRunStatus } from "@/lib/format";
 import { ReadingGuide } from "@/components/guide/ReadingGuide";
@@ -113,6 +114,7 @@ export function ConvertScreen() {
       />
       {p.programs.length > 0 && (
         <>
+          <ModelSelector liveUsage={c.review?.groq_usage} />
           <div className="conversion-toolbar">
             <SegmentedControl<View>
               label="Code view"

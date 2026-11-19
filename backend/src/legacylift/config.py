@@ -46,7 +46,12 @@ class Settings(BaseSettings):
             tokens against its JWKS and store ``sub`` as the project owner.
         gemini_api_key: Key for ``POST /api/projects/{id}/describe`` and
             ``POST /api/projects/{id}/ai-review``. Unset means those routes answer 400.
-        gemini_timeout_seconds: How long one Gemini request may wait.
+        gemini_timeout_seconds: How long one Gemini request may wait. Also used
+            for one Groq or OpenRouter request.
+        groq_api_key: Key for Groq chat completions. Unset leaves Groq out of
+            auto routing. Never logged.
+        openrouter_api_key: Key for OpenRouter chat completions. Unset leaves
+            OpenRouter out of auto routing. Never logged.
     """
 
     model_config = SettingsConfigDict(env_prefix="LEGACYLIFT_", env_file=".env", extra="ignore")
@@ -69,6 +74,8 @@ class Settings(BaseSettings):
     )
     gemini_api_key: str | None = None
     gemini_timeout_seconds: float = Field(default=30, gt=0)
+    groq_api_key: str | None = None
+    openrouter_api_key: str | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod
