@@ -689,7 +689,9 @@ class ProjectService:
         return AIReviewOutcome(
             run=run,
             model=unique_models[0] if len(unique_models) == 1 else ", ".join(unique_models),
-            provider=unique_providers[0] if len(unique_providers) == 1 else ", ".join(unique_providers),
+            provider=unique_providers[0]
+            if len(unique_providers) == 1
+            else ", ".join(unique_providers),
             routing_note="\n".join(notes),
             groq_usage=usage,
         )

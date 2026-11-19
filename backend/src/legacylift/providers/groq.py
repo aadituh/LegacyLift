@@ -226,7 +226,9 @@ class GroqUsageTracker:
         Returns:
             The updated snapshot.
         """
-        return self._update(model, headers, tokens=tokens, requests=1, limited=False, rules=rules, now=now)
+        return self._update(
+            model, headers, tokens=tokens, requests=1, limited=False, rules=rules, now=now
+        )
 
     def observe_limited(
         self,
@@ -248,7 +250,9 @@ class GroqUsageTracker:
             The updated snapshot. The request is counted. Tokens are not, because
             a rejected call does not report usage.
         """
-        return self._update(model, headers, tokens=0, requests=1, limited=True, rules=rules, now=now)
+        return self._update(
+            model, headers, tokens=0, requests=1, limited=True, rules=rules, now=now
+        )
 
     def _update(
         self,
@@ -279,18 +283,24 @@ class GroqUsageTracker:
                 low_budget=current.low_budget,
                 rate_limited_until=None,
             )
-            updated = replace(updated, low_budget=_low_budget_snapshot(updated, rules.low_budget_fraction))
+            updated = replace(
+                updated, low_budget=_low_budget_snapshot(updated, rules.low_budget_fraction)
+            )
             if limited:
                 delay = parse_retry_after(headers)
                 if delay is None:
-                    delay = parse_duration(parsed.reset_tokens) or parse_duration(parsed.reset_requests)
+                    delay = parse_duration(parsed.reset_tokens) or parse_duration(
+                        parsed.reset_requests
+                    )
                 if delay is None:
                     delay = 60.0
                 updated = replace(updated, rate_limited_until=now + max(delay, 0))
             self._models[model] = updated
             return self._with_warning(updated, rules, now)
 
-    def _with_warning(self, snapshot: GroqSnapshot, rules: RoutingRules, now: float) -> GroqSnapshot:
+    def _with_warning(
+        self, snapshot: GroqSnapshot, rules: RoutingRules, now: float
+    ) -> GroqSnapshot:
         """Attach the warning string for a low or rate-limited budget."""
         percent = int(rules.low_budget_fraction * 100)
         if snapshot.rate_limited_until is not None and snapshot.rate_limited_until > now:
@@ -386,7 +396,9 @@ class GroqProvider:
         now = self.clock()
         state = self.tracker.snapshot(request.groq_model, self.rules, now)
         if state.rate_limited_until is not None and state.rate_limited_until > now:
-            raise ProviderCallError("groq", state.warning or "Groq is rate-limited.", kind="rate_limit")
+            raise ProviderCallError(
+                "groq", state.warning or "Groq is rate-limited.", kind="rate_limit"
+            )
         return self._send(request, allow_retry=True, json_mode=True)
 
     def _send(
@@ -410,10 +422,16 @@ class GroqProvider:
         try:
             payload = loads_object(result.body)
         except json.JSONDecodeError as error:
-            raise ProviderCallError("groq", "Groq returned a body that was not JSON.", kind="malformed") from error
+            raise ProviderCallError(
+                "groq", "Groq returned a body that was not JSON.", kind="malformed"
+            ) from error
         text = _message_text(payload)
         usage = _usage(payload)
-        tokens = usage.total_tokens if usage and usage.total_tokens is not None else request.estimated_tokens
+        tokens = (
+            usage.total_tokens
+            if usage and usage.total_tokens is not None
+            else request.estimated_tokens
+        )
         snapshot = self.tracker.observe(
             request.groq_model,
             result.headers,
@@ -441,7 +459,9 @@ class GroqProvider:
         if allow_retry and json_mode and "json_validate_failed" in error.body:
             return self._send(request, allow_retry=False, json_mode=False)
         if error.kind == "rate_limit":
-            self.tracker.observe_limited(request.groq_model, error.headers, rules=self.rules, now=self.clock())
+            self.tracker.observe_limited(
+                request.groq_model, error.headers, rules=self.rules, now=self.clock()
+            )
             delay = retry_delay(error.headers)
             if allow_retry and delay is not None and delay <= self.rules.groq_retry_max_seconds:
                 self.sleep(max(delay, 0))
@@ -452,7 +472,9 @@ class GroqProvider:
                 kind="rate_limit",
                 headers=error.headers,
             ) from error
-        raise ProviderCallError("groq", str(error), kind=error.kind, headers=error.headers) from error
+        raise ProviderCallError(
+            "groq", str(error), kind=error.kind, headers=error.headers
+        ) from error
 
 
 def _chat_body(request: TranslationRequest, *, json_mode: bool = True) -> dict[str, object]:
@@ -484,13 +506,19 @@ def _chat_body(request: TranslationRequest, *, json_mode: bool = True) -> dict[s
 def _message_text(payload: object) -> str:
     """Return the first choice's message content."""
     if not isinstance(payload, dict):
-        raise ProviderCallError("groq", "Groq returned a body that was not a chat completion.", kind="malformed")
+        raise ProviderCallError(
+            "groq", "Groq returned a body that was not a chat completion.", kind="malformed"
+        )
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
-        raise ProviderCallError("groq", "Groq returned a body that was not a chat completion.", kind="malformed")
+        raise ProviderCallError(
+            "groq", "Groq returned a body that was not a chat completion.", kind="malformed"
+        )
     message = choices[0].get("message")
     if not isinstance(message, dict):
-        raise ProviderCallError("groq", "Groq returned a body that was not a chat completion.", kind="malformed")
+        raise ProviderCallError(
+            "groq", "Groq returned a body that was not a chat completion.", kind="malformed"
+        )
     content = _completion_text(message)
     if content is None:
         raise ProviderCallError("groq", "Groq returned an empty completion.", kind="malformed")

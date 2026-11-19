@@ -114,7 +114,8 @@ export function ModelSelector({ liveUsage }: { liveUsage?: GroqUsage | null }) {
       )}
       {selection.mode === "groq" && !options?.groq_configured && (
         <p className="hint">
-          Add LEGACYLIFT_GROQ_API_KEY on the API before a Groq review can be sent.
+          Add LEGACYLIFT_GROQ_API_KEY on the API before a Groq review can be
+          sent.
         </p>
       )}
       {(selection.mode === "groq" || selection.mode === "auto") && (

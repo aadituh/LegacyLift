@@ -4,7 +4,6 @@ OpenRouter limits are not shown as a progress bar. This module counts requests
 in a sliding window and refuses to send once the configured cap is reached.
 """
 
-import hashlib
 import json
 import threading
 import time
@@ -129,19 +128,15 @@ class SlidingWindowLimiter:
         return None
 
 
-def _digest(api_key: str | None) -> str:
-    """Return a short hash so the cache can tell keys apart without storing one."""
-    if not api_key:
-        return ""
-    return hashlib.sha256(api_key.encode()).hexdigest()[:12]
-
-
 @dataclass
 class _CacheEntry:
-    """One cached model list."""
+    """One cached model list.
+
+    The process has one provider key, loaded at startup, so the cache does not
+    store or hash that key.
+    """
 
     stored_at: float
-    digest: str
     models: list[ModelInfo]
 
 
@@ -180,7 +175,6 @@ class ModelCatalog:
             return [], ""
         return self._cached(
             "groq",
-            api_key,
             now,
             urllib.request.Request(
                 GROQ_MODELS_URL,
@@ -203,7 +197,6 @@ class ModelCatalog:
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         return self._cached(
             "openrouter",
-            api_key,
             now,
             urllib.request.Request(OPENROUTER_MODELS_URL, headers=headers, method="GET"),
         )
@@ -211,17 +204,14 @@ class ModelCatalog:
     def _cached(
         self,
         provider: str,
-        api_key: str | None,
         now: float,
         request: urllib.request.Request,
     ) -> tuple[list[ModelInfo], str]:
         """Return the cached list or fetch it. Errors keep a fresh-enough stale list."""
-        digest = _digest(api_key)
         with self._lock:
             current = self._groq if provider == "groq" else self._openrouter
             if (
                 current is not None
-                and current.digest == digest
                 and now - current.stored_at < self.rules.model_catalog_ttl_seconds
             ):
                 return list(current.models), ""
@@ -231,10 +221,12 @@ class ModelCatalog:
         except (HttpFailure, json.JSONDecodeError):
             with self._lock:
                 stale = self._groq if provider == "groq" else self._openrouter
-                if stale is not None and stale.digest == digest:
-                    return list(stale.models), f"{_label(provider)} model list could not be refreshed."
+                if stale is not None:
+                    return list(
+                        stale.models
+                    ), f"{_label(provider)} model list could not be refreshed."
             return [], f"{_label(provider)} model list could not be loaded."
-        entry = _CacheEntry(stored_at=now, digest=digest, models=models)
+        entry = _CacheEntry(stored_at=now, models=models)
         with self._lock:
             if provider == "groq":
                 self._groq = entry
@@ -336,7 +328,9 @@ class OpenRouterProvider:
                 or OpenRouter timed out or returned a body that was not a completion.
         """
         if self.api_key is None:
-            raise ProviderCallError("openrouter", "OpenRouter is not configured.", kind="unconfigured")
+            raise ProviderCallError(
+                "openrouter", "OpenRouter is not configured.", kind="unconfigured"
+            )
         blocked = self.limiter.acquire(self.clock())
         if blocked is not None:
             raise ProviderCallError("openrouter", blocked, kind="limited")
@@ -391,7 +385,9 @@ class OpenRouterProvider:
             usage=_usage(payload),
         )
 
-    def _review_from_reasoning(self, request: TranslationRequest, reasoning: str) -> TranslationResponse:
+    def _review_from_reasoning(
+        self, request: TranslationRequest, reasoning: str
+    ) -> TranslationResponse:
         """Ask the same model to turn a reasoning trace into the review JSON.
 
         A short prompt is used because the long review makes some free models
@@ -407,7 +403,7 @@ class OpenRouterProvider:
         if len(excerpt) > 1200:
             excerpt = excerpt[-1200:]
         prompt = (
-            'Output only this JSON and nothing else, using integer line numbers: '
+            "Output only this JSON and nothing else, using integer line numbers: "
             '{"matches":[{"cobol_lines":[1],"python_lines":[1],"detail":"text"}],'
             '"concerns":[]}\n\nAnalysis:\n'
             f"{excerpt}"
@@ -479,17 +475,23 @@ def _message_text(payload: object) -> str:
     """Return the first choice's message content."""
     if not isinstance(payload, dict):
         raise ProviderCallError(
-            "openrouter", "OpenRouter returned a body that was not a chat completion.", kind="malformed"
+            "openrouter",
+            "OpenRouter returned a body that was not a chat completion.",
+            kind="malformed",
         )
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
         raise ProviderCallError(
-            "openrouter", "OpenRouter returned a body that was not a chat completion.", kind="malformed"
+            "openrouter",
+            "OpenRouter returned a body that was not a chat completion.",
+            kind="malformed",
         )
     message = choices[0].get("message")
     if not isinstance(message, dict):
         raise ProviderCallError(
-            "openrouter", "OpenRouter returned a body that was not a chat completion.", kind="malformed"
+            "openrouter",
+            "OpenRouter returned a body that was not a chat completion.",
+            kind="malformed",
         )
     content = message.get("content")
     if isinstance(content, str) and content.strip():
@@ -503,7 +505,9 @@ def _message_text(payload: object) -> str:
             "The model returned reasoning but not the review JSON.",
             kind="malformed",
         )
-    raise ProviderCallError("openrouter", "OpenRouter returned an empty completion.", kind="malformed")
+    raise ProviderCallError(
+        "openrouter", "OpenRouter returned an empty completion.", kind="malformed"
+    )
 
 
 def _account_restriction(body: str) -> str:

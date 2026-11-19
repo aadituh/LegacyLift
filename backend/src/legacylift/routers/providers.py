@@ -33,7 +33,9 @@ def provider_options(request: Request) -> ProviderOptionsResponse:
         groq_configured=translator.groq.api_key is not None,
         openrouter_configured=translator.openrouter.api_key is not None,
         groq_models=[ProviderModelResponse(id=item.id, name=item.name) for item in groq_models],
-        openrouter_models=[ProviderModelResponse(id=item.id, name=item.name) for item in openrouter_models],
+        openrouter_models=[
+            ProviderModelResponse(id=item.id, name=item.name) for item in openrouter_models
+        ],
         openrouter_requests_per_day=rules.openrouter_requests_per_day,
         openrouter_requests_per_minute=rules.openrouter_requests_per_minute,
         low_budget_fraction=rules.low_budget_fraction,

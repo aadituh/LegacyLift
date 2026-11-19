@@ -261,7 +261,9 @@ def _finding_items(value: object) -> list[dict[str, object]]:
         if not isinstance(item, dict):
             continue
         data = {str(key).lower(): field for key, field in item.items()}
-        detail = data.get("detail") or data.get("description") or data.get("text") or data.get("reason")
+        detail = (
+            data.get("detail") or data.get("description") or data.get("text") or data.get("reason")
+        )
         if not isinstance(detail, str) or not detail.strip():
             continue
         items.append(

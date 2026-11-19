@@ -64,7 +64,9 @@ def _plan(
         openrouter_block=block,
         now=NOW,
     )
-    return f"{plan.providers[0]}|{plan.reason}|{plan.limit_message or ''}|{','.join(plan.providers)}"
+    return (
+        f"{plan.providers[0]}|{plan.reason}|{plan.limit_message or ''}|{','.join(plan.providers)}"
+    )
 
 
 def test_routing_sends_large_estimates_to_gemini():
@@ -151,7 +153,10 @@ def test_manual_choice_overrides_auto():
         now=NOW,
     )
     assert blocked.limit_message is not None
-    assert fallback_chain("groq", groq_configured=True, openrouter_configured=False) == ("groq", "gemini")
+    assert fallback_chain("groq", groq_configured=True, openrouter_configured=False) == (
+        "groq",
+        "gemini",
+    )
 
 
 def test_parse_groq_headers_and_durations():
@@ -166,7 +171,11 @@ def test_parse_groq_headers_and_durations():
         }
     )
     assert parsed.any_present is True
-    assert (parsed.limit_tokens, parsed.remaining_tokens, parsed.reset_tokens) == (18000, 17997, "7.66s")
+    assert (parsed.limit_tokens, parsed.remaining_tokens, parsed.reset_tokens) == (
+        18000,
+        17997,
+        "7.66s",
+    )
     assert parsed.limit_requests == 14400
     assert parsed.remaining_requests == 14370
     assert parse_duration("7.66s") == pytest.approx(7.66)
@@ -302,7 +311,13 @@ def test_openrouter_converts_reasoning_into_review_json():
         if calls["n"] == 1:
             body = {
                 "choices": [
-                    {"message": {"role": "assistant", "content": "", "reasoning": "DISPLAY maps to print."}}
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "",
+                            "reasoning": "DISPLAY maps to print.",
+                        }
+                    }
                 ]
             }
         else:
@@ -320,11 +335,18 @@ def test_openrouter_converts_reasoning_into_review_json():
     assert '"matches"' in response.text
 
 
-def _translator(groq_transport, openrouter_transport, *, groq_key="secret-groq", open_key="secret-open"):
+def _translator(
+    groq_transport, openrouter_transport, *, groq_key="secret-groq", open_key="secret-open"
+):
     rules = RULES
     tracker = GroqUsageTracker()
     groq = GroqProvider(
-        groq_key, timeout=5, rules=rules, tracker=tracker, transport=groq_transport, clock=lambda: NOW
+        groq_key,
+        timeout=5,
+        rules=rules,
+        tracker=tracker,
+        transport=groq_transport,
+        clock=lambda: NOW,
     )
     openrouter = OpenRouterProvider(
         open_key,
@@ -364,7 +386,9 @@ def test_fallback_order_skips_a_timeout_then_a_server_error():
 
     def gemini(request):
         gemini_calls["n"] += 1
-        return TranslationResponse(text=_review_json(), provider="gemini", model="gemini-3.5-flash-lite")
+        return TranslationResponse(
+            text=_review_json(), provider="gemini", model="gemini-3.5-flash-lite"
+        )
 
     first = _translator(groq_down, open_ok).translate(
         TranslationRequest("short", "review"),
@@ -402,7 +426,9 @@ def test_malformed_provider_text_falls_back_and_all_failures_are_named():
         raise AIReviewError("Gemini rejected the AI review request.")
 
     with pytest.raises(AIReviewError, match="Groq") as caught:
-        translator.translate(TranslationRequest("short", "review"), ModelChoice("auto"), gemini=gemini)
+        translator.translate(
+            TranslationRequest("short", "review"), ModelChoice("auto"), gemini=gemini
+        )
     message = str(caught.value)
     assert "OpenRouter" in message
     assert "Gemini" in message
@@ -429,7 +455,9 @@ def test_model_catalog_reuses_a_list_until_the_ttl():
     def transport(request, timeout):
         calls["n"] += 1
         assert "secret-groq" not in request.full_url
-        return HttpResult(200, json.dumps({"data": [{"id": "openai/gpt-oss-20b", "name": "GPT"}]}), {})
+        return HttpResult(
+            200, json.dumps({"data": [{"id": "openai/gpt-oss-20b", "name": "GPT"}]}), {}
+        )
 
     catalog = ModelCatalog(RoutingRules(model_catalog_ttl_seconds=10), transport=transport)
     first, error = catalog.groq_models("secret-groq", 100)

@@ -65,4 +65,10 @@ def format_tokens(count: int) -> str:
 
 
 # Re-export the ratio so callers can name the constant without importing config.
-__all__ = ["CHARS_PER_TOKEN", "OUTPUT_TOKEN_RATIO", "estimate_input_tokens", "estimate_total", "format_tokens"]
+__all__ = [
+    "CHARS_PER_TOKEN",
+    "OUTPUT_TOKEN_RATIO",
+    "estimate_input_tokens",
+    "estimate_total",
+    "format_tokens",
+]

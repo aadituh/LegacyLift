@@ -304,7 +304,9 @@ class Translator:
         return cls(
             gemini=GeminiProvider(settings.gemini_api_key, timeout=timeout, rules=rules),
             groq=GroqProvider(settings.groq_api_key, timeout=timeout, rules=rules, tracker=tracker),
-            openrouter=OpenRouterProvider(settings.openrouter_api_key, timeout=timeout, rules=rules),
+            openrouter=OpenRouterProvider(
+                settings.openrouter_api_key, timeout=timeout, rules=rules
+            ),
             catalog=ModelCatalog(rules),
             rules=rules,
         )
