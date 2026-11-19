@@ -5,6 +5,7 @@ in a sliding window and refuses to send once the configured cap is reached.
 """
 
 import json
+import re
 import threading
 import time
 import urllib.request
@@ -399,13 +400,11 @@ class OpenRouterProvider:
         blocked = self.limiter.acquire(self.clock())
         if blocked is not None:
             raise ProviderCallError("openrouter", blocked, kind="limited")
-        excerpt = reasoning.strip()
-        if len(excerpt) > 800:
-            excerpt = excerpt[-800:]
+        excerpt = _review_facts(reasoning)
         prompt = (
-            "Output only this JSON and nothing else, using integer line numbers: "
+            "Output only JSON "
             '{"matches":[{"cobol_lines":[1],"python_lines":[1],"detail":"text"}],'
-            '"concerns":[]}\n\nAnalysis:\n'
+            '"concerns":[]}. Integer line numbers. Analysis: '
             f"{excerpt}"
         )
         http_request = urllib.request.Request(
@@ -414,7 +413,7 @@ class OpenRouterProvider:
                 {
                     "model": request.openrouter_model,
                     "temperature": 0,
-                    "max_tokens": 4000,
+                    "max_tokens": 3000,
                     "messages": [{"role": "user", "content": prompt}],
                 }
             ).encode(),
@@ -517,6 +516,21 @@ def _message_text(payload: object) -> str:
     raise ProviderCallError(
         "openrouter", "OpenRouter returned an empty completion.", kind="malformed"
     )
+
+
+def _review_facts(reasoning: str) -> str:
+    """Keep conclusion sentences and drop the model's planning monologue."""
+    sentences = re.split(r"(?<=[.!?])\s+", reasoning)
+    useful: list[str] = []
+    for sentence in sentences:
+        text = sentence.strip()
+        lowered = text.lower()
+        if len(text) < 20 or lowered.startswith(("need ", "we need", "must ")):
+            continue
+        if any(word in lowered for word in ("cobol", "python", "line", "concern", "display")):
+            useful.append(text)
+    excerpt = " ".join(useful[-4:]) if useful else reasoning.strip()[-400:]
+    return excerpt[:500]
 
 
 def _account_restriction(body: str) -> str:

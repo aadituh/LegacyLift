@@ -302,6 +302,17 @@ def test_openrouter_does_not_call_http_when_the_window_is_full():
     assert calls["n"] == 0
 
 
+def test_review_facts_drop_the_planning_monologue():
+    from legacylift.providers.openrouter import _review_facts
+
+    text = _review_facts(
+        "We need to compare the sources. Need to be careful. "
+        "COBOL line 9 DISPLAY prints the name. Python line 4 uses print."
+    )
+    assert "Need to" not in text
+    assert "DISPLAY prints the name" in text
+
+
 def test_openrouter_converts_reasoning_into_review_json():
     calls = {"n": 0}
 
