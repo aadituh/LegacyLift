@@ -2,10 +2,21 @@
 import { useState } from "react";
 import { termsInCobol } from "@/lib/cobol-terms";
 import { Button } from "@/components/ui/Button";
-export function CobolTerms({ source }: { source: string }) {
+export function CobolTerms({
+  source,
+  onSelect,
+}: {
+  source: string;
+  onSelect?: (term: string | null) => void;
+}) {
   const found = termsInCobol(source);
   const [open, setOpen] = useState<string | null>(null);
   const selected = found.find((entry) => entry.term === open);
+  function choose(term: string) {
+    const next = open === term ? null : term;
+    setOpen(next);
+    onSelect?.(next);
+  }
   if (!found.length) return null;
   return (
     <div className="cobol-terms">
@@ -17,9 +28,7 @@ export function CobolTerms({ source }: { source: string }) {
             size="sm"
             variant="ghost"
             aria-pressed={open === entry.term}
-            onClick={() =>
-              setOpen((current) => (current === entry.term ? null : entry.term))
-            }
+            onClick={() => choose(entry.term)}
           >
             {entry.term}
           </Button>
