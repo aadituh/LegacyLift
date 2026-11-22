@@ -194,14 +194,76 @@ html[data-theme="dark"] {
 .cobol-terms p {
   margin: 0;
 }
-.cobol-terms-list {
+.cobol-dictionary {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
 }
-.cobol-terms-list .button[aria-pressed="true"] {
-  color: #1d2430;
-  background: #ffe08a;
+.cobol-dictionary-field {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+.cobol-dictionary-field input {
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+  border-right: 0;
+  border-radius: 7px 0 0 7px;
+}
+.cobol-dictionary-field button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  min-height: 45px;
+  flex: none;
+  border: 1px solid #bccbd7;
+  border-radius: 0 7px 7px 0;
+  background: var(--surface);
+  color: var(--text);
+}
+.cobol-dictionary-field input:focus,
+.cobol-dictionary-field input:focus-visible,
+.cobol-dictionary-field button:focus,
+.cobol-dictionary-field button:focus-visible {
+  outline: none;
+}
+.cobol-dictionary-field:focus-within input,
+.cobol-dictionary-field:focus-within button {
+  border-color: var(--accent);
+}
+.cobol-dictionary-menu {
+  margin-top: -4px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid #bccbd7;
+  border-radius: 7px;
+  background: var(--surface);
+}
+.cobol-dictionary-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.cobol-dictionary-menu button:hover,
+.cobol-dictionary-menu button[aria-selected="true"] {
+  background: var(--surface-2);
+  color: var(--accent);
+}
+.cobol-term-count mark {
+  background: rgb(255 196 60 / 32%);
+  color: inherit;
+  font-weight: 750;
+  padding: 0 4px;
+  border-radius: 2px;
 }
 .syntax-editor .cobol-term-mark {
   background: rgb(255 196 60 / 32%);
