@@ -10,6 +10,8 @@ Each entry describes the code at that time. The [backend README](../README.md) d
 - AI review and describe use `gemini-3.5-flash-lite`.
 - `docker compose` passes `LEGACYLIFT_GEMINI_API_KEY` to the API from the root `.env`.
 - `POST /api/projects/demo` and **Load demo project** create `October close`, with the 10 sample bank files.
+- Converter: `DISPLAY` of a group, an OCCURS row, or a whole table becomes a review note. One table element, such as `DISPLAY X(2)`, still converts.
+- Convert: each verification card describes that program's own result. The project result stays at the top of the page.
 
 ### Removed
 

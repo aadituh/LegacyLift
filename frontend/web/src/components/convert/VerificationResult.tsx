@@ -58,10 +58,9 @@ export function VerificationResult({
             <span className="muted">
               {status === "not_verified"
                 ? "Verification is unavailable. No outputs were compared."
-                : verification?.note ||
-                  (status === "verified"
-                    ? "COBOL and Python outputs match."
-                    : "Outputs differed or a program failed.")}
+                : status === "verified"
+                  ? "COBOL and Python outputs match."
+                  : "Outputs differed or a program failed."}
             </span>
           </div>
           {file?.error &&

@@ -325,6 +325,32 @@ PROCEDURE DIVISION.
     assert run_python(draft.python) == "closed\n00010\nopen\n"
 
 
+@pytest.mark.parametrize(
+    ("storage", "item"),
+    [
+        ('01 LINE-OUT.\n   05 A PIC X(2) VALUE "AB".\n   05 B PIC X(2) VALUE "CD".', "LINE-OUT"),
+        ('01 LINE-OUT.\n   05 FILLER PIC X VALUE "*".\n   05 A PIC X(2) VALUE "AB".', "LINE-OUT"),
+        ('01 TBL.\n   05 ROW OCCURS 2 TIMES.\n      10 A PIC X(2) VALUE "AB".', "ROW(1)"),
+        ('01 TBL.\n   05 ROW OCCURS 2 TIMES.\n      10 A PIC X(2) VALUE "AB".', "ROW"),
+        ('01 TBL.\n   05 X OCCURS 2 TIMES PIC X VALUE "A".', "X"),
+    ],
+)
+def test_display_of_a_group_becomes_a_review_note(storage: str, item: str):
+    """DISPLAY of a group or whole table prints its bytes in COBOL; refuse, don't print a dict."""
+    draft = translate_program(program(storage, f"DISPLAY {item}."))
+    assert any(note.endswith(f"DISPLAY {item}") for note in draft.notes)
+    printed = run_python(draft.python)
+    assert "{" not in printed and "[" not in printed
+
+
+def test_display_of_one_table_element_still_converts():
+    draft = translate_program(
+        program('01 TBL.\n   05 X OCCURS 2 TIMES PIC X VALUE "A".', "DISPLAY X(2).")
+    )
+    assert draft.notes == []
+    assert run_python(draft.python) == "A\n"
+
+
 def test_occurs_table_uses_list_with_one_based_indexes():
     """OCCURS becomes a list; COBOL 1-based NAME(I) maps to name[i - 1]."""
     source = """PROGRAM-ID. TABLE1.
