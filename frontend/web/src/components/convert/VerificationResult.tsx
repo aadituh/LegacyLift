@@ -21,6 +21,7 @@ export function VerificationResult({
   level?: 2 | 3;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [differencesOnly, setDifferencesOnly] = useState(false);
   if (!verification && !isVerifying) return null;
   const file = verification?.files.find((f) => f.source_name === fileName);
   const cobol = outputLines(file?.cobol_stdout ?? ""),
@@ -30,11 +31,15 @@ export function VerificationResult({
       { length: count },
       (_, i) => cobol[i] !== python[i],
     ).filter(Boolean).length;
+  const rowIndexes = Array.from({ length: count }, (_, i) => i).filter(
+    (i) => !differencesOnly || cobol[i] !== python[i],
+  );
   const status = verification
     ? verificationStatus(file, verification)
     : "not_verified";
   return (
     <Card
+      className="verification-result"
       title={`Verification for ${fileName}`}
       level={level}
       actions={<ShieldCheck size={21} aria-hidden="true" />}
@@ -70,9 +75,20 @@ export function VerificationResult({
             ))}
           {count > 0 && (
             <>
-              <p className="hint">
-                {differing} of {count} output lines differ
-              </p>
+              <div className="verification-line-tools">
+                <p className="hint">
+                  {differing} of {count} output lines differ
+                </p>
+                {differing > 0 && differing < count && (
+                  <Button
+                    size="sm"
+                    aria-pressed={differencesOnly}
+                    onClick={() => setDifferencesOnly((on) => !on)}
+                  >
+                    {differencesOnly ? "Show all lines" : "Differences only"}
+                  </Button>
+                )}
+              </div>
               <div
                 className="output-table-wrap"
                 tabIndex={0}
@@ -89,9 +105,8 @@ export function VerificationResult({
                     </tr>
                   </thead>
                   <tbody>
-                    {Array.from(
-                      { length: showAll ? count : Math.min(count, 200) },
-                      (_, i) => (
+                    {(showAll ? rowIndexes : rowIndexes.slice(0, 200)).map(
+                      (i) => (
                         <tr
                           key={i}
                           className={cobol[i] !== python[i] ? "diff-row" : ""}
@@ -112,9 +127,11 @@ export function VerificationResult({
                   </tbody>
                 </table>
               </div>
-              {count > 200 && (
+              {rowIndexes.length > 200 && (
                 <Button size="sm" onClick={() => setShowAll(!showAll)}>
-                  {showAll ? "Show first 200 rows" : `Show all ${count} rows`}
+                  {showAll
+                    ? "Show first 200 rows"
+                    : `Show all ${rowIndexes.length} rows`}
                 </Button>
               )}
             </>
