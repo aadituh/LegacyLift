@@ -75,17 +75,16 @@ html[data-theme="dark"] {
 [data-theme="dark"] .auth-layout {
   background: var(--bg);
 }
-[data-theme="dark"] .syntax-editor .cobol-term-mark {
+[data-theme="dark"] .syntax-editor .cobol-term-mark,
+[data-theme="dark"] .cobol-term-count mark {
   background: rgb(255 196 60 / 28%);
-}
-[data-theme="dark"] .cobol-terms-list .button[aria-pressed="true"] {
-  background: #8a6a1a;
-  color: #fff8e6;
 }
 [data-theme="dark"] .auth-card,
 [data-theme="dark"] .code-panel,
 [data-theme="dark"] .button-secondary,
 [data-theme="dark"] input:not([type="file"]),
+[data-theme="dark"] .cobol-dictionary-field button,
+[data-theme="dark"] .cobol-dictionary-menu,
 [data-theme="dark"] select,
 [data-theme="dark"] .skip-link {
   background: var(--surface);
