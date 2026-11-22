@@ -185,6 +185,7 @@ html[data-theme="dark"] {
 [data-theme="dark"] .project-list > li,
 [data-theme="dark"] .download-list li,
 [data-theme="dark"] .report-download,
+[data-theme="dark"] .download-all,
 [data-theme="dark"] .run-list li {
   border-color: var(--border);
 }

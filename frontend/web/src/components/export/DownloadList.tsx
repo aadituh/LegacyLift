@@ -1,5 +1,12 @@
-import { FileCode2, Download, FileSpreadsheet } from "lucide-react";
+import {
+  FileCode2,
+  Download,
+  FileArchive,
+  FileSpreadsheet,
+} from "lucide-react";
 import type { ConvertedFile, VerifyResponse } from "@/types/api";
+import { saveBlob } from "@/lib/download";
+import { zipTextFiles } from "@/lib/zip";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -20,6 +27,14 @@ export function DownloadList({
   onDownloadReport?: () => void;
   onPreview?: (index: number) => void;
 }) {
+  function downloadAll() {
+    saveBlob(
+      zipTextFiles(
+        files.map((file) => ({ name: file.python_name, text: file.python })),
+      ),
+      "python-drafts.zip",
+    );
+  }
   return (
     <Card title="Downloads" actions={<Download size={21} aria-hidden="true" />}>
       {!files.length ? (
@@ -52,6 +67,23 @@ export function DownloadList({
             </li>
           ))}
         </ul>
+      )}
+      {files.length > 1 && (
+        <div className="download-all">
+          <span className="file-icon program">
+            <FileArchive size={22} aria-hidden="true" />
+          </span>
+          <div>
+            <h3>python-drafts.zip</h3>
+            <p className="hint">
+              Every Python file on this page, including local edits.
+            </p>
+          </div>
+          <Button size="sm" onClick={downloadAll}>
+            <Download size={16} aria-hidden="true" />
+            Download .zip<span className="sr-only"> of every Python file</span>
+          </Button>
+        </div>
       )}
       {showReport && (
         <div className="report-download">

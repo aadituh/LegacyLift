@@ -62,8 +62,21 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 15px;
   flex-wrap: wrap;
+}
+.verification-result .notice,
+.verification-result details {
+  margin-top: 16px;
+}
+.verification-line-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.verification-line-tools .hint {
+  margin: 0;
 }
 .output-table-wrap {
   overflow: auto;
@@ -171,7 +184,8 @@
   color: var(--muted);
 }
 .download-list li,
-.report-download {
+.report-download,
+.download-all {
   display: flex;
   align-items: center;
   gap: 15px;
@@ -182,12 +196,14 @@
   border-top: 0;
 }
 .download-list li > div,
-.report-download > div {
+.report-download > div,
+.download-all > div {
   flex: 1;
   min-width: 0;
 }
 .download-list h3,
-.report-download h3 {
+.report-download h3,
+.download-all h3 {
   font: 600 14px var(--font-mono);
   margin-bottom: 5px;
   overflow-wrap: anywhere;
@@ -196,7 +212,8 @@
   background: #f5fafb;
   border-radius: 6px;
 }
-.report-download {
+.report-download,
+.download-all {
   margin-top: 14px;
   padding-top: 22px;
 }
