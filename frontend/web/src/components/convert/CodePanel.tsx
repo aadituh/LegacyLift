@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CodeEditor } from "@/components/ui/CodeEditor";
+import { CobolTerms } from "./CobolTerms";
 export function CodePanel({
   cobol,
   sourceName,
@@ -168,6 +169,7 @@ export function CodePanel({
               </span>
               <span>UTF-8</span>
             </footer>
+            {cobol !== undefined && <CobolTerms source={cobol} />}
           </section>
         )}
         {view !== "cobol" && (
