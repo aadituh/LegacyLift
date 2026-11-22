@@ -17,6 +17,17 @@
 .project-review-flow .card > .hint {
   max-width: 85ch;
 }
+.description-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.description-list li {
+  display: grid;
+  gap: 4px;
+}
 .project-review-flow .review-groups {
   grid-template-columns: minmax(0, 1fr);
 }
