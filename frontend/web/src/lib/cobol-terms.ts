@@ -35,8 +35,18 @@ const terms = [
 
 export type CobolTerm = (typeof terms)[number];
 
+function termExpression(term: string, flags: string) {
+  return new RegExp(`(?<![A-Z0-9-])${term}(?![A-Z0-9-])`, flags);
+}
+
 export function termsInCobol(source: string): CobolTerm[] {
-  return terms.filter((entry) =>
-    new RegExp(`(?<![A-Z0-9-])${entry.term}(?![A-Z0-9-])`, "i").test(source),
+  return terms.filter((entry) => termExpression(entry.term, "i").test(source));
+}
+
+export function termRanges(source: string, term: string) {
+  return [...source.matchAll(termExpression(term, "gi"))].flatMap((match) =>
+    match.index === undefined
+      ? []
+      : [{ from: match.index, to: match.index + match[0].length }],
   );
 }

@@ -8,7 +8,33 @@ import { classHighlighter } from "@lezer/highlight";
 import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import { openSearchPanel } from "@codemirror/search";
+import { termRanges } from "@/lib/cobol-terms";
 const highlightLine = StateEffect.define<number | null>();
+const highlightTerm = StateEffect.define<string | null>();
+const termMarks = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, transaction) {
+    value = value.map(transaction.changes);
+    for (const effect of transaction.effects)
+      if (effect.is(highlightTerm)) {
+        const ranges = effect.value
+          ? termRanges(transaction.state.doc.toString(), effect.value)
+          : [];
+        value = ranges.length
+          ? Decoration.set(
+              ranges.map((range) =>
+                Decoration.mark({ class: "cobol-term-mark" }).range(
+                  range.from,
+                  range.to,
+                ),
+              ),
+            )
+          : Decoration.none;
+      }
+    return value;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
 const sourceHighlight = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(value, transaction) {
@@ -39,6 +65,7 @@ export function CodeEditor({
   focusLine,
   findRequest = 0,
   scrollToFocus = false,
+  markedTerm = null,
 }: {
   value: string;
   language: "cobol" | "python";
@@ -49,6 +76,7 @@ export function CodeEditor({
   focusLine?: { line: number; tick?: number } | null;
   findRequest?: number;
   scrollToFocus?: boolean;
+  markedTerm?: string | null;
 }) {
   const editor = useRef<ReactCodeMirrorRef>(null);
   const extensions = useMemo(
@@ -56,6 +84,7 @@ export function CodeEditor({
       language === "python" ? python() : cobolLanguage,
       syntaxHighlighting(classHighlighter),
       sourceHighlight,
+      termMarks,
       EditorView.contentAttributes.of({
         "aria-label": label,
         "aria-readonly": String(!editable),
@@ -99,6 +128,21 @@ export function CodeEditor({
     if (findRequest && editor.current?.view)
       openSearchPanel(editor.current.view);
   }, [findRequest]);
+  useEffect(() => {
+    const view = editor.current?.view;
+    if (!view) return;
+    const ranges = markedTerm
+      ? termRanges(view.state.doc.toString(), markedTerm)
+      : [];
+    view.dispatch({
+      effects: [
+        highlightTerm.of(markedTerm),
+        ...(ranges[0]
+          ? [EditorView.scrollIntoView(ranges[0].from, { y: "center" })]
+          : []),
+      ],
+    });
+  }, [markedTerm, value]);
   return (
     <CodeMirror
       ref={editor}

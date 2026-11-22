@@ -43,6 +43,7 @@ export function CodePanel({
   const [focused, setFocused] = useState(false);
   const [findSource, setFindSource] = useState(0);
   const [findPython, setFindPython] = useState(0);
+  const [markedTerm, setMarkedTerm] = useState<string | null>(null);
   const workbench = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const update = () =>
@@ -153,6 +154,7 @@ export function CodePanel({
                   focusLine={focusLine}
                   findRequest={findSource}
                   scrollToFocus
+                  markedTerm={markedTerm}
                 />
               </div>
             ) : (
@@ -169,7 +171,13 @@ export function CodePanel({
               </span>
               <span>UTF-8</span>
             </footer>
-            {cobol !== undefined && <CobolTerms source={cobol} />}
+            {cobol !== undefined && (
+              <CobolTerms
+                key={sourceName}
+                source={cobol}
+                onSelect={setMarkedTerm}
+              />
+            )}
           </section>
         )}
         {view !== "cobol" && (
