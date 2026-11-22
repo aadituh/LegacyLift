@@ -3,6 +3,7 @@ import type { SourceFile } from "@/types/api";
 import type { useConversion } from "@/hooks/useConversion";
 import { Button } from "@/components/ui/Button";
 import { DependencyCard } from "./DependencyCard";
+import { DescribeCard } from "./DescribeCard";
 import { VerificationResult } from "./VerificationResult";
 import { AiReviewCard } from "./AiReviewCard";
 import { ReviewNotes } from "./ReviewNotes";
@@ -25,6 +26,7 @@ export function ProjectReview({
   ).find((file) => file.program === source?.name);
   return (
     <div className="project-review-flow">
+      {c.project?.id && <DescribeCard projectId={c.project.id} />}
       <DependencyCard
         fileName={source?.name ?? ""}
         analysis={c.analysis}
