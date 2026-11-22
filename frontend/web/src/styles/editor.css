@@ -184,6 +184,21 @@ html[data-theme="dark"] {
 .source-code-region {
   min-width: 0;
 }
+.cobol-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px 16px;
+}
+.cobol-terms .hint,
+.cobol-terms p {
+  margin: 0;
+}
+.cobol-terms-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .code-panel > .syntax-editor,
 .source-code-region {
   flex: 1;
