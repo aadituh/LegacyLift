@@ -10,9 +10,9 @@ Convert up to five COBOL programs without creating a project.
 ## Steps
 1. Click **Batch conversion** in the main navigation.
 2. Click **Choose COBOL files** and select your files. To try the page without files, click **Load small sample**.
-3. Check that the file names appear under the buttons.
+3. Check that the file names appear in the list on the left.
 4. Click **Convert files**.
-5. Select a program in the file tabs to see its COBOL beside the Python draft.
+5. Select a program in that list to see its COBOL beside the Python draft.
 6. Read **Lines to review**. Each entry is a COBOL line the converter did not translate.
 7. Under **Downloads**, click **Download .py** for each program you want to keep.
 

@@ -9,23 +9,8 @@ export function FileTabs({
   onSelect: (index: number) => void;
 }) {
   if (!labels.length) return null;
-  return labels.length > 8 ? (
-    <div className="field">
-      <label htmlFor="selected-file">Selected program</label>
-      <select
-        id="selected-file"
-        value={selectedIndex}
-        onChange={(e) => onSelect(Number(e.target.value))}
-      >
-        {labels.map((f, i) => (
-          <option key={f.name} value={i}>
-            {f.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  ) : (
-    <div className="file-tabs" role="group" aria-label="Select a program">
+  return (
+    <nav className="file-sidebar" aria-label="Programs">
       {labels.map((f, i) => (
         <button
           key={f.name}
@@ -38,6 +23,6 @@ export function FileTabs({
           <span>{f.name}</span>
         </button>
       ))}
-    </div>
+    </nav>
   );
 }

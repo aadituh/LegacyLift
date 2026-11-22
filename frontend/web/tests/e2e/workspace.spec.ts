@@ -634,10 +634,10 @@ test("wide syntax editors support search, wrapping, focus mode and keyboard esca
   const editor = page.getByLabel("Edit BANKMAIN.py", { exact: true });
   await expect(editor).toBeVisible();
   const code = page.locator(".code-workbench");
-  expect((await code.boundingBox())!.width).toBeGreaterThan(1700);
+  expect((await code.boundingBox())!.width).toBeGreaterThan(1500);
   expect(
     (await page.locator(".python-panel").boundingBox())!.width,
-  ).toBeGreaterThan(800);
+  ).toBeGreaterThan(720);
   await expect(
     page.locator(".source-code-region .tok-keyword").first(),
   ).toBeVisible();

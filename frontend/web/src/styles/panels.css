@@ -135,38 +135,6 @@
   margin-top: -13px;
   font-size: 14px;
 }
-.file-tabs {
-  display: flex;
-  gap: 5px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  padding: 0 0 1px;
-  margin-bottom: -24px;
-}
-.file-tabs button {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid transparent;
-  background: transparent;
-  padding: 13px 19px;
-  color: #536e81;
-  min-width: 0;
-  max-width: 260px;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-.file-tabs button > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.file-tabs button[aria-pressed="true"] {
-  color: #0c6975;
-  border-bottom: 2px solid var(--accent);
-  background: #eaf4f6;
-  border-radius: 7px 7px 0 0;
-}
 .code-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

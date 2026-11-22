@@ -63,46 +63,50 @@ export function BatchScreen() {
             sample.
           </p>
         )}
-        {b.batchFiles.length > 0 && (
-          <p className="hint">{b.batchFiles.map((f) => f.name).join(" · ")}</p>
-        )}
       </Card>
       {b.busy === "batch-converting" && <ConversionProgress />}
-      <FileTabs
-        labels={b.batchFiles.map((f) => ({ name: f.name }))}
-        selectedIndex={b.batchIndex}
-        onSelect={b.select}
-      />
-      <CodePanel
-        cobol={b.batchSources[b.batchIndex]}
-        python={current?.python}
-        pythonName={current?.python_name}
-        status={current ? "Draft" : undefined}
-        edited={Boolean(
-          current && current.python !== b.batchOriginal[current.python_name],
+      <div className={b.batchFiles.length ? "convert-files" : undefined}>
+        {b.batchFiles.length > 0 && (
+          <FileTabs
+            labels={b.batchFiles.map((f) => ({ name: f.name }))}
+            selectedIndex={b.batchIndex}
+            onSelect={b.select}
+          />
         )}
-        onEditPython={b.editPython}
-        emptyCobolText="Choose COBOL files or load a sample."
-      />
-      {current?.notes.length ? (
-        <Card title="Lines to review">
-          <ul
-            className="review-notes"
-            tabIndex={0}
-            aria-label="Lines to review"
-          >
-            {current.notes.map((n, i) => (
-              <li key={i}>{n}</li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
-      <DownloadList
-        files={b.batchResults}
-        selectedIndex={b.batchIndex}
-        showReport={false}
-        onDownloadPython={b.downloadPython}
-      />
+        <div className="convert-file-main">
+          <CodePanel
+            cobol={b.batchSources[b.batchIndex]}
+            python={current?.python}
+            pythonName={current?.python_name}
+            status={current ? "Draft" : undefined}
+            edited={Boolean(
+              current &&
+              current.python !== b.batchOriginal[current.python_name],
+            )}
+            onEditPython={b.editPython}
+            emptyCobolText="Choose COBOL files or load a sample."
+          />
+          {current?.notes.length ? (
+            <Card title="Lines to review">
+              <ul
+                className="review-notes"
+                tabIndex={0}
+                aria-label="Lines to review"
+              >
+                {current.notes.map((n, i) => (
+                  <li key={i}>{n}</li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+          <DownloadList
+            files={b.batchResults}
+            selectedIndex={b.batchIndex}
+            showReport={false}
+            onDownloadPython={b.downloadPython}
+          />
+        </div>
+      </div>
       <p className="notice">
         <Info size={18} aria-hidden="true" />
         <span>

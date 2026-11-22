@@ -183,55 +183,60 @@ export function ConvertScreen() {
             />
           ) : (
             <>
-              <FileTabs
-                labels={
-                  c.results.length
-                    ? c.results.map((f) => ({ name: f.source_name }))
-                    : p.programs.map((f) => ({ name: f.name }))
-                }
-                selectedIndex={c.selectedIndex}
-                onSelect={c.select}
-              />
-              <CodePanel
-                sourceName={source?.name}
-                focusLine={
-                  focusLine?.sourceKey === `${projectId}:${source?.name}`
-                    ? focusLine
-                    : null
-                }
-                cobol={source?.content}
-                python={current?.python}
-                pythonName={current?.python_name}
-                status={
-                  current
-                    ? formatRunStatus(
-                        current.notes.length ? "review_required" : "draft",
-                      )
-                    : undefined
-                }
-                edited={c.selectedEdited}
-                onEditPython={c.editPython}
-                view={view}
-              />
-              <div className="file-review-summary">
-                <span>
-                  {source?.name}{" "}
-                  {current
-                    ? `· ${current.notes.length} statements flagged for review`
-                    : "· original source"}
-                </span>
-                {current && (
-                  <a href="#review-findings">
-                    Review this file <ArrowRight size={14} aria-hidden="true" />
-                  </a>
-                )}
+              <div className="convert-files">
+                <FileTabs
+                  labels={
+                    c.results.length
+                      ? c.results.map((f) => ({ name: f.source_name }))
+                      : p.programs.map((f) => ({ name: f.name }))
+                  }
+                  selectedIndex={c.selectedIndex}
+                  onSelect={c.select}
+                />
+                <div className="convert-file-main">
+                  <CodePanel
+                    sourceName={source?.name}
+                    focusLine={
+                      focusLine?.sourceKey === `${projectId}:${source?.name}`
+                        ? focusLine
+                        : null
+                    }
+                    cobol={source?.content}
+                    python={current?.python}
+                    pythonName={current?.python_name}
+                    status={
+                      current
+                        ? formatRunStatus(
+                            current.notes.length ? "review_required" : "draft",
+                          )
+                        : undefined
+                    }
+                    edited={c.selectedEdited}
+                    onEditPython={c.editPython}
+                    view={view}
+                  />
+                  <div className="file-review-summary">
+                    <span>
+                      {source?.name}{" "}
+                      {current
+                        ? `· ${current.notes.length} statements flagged for review`
+                        : "· original source"}
+                    </span>
+                    {current && (
+                      <a href="#review-findings">
+                        Review this file{" "}
+                        <ArrowRight size={14} aria-hidden="true" />
+                      </a>
+                    )}
+                  </div>
+                  <ProjectReview
+                    conversion={c}
+                    source={source}
+                    files={p.project.files}
+                    onJumpLine={jumpLine}
+                  />
+                </div>
               </div>
-              <ProjectReview
-                conversion={c}
-                source={source}
-                files={p.project.files}
-                onJumpLine={jumpLine}
-              />
             </>
           )}
         </>

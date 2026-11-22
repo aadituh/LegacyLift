@@ -10,7 +10,7 @@ Check that each Python draft prints the same output as its COBOL program.
 ## Steps
 1. Open the project and go to **Convert**.
 2. Click **Convert project**. Verification starts when the conversion finishes; the status line reads "Comparing COBOL and Python outputs."
-3. Select a program in the file tabs.
+3. Select a program in the list on the left.
 4. Scroll to **Verification for** *program name* and read the status: **Verified**, **Mismatch**, or **Not compared**.
 5. For a mismatch, read the line under the status, such as "3 of 12 output lines differ", and the output table.
 6. To see every program on one page, set **Code view** to **Audit report**.
