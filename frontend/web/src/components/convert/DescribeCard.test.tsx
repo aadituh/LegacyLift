@@ -28,7 +28,9 @@ it("shows each program summary and the missing-key error", async () => {
   expect(
     await screen.findByText("Closes October and prints the ledger totals."),
   ).toBeTruthy();
-  expect(screen.getByText("MONTHEND copies the fee sheet FEERATES.")).toBeTruthy();
+  expect(
+    screen.getByText("MONTHEND copies the fee sheet FEERATES."),
+  ).toBeTruthy();
   vi.mocked(describeProject).mockRejectedValueOnce(
     new Error("Set LEGACYLIFT_GEMINI_API_KEY before describing a project."),
   );
