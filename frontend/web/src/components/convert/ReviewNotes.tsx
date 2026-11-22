@@ -19,7 +19,7 @@ export function ReviewNotes({
   notes: string[];
   source?: SourceFile;
   files: SourceFile[];
-  onJumpLine: (line: number) => void;
+  onJumpLine: (line: number, converterLine?: number | null) => void;
 }) {
   const locate = useMemo(
     () => (source ? buildSourceLocations(source, files) : () => null),
@@ -72,7 +72,7 @@ export function ReviewNotes({
                               size="sm"
                               onClick={() => {
                                 if (location.file.id === source?.id)
-                                  onJumpLine(location.line);
+                                  onJumpLine(location.line, note.line);
                                 else {
                                   setPreview(location);
                                   dialog.current?.showModal();

@@ -25,6 +25,7 @@ export function CodePanel({
   emptyCobolText = "Upload programs to a project.",
   view = "both",
   focusLine,
+  pythonFocusLine,
 }: {
   cobol?: string;
   sourceName?: string;
@@ -36,6 +37,7 @@ export function CodePanel({
   emptyCobolText?: string;
   view?: "both" | "cobol" | "python";
   focusLine?: { line: number; tick: number } | null;
+  pythonFocusLine?: { line: number; tick: number } | null;
 }) {
   const [copied, setCopied] = useState("");
   const [message, setMessage] = useState("");
@@ -232,6 +234,7 @@ export function CodePanel({
                 language="python"
                 editable
                 wrap={wrap}
+                focusLine={pythonFocusLine}
                 findRequest={findPython}
                 onChange={(text) => {
                   setCopied("");

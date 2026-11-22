@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupReviewNotes } from "./review-notes";
+import { groupReviewNotes, pythonTodoLine } from "./review-notes";
 describe("source review guidance", () => {
   it("groups formatting and file handling without dropping unknown statements", () => {
     const notes = [
@@ -24,6 +24,17 @@ describe("source review guidance", () => {
     ).toEqual([...notes].sort());
     expect(groups[0].notes[0].line).toBe(73);
     expect(groups[3].notes[0].line).toBeNull();
+  });
+  it("finds the Python comment for a converter line", () => {
+    const python = [
+      "def main():",
+      "    # TODO: COBOL line 12: OPEN INPUT ACCOUNT-FILE",
+      "    return",
+      "    # TODO: COBOL line 120: DISPLAY TOTAL",
+    ].join("\n");
+    expect(pythonTodoLine(python, 12)).toBe(2);
+    expect(pythonTodoLine(python, 120)).toBe(4);
+    expect(pythonTodoLine(python, 13)).toBeNull();
   });
   it("does not infer a source location from numbers inside a diagnostic", () => {
     expect(

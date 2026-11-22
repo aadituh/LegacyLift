@@ -27,6 +27,7 @@ import { ConversionProgress } from "./ConversionProgress";
 import { ModelSelector } from "./ModelSelector";
 import { AuditReport } from "./AuditReport";
 import { formatRunStatus } from "@/lib/format";
+import { pythonTodoLine } from "@/lib/review-notes";
 import { ReadingGuide } from "@/components/guide/ReadingGuide";
 type View = "both" | "cobol" | "python" | "report";
 export function ConvertScreen() {
@@ -36,13 +37,17 @@ export function ConvertScreen() {
   const [view, setView] = useState<View>("both");
   const [focusLine, setFocusLine] = useState<{
     line: number;
+    pythonLine: number | null;
     tick: number;
     sourceKey: string;
   } | null>(null);
-  function jumpLine(line: number) {
+  function jumpLine(line: number, converterLine?: number | null) {
     setView("both");
+    const python = c.results[c.selectedIndex]?.python;
     setFocusLine((previous) => ({
       line,
+      pythonLine:
+        converterLine && python ? pythonTodoLine(python, converterLine) : null,
       tick: (previous?.tick ?? 0) + 1,
       sourceKey: `${projectId}:${source?.name}`,
     }));
@@ -199,6 +204,12 @@ export function ConvertScreen() {
                     focusLine={
                       focusLine?.sourceKey === `${projectId}:${source?.name}`
                         ? focusLine
+                        : null
+                    }
+                    pythonFocusLine={
+                      focusLine?.sourceKey === `${projectId}:${source?.name}` &&
+                      focusLine.pythonLine
+                        ? { line: focusLine.pythonLine, tick: focusLine.tick }
                         : null
                     }
                     cobol={source?.content}

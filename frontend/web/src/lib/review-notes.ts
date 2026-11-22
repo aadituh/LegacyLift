@@ -18,6 +18,11 @@ export const reviewCategories = {
       "Inspect these statements and confirm their behavior in the Python draft.",
   },
 };
+export function pythonTodoLine(python: string, converterLine: number) {
+  const mark = `# TODO: COBOL line ${converterLine}:`;
+  const index = python.split(/\r?\n/).findIndex((line) => line.includes(mark));
+  return index < 0 ? null : index + 1;
+}
 export function groupReviewNotes(notes: string[]) {
   return Object.entries(reviewCategories)
     .map(([key, category]) => ({

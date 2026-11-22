@@ -17,7 +17,7 @@ export function ProjectReview({
   conversion: ReturnType<typeof useConversion>;
   source?: SourceFile;
   files: SourceFile[];
-  onJumpLine: (line: number) => void;
+  onJumpLine: (line: number, converterLine?: number | null) => void;
 }) {
   const current = c.results[c.selectedIndex];
   const called = calledProgramReports(
