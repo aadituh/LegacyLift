@@ -159,17 +159,20 @@
     margin-left: 0;
   }
   .download-list li,
-  .report-download {
+  .report-download,
+  .download-all {
     flex-wrap: wrap;
     padding-inline: 0;
     gap: 11px;
   }
   .download-list li > div,
-  .report-download > div {
+  .report-download > div,
+  .download-all > div {
     flex-basis: calc(100% - 55px);
   }
   .download-list .button,
-  .report-download .button {
+  .report-download .button,
+  .download-all .button {
     width: 100%;
   }
   .run-list li {

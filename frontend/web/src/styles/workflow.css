@@ -241,13 +241,15 @@
   padding: 20px;
 }
 .export-layout .download-list li,
-.export-layout .report-download {
+.export-layout .report-download,
+.export-layout .download-all {
   flex-wrap: wrap;
   padding-inline: 0;
   gap: 10px;
 }
 .export-layout .download-list li > div,
-.export-layout .report-download > div {
+.export-layout .report-download > div,
+.export-layout .download-all > div {
   flex-basis: calc(100% - 55px);
 }
 .export-layout .download-list .button {
