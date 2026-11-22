@@ -20,7 +20,8 @@ Supported (WORKING-STORAGE, LINKAGE, and PROCEDURE DIVISION)
 
 **Procedure**
 
-- ``DISPLAY`` with ``display_number`` / ``cobol_text`` padding (GnuCOBOL),
+- ``DISPLAY`` with ``display_number`` / ``cobol_text`` padding (GnuCOBOL);
+  a whole group or table is a review note,
   ``MOVE``/``ADD``/``SUBTRACT``, ``MULTIPLY``/``DIVIDE``,
   ``COMPUTE [ROUNDED]``
 - Paragraphs → nested (or callee) functions; ``PERFORM name`` / ``THRU``
@@ -260,6 +261,10 @@ class FieldModel:
         init_lines: Python assignments for WORKING-STORAGE.
         linkage_params: Ordered LINKAGE / USING parameter COBOL names.
         scalar_vars: Python names that need ``nonlocal`` in nested paragraphs.
+        record_names: Groups and OCCURS groups, held as a dict or a list of
+            dicts, with or without a subscript.
+        table_names: Elementary OCCURS fields, held as a list when used
+            without a subscript.
     """
 
     fields: dict[str, Value] = field(default_factory=dict)
@@ -273,6 +278,8 @@ class FieldModel:
     init_lines: list[str] = field(default_factory=list)
     linkage_params: list[str] = field(default_factory=list)
     scalar_vars: list[str] = field(default_factory=list)
+    record_names: set[str] = field(default_factory=set)
+    table_names: set[str] = field(default_factory=set)
     notes: list[str] = field(default_factory=list)
     todos: list[str] = field(default_factory=list)
 
@@ -892,6 +899,7 @@ def build_field_model(
             if section == "storage":
                 model.init_lines.append(f"{py} = [{default} for _ in range({n})]")
                 model.scalar_vars.append(py)
+            model.table_names.add(cobol_name.upper())
             model.fields[cobol_name.upper()] = _value_for_field(
                 py,
                 is_number=is_number,
@@ -1052,6 +1060,7 @@ def _emit_group(
     """Emit init / register a finished group or OCCURS table."""
     name = pending.cobol_name
     py = pending.py_name
+    model.record_names.add(name)
     if pending.occurs is not None:
         record = _record_default_dict(pending.children)
         if pending.section == "storage":
@@ -1196,13 +1205,31 @@ def translate_multiply_divide(line: str, model: FieldModel) -> str | None:
 
 
 def translate_display(items_text: str, model: FieldModel) -> str | None:
-    """Translate the items after ``DISPLAY`` into a ``print`` call."""
+    """Translate the items after ``DISPLAY`` into a ``print`` call.
+
+    Args:
+        items_text: Everything after ``DISPLAY``, such as ``"TOTAL: " WS-TOTAL``.
+        model: Fields known in this program.
+
+    Returns:
+        A ``print(...)`` call, or ``None`` when an item can't be printed
+        exactly. A group or a whole table is ``None``: COBOL prints its
+        bytes in storage order, and the Python dict or list doesn't keep
+        that layout.
+
+    Example:
+        >>> translate_display('"HI"', FieldModel())
+        "print('HI', sep='')"
+    """
     items_text = items_text.strip()
     items = DISPLAY_ITEM.findall(items_text)
     if not items or DISPLAY_ITEM.sub("", items_text).strip():
         return None
     codes = []
     for item in items:
+        base = item.split("(", 1)[0].strip().upper()
+        if base in model.record_names or item.strip().upper() in model.table_names:
+            return None
         value = translate_value(item, model)
         if value is None:
             return None
