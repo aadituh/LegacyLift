@@ -39,33 +39,35 @@ export function ProjectDescription({ projectId }: { projectId: string }) {
               <X size={18} aria-hidden="true" />
             </Button>
           </header>
-          <p className="hint">
-            A short description of each program and the files they share. Auto
-            mode writes it: Groq for a smaller description, and Gemini
-            (gemini-3.5-flash-lite) for a larger one. This does not change the
-            conversion.
-          </p>
-          <Button onClick={() => void describe()} isPending={busy}>
-            {busy ? "Describing…" : "Describe project"}
-          </Button>
-          {error && (
-            <p className="notice danger" role="alert">
-              {error}
+          <div className="project-description-body">
+            <p className="hint">
+              A short description of each program and the files they share. Auto
+              mode writes it: Groq for a smaller description, and Gemini
+              (gemini-3.5-flash-lite) for a larger one. This does not change the
+              conversion.
             </p>
-          )}
-          {result && (
-            <>
-              <ul className="description-list">
-                {result.programs.map((program) => (
-                  <li key={program.name}>
-                    <strong>{program.name}</strong>
-                    <span>{program.summary}</span>
-                  </li>
-                ))}
-              </ul>
-              {result.shared_data && <p>{result.shared_data}</p>}
-            </>
-          )}
+            <Button onClick={() => void describe()} isPending={busy}>
+              {busy ? "Describing…" : "Describe project"}
+            </Button>
+            {error && (
+              <p className="notice danger" role="alert">
+                {error}
+              </p>
+            )}
+            {result && (
+              <>
+                <ul className="description-list">
+                  {result.programs.map((program) => (
+                    <li key={program.name}>
+                      <strong>{program.name}</strong>
+                      <span>{program.summary}</span>
+                    </li>
+                  ))}
+                </ul>
+                {result.shared_data && <p>{result.shared_data}</p>}
+              </>
+            )}
+          </div>
         </section>
       ) : (
         <button
