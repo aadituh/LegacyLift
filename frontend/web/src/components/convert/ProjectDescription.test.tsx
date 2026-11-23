@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { DescribeCard } from "./DescribeCard";
+import { ProjectDescription } from "./ProjectDescription";
 
 vi.mock("@/lib/api/projects", () => ({
   describeProject: vi.fn(),
@@ -23,7 +23,11 @@ it("shows each program summary and the missing-key error", async () => {
     ],
     shared_data: "MONTHEND copies the fee sheet FEERATES.",
   });
-  const view = render(<DescribeCard projectId="1" />);
+  const view = render(<ProjectDescription projectId="1" />);
+  fireEvent.click(
+    screen.getByRole("button", { name: "What this project does" }),
+  );
+  expect(screen.getByText(/gemini-3.5-flash-lite/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Describe project" }));
   expect(
     await screen.findByText("Closes October and prints the ledger totals."),
@@ -34,7 +38,7 @@ it("shows each program summary and the missing-key error", async () => {
   vi.mocked(describeProject).mockRejectedValueOnce(
     new Error("Set LEGACYLIFT_GEMINI_API_KEY before describing a project."),
   );
-  view.rerender(<DescribeCard projectId="1" />);
+  view.rerender(<ProjectDescription projectId="1" />);
   fireEvent.click(screen.getByRole("button", { name: "Describe project" }));
   expect((await screen.findByRole("alert")).textContent).toContain(
     "Set LEGACYLIFT_GEMINI_API_KEY before describing a project.",
