@@ -110,6 +110,13 @@
 .manual-article li > p {
   margin-top: 0.35em;
 }
+.manual-article img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
 .manual-article a {
   color: var(--accent-hover);
   overflow-wrap: anywhere;

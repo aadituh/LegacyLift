@@ -20,4 +20,6 @@ The built app has no separate Analyze screen. The dependency map is a section of
 * Choosing a connection jumps to that line in the COBOL source.
 * Unresolved names stay on the card when a target is missing from the project.
 
-Figure 1. Dependencies for BANKMAIN on the Convert page. To be added when this screen is finalized for the manual.
+![Dependencies for BANKMAIN on the Convert page](images/analyze-dependencies.png)
+
+*Figure 1. Dependencies for BANKMAIN on the Convert page.*

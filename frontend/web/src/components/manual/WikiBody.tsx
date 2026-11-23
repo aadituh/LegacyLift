@@ -86,7 +86,7 @@ function renderToken(token: Token, key: string): ReactNode {
       return (
         // Wiki pages are the manual text; keep their images when a page has one.
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={key} src={token.href} alt={token.text} />
+        <img key={key} src={manualImageSrc(token.href)} alt={token.text} />
       );
     default:
       return null;
@@ -148,6 +148,14 @@ function renderTable(token: Tokens.Table, key: string): ReactNode {
       </table>
     </div>
   );
+}
+
+/** Wiki pictures live in `wiki/images`. The manual serves the same files from `public/manual-images`. */
+function manualImageSrc(href: string): string {
+  const name = href.match(/^images\/([A-Za-z0-9._-]+)$/)?.[1];
+  if (!name) return href;
+  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  return `${base}/manual-images/${name}`;
 }
 
 function renderLink(token: Tokens.Link, key: string): ReactNode {

@@ -38,6 +38,17 @@ it("turns wiki links into manual links and leaves fenced code unchanged", () => 
   expect(linked).toContain("```\n[[Home]]\n```");
 });
 
+it("shows a wiki figure from the manual image folder", () => {
+  render(<WikiBody markdown={wikiPage("Analyze-Page")!.markdown} />);
+  expect(
+    screen
+      .getByRole("img", {
+        name: "Dependencies for BANKMAIN on the Convert page",
+      })
+      .getAttribute("src"),
+  ).toBe("/manual-images/analyze-dependencies.png");
+});
+
 it("renders every wiki page without dropping its text", () => {
   for (const page of wikiCatalog().pages.values()) {
     const view = render(<WikiBody markdown={page.markdown} />);
