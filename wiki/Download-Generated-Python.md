@@ -17,4 +17,6 @@ Generated Python is a draft for human review before production use.
 * **Download .csv** stays off until the project has been verified. The CSV describes the saved draft, not unsaved edits.
 * Batch conversion does not use this download list.
 
-Figure 1. The Downloads card with **Download .py** and **Download .csv**. To be added when this screen is finalized for the manual.
+![The Downloads card with Download .py and Download .csv](images/downloads-card.png)
+
+*Figure 1. The Downloads card with Download .py and Download .csv.*

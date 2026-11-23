@@ -25,6 +25,10 @@ Convert opens at `/convert?project=`.
 * The verification result for the selected program, plus **Run verification again**. Verification compares the saved draft, not unsaved edits.
 * The audit report view says **Convert this project before viewing the report** when there is no conversion yet.
 
-Figure 1. Convert, Side by side, with a program selected. To be added when this screen is finalized for the manual.
+![Convert, Side by side, with BANKMAIN selected](images/convert-side-by-side.png)
 
-Figure 2. The Audit report view. To be added when this screen is finalized for the manual.
+*Figure 1. Convert, Side by side, with a program selected.*
+
+![The Audit report view for the October close project](images/convert-audit-report.png)
+
+*Figure 2. The Audit report view.*

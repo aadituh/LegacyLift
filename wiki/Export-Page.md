@@ -29,6 +29,8 @@ Export opens at `/export?project=`.
 * **Preview before downloading**, switched among **Python**, **Original COBOL**, and **Audit report**.
 * **Run history** for analyze, convert, verify, and AI review, with status and time.
 
-Figure 1. Export with a Python file selected. To be added when this screen is finalized for the manual.
+![Preview of BANKMAIN.py before downloading](images/export-python.png)
 
-Figure 2. The Audit report preview. To be added when this screen is finalized for the manual.
+*Figure 1. Export with a Python file selected.*
+
+The **Audit report** switch in that preview shows the same report as Figure 2 on the [[Convert Page|Convert-Page]].
