@@ -29,6 +29,8 @@ services:
       # No value: Compose passes it from the root .env or the shell, if it is set.
       LEGACYLIFT_GEMINI_API_KEY:
       LEGACYLIFT_TOKEN_SECRET:
+      LEGACYLIFT_GROQ_API_KEY:
+      LEGACYLIFT_OPENROUTER_API_KEY:
     ports:
       - "8000:8000"
     networks: [default, runner]
