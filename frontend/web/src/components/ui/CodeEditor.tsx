@@ -79,6 +79,7 @@ export function CodeEditor({
   markedTerm?: string | null;
 }) {
   const editor = useRef<ReactCodeMirrorRef>(null);
+  const revealedTick = useRef<number | undefined>(undefined);
   const extensions = useMemo(
     () => [
       language === "python" ? python() : cobolLanguage,
@@ -121,8 +122,16 @@ export function CodeEditor({
   useEffect(() => {
     const view = editor.current?.view;
     if (!view) return;
-    if (focusLine) reveal(view);
-    else view.dispatch({ effects: highlightLine.of(null) });
+    if (!focusLine) {
+      revealedTick.current = undefined;
+      view.dispatch({ effects: highlightLine.of(null) });
+      return;
+    }
+    if (focusLine.tick !== undefined && revealedTick.current === focusLine.tick)
+      return;
+    if (focusLine.line < 1 || focusLine.line > view.state.doc.lines) return;
+    reveal(view);
+    revealedTick.current = focusLine.tick;
   }, [focusLine, value, reveal]);
   useEffect(() => {
     if (findRequest && editor.current?.view)

@@ -590,7 +590,12 @@ test("visual dependencies, review guidance, persistent dark mode and mobile prev
     .getByRole("button", { name: /View source line/ })
     .first()
     .click();
-  await expect(page.locator(".focused-line")).toContainText("PIC");
+  await expect(
+    page.getByLabel("Read original COBOL").locator(".focused-line"),
+  ).toContainText("PIC");
+  await expect(
+    page.getByLabel("Edit BANKMAIN.py").locator(".focused-line"),
+  ).toContainText("TODO: COBOL line");
   await accessible(page);
   await screenshot(page, "convert-dark");
   await page.getByRole("link", { name: "Go to Export", exact: true }).click();
