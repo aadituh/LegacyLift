@@ -29,6 +29,7 @@ import { AuditReport } from "./AuditReport";
 import { formatRunStatus } from "@/lib/format";
 import { pythonTodoLine } from "@/lib/review-notes";
 import { ReadingGuide } from "@/components/guide/ReadingGuide";
+import { ProjectDescription } from "./ProjectDescription";
 type View = "both" | "cobol" | "python" | "report";
 export function ConvertScreen() {
   const projectId = useSearchParams().get("project") ?? "";
@@ -256,6 +257,7 @@ export function ConvertScreen() {
         Supports fields, groups, OCCURS, IF / EVALUATE, PERFORM, CALL, and COPY.
         Unsupported statements stay visible as review notes.
       </p>
+      <ProjectDescription projectId={p.project.id} />
     </div>
   );
 }
